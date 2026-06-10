@@ -1,0 +1,9 @@
+{
+  "title": "Design Patterns & Principles",
+  "pages": [
+    "solid-principles",
+    "creational-patterns",
+    "structural-patterns",
+    "behavioral-patterns"
+  ]
+}

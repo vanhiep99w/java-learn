@@ -1,0 +1,7 @@
+{
+  "title": "Serialization",
+  "pages": [
+    "java-serialization",
+    "protobuf-avro"
+  ]
+}
