@@ -16,3 +16,6 @@ src/content/docs/
 __pycache__/
 .next/
 .source/
+
+# Next.js
+next-env.d.ts
