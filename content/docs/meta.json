@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "fundamentals",
+    "modern-java",
+    "jvm",
+    "collections",
+    "concurrency",
+    "serialization",
+    "design-patterns",
+    "spring",
+    "io-network"
+  ]
+}

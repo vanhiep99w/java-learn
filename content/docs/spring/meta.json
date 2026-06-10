@@ -1,0 +1,10 @@
+{
+  "title": "Spring Ecosystem",
+  "pages": [
+    "spring-overview",
+    "bean-lifecycle",
+    "spring-security",
+    "connection-pool",
+    "kafka-spring-boot"
+  ]
+}

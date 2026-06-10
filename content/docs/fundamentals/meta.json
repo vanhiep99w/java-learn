@@ -1,0 +1,17 @@
+{
+  "title": "Java Core & OOP",
+  "pages": [
+    "oop-4-tinh-chat",
+    "equals-hashcode",
+    "access-modifier",
+    "heap-vs-stack",
+    "string-immutability",
+    "exception-handling",
+    "generics",
+    "functional-interface",
+    "annotation",
+    "autoboxing-unboxing",
+    "final-keyword",
+    "comparable-vs-comparator"
+  ]
+}
