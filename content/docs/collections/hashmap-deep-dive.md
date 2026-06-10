@@ -304,20 +304,20 @@ sequenceDiagram
     participant M as HashMap
     C->>M: put(key, value)
     M->>M: hash = hash(key)
-    M->>M: nếu table == null → resize() (lazy init)
-    M->>M: i = (n-1) & hash
-    alt bucket[i] rỗng
-        M->>M: tạo Node mới đặt vào bucket[i]
+    M->>M: nếu table rỗng thì resize (lazy init)
+    M->>M: tính index i từ hash
+    alt bucket rỗng
+        M->>M: tạo Node mới đặt vào bucket
     else có node
         M->>M: duyệt chain/tree, so hash rồi equals
         alt tìm thấy key trùng
             M->>M: ghi đè value (trả về old value)
         else không thấy
             M->>M: thêm node vào cuối chain
-            M->>M: nếu chain >= 8 → treeifyBin()
+            M->>M: nếu chain đạt 8 thì treeifyBin
         end
     end
-    M->>M: ++size; nếu size > threshold → resize()
+    M->>M: tăng size, nếu vượt threshold thì resize
     M-->>C: trả về previous value (hoặc null)
 ```
 
