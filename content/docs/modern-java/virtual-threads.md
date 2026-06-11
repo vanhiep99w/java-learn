@@ -98,7 +98,7 @@ Virtual Thread = lightweight, JVM-managed, multiplexed trên carrier threads
 └────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘
      │             │             │                  │
      └─────────────┼─────────────┘                  │
-                 ▼                               │
+                   ▼                                │
          ┌───────────────────┐                      │
          │  Carrier Thread   │ (= platform thread)  │
          │  (ForkJoinPool)   │ ◄────────────────────┘
