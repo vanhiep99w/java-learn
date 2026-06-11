@@ -347,6 +347,26 @@ Map<String, Object> earlySingletonObjects     = new HashMap<>(16);            //
 Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);         // 3rd: factory
 ```
 
+**Tại sao 3 level? Sao không 2?**
+
+Level 3 (`singletonFactories`) chứa **ObjectFactory** — lambda tạo early reference. Factory này gọi `SmartInstantiationAwareBeanPostProcessor.getEarlyBeanReference()`:
+
+```java
+// AbstractAutowireCapableBeanFactory — simplified
+addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
+
+protected Object getEarlyBeanReference(String name, RootBeanDefinition mbd, Object bean) {
+    Object exposedObject = bean;
+    for (SmartInstantiationAwareBeanPostProcessor bp : getBeanPostProcessors()) {
+        exposedObject = bp.getEarlyBeanReference(exposedObject, name);
+        // AbstractAutoProxyCreator: nếu bean cần AOP → trả proxy thay vì raw bean!
+    }
+    return exposedObject;
+}
+```
+
+**Key insight:** Level 3 factory cho phép Spring quyết định **tại thời điểm bị cần** (lazy) xem trả về raw bean hay AOP proxy. Nếu chỉ dùng 2 level, Spring phải quyết định ngay lúc instantiate — nhưng lúc đó chưa biết bean có cần proxy không (BPP chưa chạy).
+
 **Flow:**
 
 ```

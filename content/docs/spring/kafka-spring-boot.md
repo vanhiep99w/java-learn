@@ -221,6 +221,30 @@ Exactly-once:
   Cần: Kafka transaction + idempotent consumer
 ```
 
+### 5.2. `__consumer_offsets` internals — offset lưu ở đâu?
+
+Committed offsets được lưu trong **internal topic** `__consumer_offsets` (50 partitions by default):
+
+```
+Partition for group = Math.abs(groupId.hashCode()) % 50
+
+Message format trong __consumer_offsets:
+Key:   [group_id, topic, partition]
+Value: [offset, metadata, timestamp]
+
+Ví dụ:
+  Key:   ["order-service", "orders", 3]
+  Value: [offset=15234, "", 1706123456789]
+```
+
+**Compaction**: Topic dùng `log.cleanup.policy=compact` — Kafka chỉ giữ **latest offset** cho mỗi [group, topic, partition] key. Old entries bị nén → topic nhỏ gọn.
+
+**Group Coordinator** = broker hosting partition chứa group:
+```
+group "order-service" → hash % 50 = partition 12
+→ Broker là leader của __consumer_offsets partition 12 = Group Coordinator
+```
+
 > [!NOTE]
 > **At-least-once + idempotent consumer** là strategy phổ biến nhất trong production. Đảm bảo không mất message, xử lý duplicate ở application layer (dedup by ID).
 

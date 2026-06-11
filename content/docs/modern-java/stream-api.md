@@ -108,7 +108,44 @@ List<String> result = stream.collect(Collectors.toList());
 // BÂY GIỜ mới chạy filter + map cho từng element
 ```
 
-**Internal**: mỗi intermediate op tạo một **stage** (AbstractPipeline). Terminal op **pull** element từ source qua từng stage:
+**Internal**: mỗi intermediate op tạo một **stage** (AbstractPipeline node). Các stages liên kết thành **linked list**:
+
+```
+Pipeline structure (linked list of stages):
+Head → FilterOp → MapOp → [Terminal: collect]
+  │        │         │
+  │        │         └─ AbstractPipeline { previousStage=FilterOp, opFlags }
+  │        └─ AbstractPipeline { previousStage=Head, opFlags }
+  └─ AbstractPipeline { spliterator=source, sourceFlags }
+```
+
+### 3.1. Sink chain — wrapSink mechanism
+
+Khi terminal operation trigger, JVM **wrap ngược** pipeline thành Sink chain:
+
+```java
+// Simplified terminal execution:
+// 1. Wrap stages thành Sink chain (build từ cuối → đầu):
+Sink<T> pipeline = terminalOp.makeSink();         // cuối
+pipeline = mapStage.wrapSink(pipeline);            // map → delegate to collect
+pipeline = filterStage.wrapSink(pipeline);         // filter → delegate to map
+
+// 2. Push elements qua Sink chain:
+pipeline.begin(size);
+spliterator.forEachRemaining(pipeline::accept);    // source push vào filter
+pipeline.end();
+```
+
+```
+Sink chain (push-based):
+Source.forEachRemaining(element) → Filter.accept(element)
+    → if pass: Map.accept(element)
+        → Collect.accept(transformed)
+```
+
+Mỗi Sink có 3 method: `begin(size)`, `accept(element)`, `end()` — cho phép short-circuit (vd `limit(5)` reject sau 5 accept) và stateful ops (vd `sorted()` buffer tất cả trong `accept`, emit trong `end`).
+
+Terminal op **pull** element từ source qua từng stage:
 
 ```
 Terminal.forEachRemaining():

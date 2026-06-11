@@ -170,6 +170,44 @@ try {
 // Path 2 (exception): foo() throws → cleanup() → rethrow
 ```
 
+### 4.3. Stack unwinding — chi phí throw exception
+
+Khi exception throw, JVM thực hiện **stack unwinding** — duyệt ngược call stack tìm handler:
+
+```
+throw tại frame F5 (deep call):
+  F5: exception table → không match → pop
+  F4: exception table → không match → pop
+  F3: exception table → MATCH! → jump to handler PC
+
+Chi phí: ~5-50μs tùy stack depth (vs ~5ns cho normal return)
+```
+
+**Tại sao throw đắt?**
+1. **fillInStackTrace()** (gọi trong constructor của Throwable): walk toàn bộ call stack, tạo `StackTraceElement[]` — đây chiếm **>90% chi phí** throw
+2. Stack unwinding: O(depth) duyệt exception tables
+
+```java
+// Optimization: skip fillInStackTrace khi không cần stack trace
+public class FastException extends RuntimeException {
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;  // no-op → throw cực nhanh (~10ns)
+    }
+}
+// Dùng cho control flow exception (vd Netty StacklessClosedChannelException)
+```
+
+| Operation | Cost |
+|-----------|------|
+| Normal method return | ~1-5ns |
+| throw + catch (shallow, 5 frames) | ~5μs |
+| throw + catch (deep, 50 frames) | ~50μs |
+| throw + catch (no stacktrace) | ~10ns |
+
+> [!WARNING]
+> Đừng dùng exception cho control flow (vd duyệt collection bằng throw). Cost gấp 1000x so với if/return. Trường hợp duy nhất chấp nhận: **rare error path** (vd file not found xảy ra 1/10000 requests).
+
 > [!NOTE]
 > `finally` **luôn chạy** — kể cả khi có `return` trong try hoặc catch. Ngoại lệ duy nhất: `System.exit()`, thread bị kill, hoặc JVM crash.
 
