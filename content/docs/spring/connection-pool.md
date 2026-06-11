@@ -163,6 +163,25 @@ public T borrow(long timeout, TimeUnit unit) {
 
 Đa số requests (>90%) hit **thread-local** tier — cùng thread borrow+return liên tục → **zero contention**.
 
+### 4.3. ConcurrentBag entry — CAS state machine
+
+```java
+// PoolEntry state (AtomicIntegerFieldUpdater):
+static final int STATE_NOT_IN_USE = 0;
+static final int STATE_IN_USE     = 1;
+static final int STATE_REMOVED    = -1;
+static final int STATE_RESERVED   = -2;
+
+// Borrow: CAS(NOT_IN_USE → IN_USE) — atomic, lock-free
+// Return: CAS(IN_USE → NOT_IN_USE) — set state + offer to handoff queue
+// Evict:  CAS(NOT_IN_USE → REMOVED) — only idle connections can be evicted
+```
+
+**Tại sao CAS đủ mà không cần lock?**
+- Mỗi connection chỉ có **1 owner** tại mọi thời điểm (IN_USE = 1 thread giữ)
+- CAS transition: chỉ thread đang giữ mới CAS `IN_USE → NOT_IN_USE`
+- Contention chỉ xảy ra ở `NOT_IN_USE → IN_USE` (nhiều thread cùng muốn borrow) — CAS retry loser, try entry tiếp
+
 > [!TIP]
 > HikariCP nhanh vì thiết kế ConcurrentBag **favour thread affinity**: connection bạn vừa trả = connection bạn sẽ lấy lại. Không cần lock, không cần sync, CAS overhead minimal.
 

@@ -140,6 +140,64 @@ sequenceDiagram
 4. Khi I/O sẵn sàng → JVM **resume** continuation: copy stack từ heap về carrier thread stack mới
 5. VT tiếp tục chạy — **không biết** đã bị unmount
 
+### 3.1. Continuation internals — stack copy chi tiết
+
+```
+TRƯỚC yield (VT đang chạy trên carrier thread):
+
+Carrier Thread Stack (OS):
+┌────────────────────────┐ ← Stack top
+│ frame: socket.read()   │  ← blocking point
+├────────────────────────┤
+│ frame: processData()   │
+├────────────────────────┤
+│ frame: handleRequest() │
+├────────────────────────┤
+│ frame: Continuation.run│  ← entry point
+└────────────────────────┘
+
+SAU yield (VT unmounted):
+
+Heap (Java Objects):                    Carrier Thread Stack:
+┌────────────────────────┐              ┌────────────────────┐
+│ StackChunk object       │              │ (rảnh — chạy VT khác)
+│ ├─ frame: socket.read() │              └────────────────────┘
+│ ├─ frame: processData() │
+│ ├─ frame: handleRequest()│
+│ └─ metadata (PC, locals) │
+└────────────────────────┘
+
+KHI resume (mount lại — có thể carrier KHÁC):
+
+Carrier Thread Stack (có thể carrier #2):
+┌────────────────────────┐ ← restore từ heap
+│ frame: socket.read()   │  ← tiếp tục tại đây
+├────────────────────────┤
+│ frame: processData()   │
+├────────────────────────┤
+│ frame: handleRequest() │
+└────────────────────────┘
+```
+
+**StackChunk** (JDK 21 internal):
+- Là Java object trên heap chứa **frozen stack frames**
+- Mỗi frame = compiled code metadata + local variables + operand stack
+- Copy nguyên block memory (memcpy) — **rất nhanh** (~100ns cho stack nông)
+- Stack chunk có thể chain (linked list) cho deep stacks
+
+### 3.2. Yield points — JVM biết unmount ở đâu
+
+JVM **không** unmount ở mọi điểm. Chỉ yield tại **safe points** đã được instrumented:
+
+| Yield point | Ví dụ |
+|------------|-------|
+| `java.net.*` blocking I/O | `Socket.read()`, `ServerSocket.accept()` |
+| `java.nio.*` channel ops | `SocketChannel.read()` |
+| `Thread.sleep()` | Tự yield |
+| `LockSupport.park()` | `ReentrantLock.lock()`, `Condition.await()` |
+| `Object.wait()` | Legacy wait/notify |
+| `BlockingQueue` operations | `take()`, `poll(timeout)` |
+
 > [!IMPORTANT]
 > Từ góc nhìn code, blocking call vẫn "block" (API không đổi). Nhưng bên dưới, chỉ **virtual thread** bị suspend — **carrier thread** (OS thread thật) được giải phóng để chạy task khác. Đây là "blocking without wasting OS thread".
 

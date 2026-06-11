@@ -208,8 +208,65 @@ Khi gọi `getAnnotation()`, JVM tạo **dynamic proxy** implement annotation in
 
 `AnnotationInvocationHandler` giữ `Map<String, Object>` chứa annotation element values. Mỗi method call (`value()`, `priority()`) được dispatch tới map lookup.
 
+### 6.2. Cách AnnotationInvocationHandler hoạt động — chi tiết nội bộ
+
+```java
+// sun.reflect.annotation.AnnotationInvocationHandler (simplified)
+class AnnotationInvocationHandler implements InvocationHandler {
+    private final Class<? extends Annotation> type;  // MyAnnotation.class
+    private final Map<String, Object> memberValues;  // {"value":"important","priority":1}
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) {
+        String name = method.getName();
+
+        // Special methods:
+        if (name.equals("toString")) return toStringImpl();
+        if (name.equals("hashCode")) return hashCodeImpl();
+        if (name.equals("equals"))   return equalsImpl(args[0]);
+        if (name.equals("annotationType")) return type;
+
+        // Annotation element method → lookup from map:
+        Object result = memberValues.get(name);
+        // Nếu result là array → clone (để caller không sửa internal state)
+        if (result.getClass().isArray()) return cloneArray(result);
+        return result;
+    }
+}
+```
+
+**Flow hoàn chỉnh khi gọi `getAnnotation()`:**
+
+```mermaid
+sequenceDiagram
+    participant Code as Application Code
+    participant Class as Class object
+    participant CP as .class constant pool
+    participant Proxy as Proxy.newProxyInstance
+
+    Code->>Class: getAnnotation(MyAnnotation.class)
+    Class->>CP: Đọc RuntimeVisibleAnnotations attribute
+    CP-->>Class: Raw bytes: element-value pairs
+    Class->>Class: Parse thành Map<String, Object>
+    Class->>Proxy: Tạo dynamic proxy (MyAnnotation interface)
+    Proxy-->>Code: $Proxy1 instance (cached)
+    Note over Code: ann.value() → InvocationHandler → map.get("value")
+```
+
 > [!NOTE]
-> Vì annotation tại runtime là proxy, **mỗi lần** `getAnnotation()` có thể tạo proxy mới. Framework như Spring **cache** kết quả scan annotation để tránh overhead lặp lại.
+> JDK cache annotation proxy per `Class` object — gọi `getAnnotation()` nhiều lần trên cùng class trả về **cùng proxy instance**. Nhưng `getDeclaredAnnotations()` có thể tạo array mới mỗi lần. Spring cache kết quả scan annotation thêm 1 tầng nữa.
+
+### 6.3. Performance: annotation access cost
+
+| Operation | Cost | Ghi chú |
+|-----------|------|---------|
+| `isAnnotationPresent(X.class)` | O(n) scan annotations array | n = số annotations trên element |
+| `getAnnotation(X.class)` (lần đầu) | Parse .class + tạo proxy | Nặng — cold path |
+| `getAnnotation(X.class)` (cached) | HashMap lookup | Nhanh — hot path |
+| Spring `@Transactional` check | 1 lookup trong annotation cache | BeanPostProcessor đã scan lúc startup |
+
+> [!TIP]
+> Nếu scan annotation thủ công trong hot path, **cache kết quả**. Reflection + proxy creation mỗi lần = performance killer. Spring làm đúng: scan 1 lần lúc startup, cache metadata, dùng suốt lifetime.
 
 ---
 

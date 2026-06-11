@@ -206,6 +206,31 @@ Mặc định: **ThreadLocal strategy** — mỗi thread có SecurityContext ri�
 | `MODE_INHERITABLETHREADLOCAL` | Cần propagate sang child thread |
 | `MODE_GLOBAL` | Standalone app (hiếm) |
 
+### 6.1b. SecurityContextHolder internals
+
+```java
+// SecurityContextHolder (simplified):
+final class ThreadLocalSecurityContextHolderStrategy {
+    private static final ThreadLocal<SecurityContext> contextHolder = new ThreadLocal<>();
+    
+    public SecurityContext getContext() {
+        SecurityContext ctx = contextHolder.get();
+        if (ctx == null) {
+            ctx = createEmptyContext();  // lazy create
+            contextHolder.set(ctx);
+        }
+        return ctx;
+    }
+    public void clearContext() { contextHolder.remove(); }
+}
+```
+
+**Lifecycle trong 1 HTTP request:**
+1. `SecurityContextHolderFilter`: load context từ `SecurityContextRepository` (Session) → set ThreadLocal
+2. Authentication filters: đặt `Authentication` vào context
+3. Controller: `SecurityContextHolder.getContext().getAuthentication()` → ThreadLocal get
+4. Response complete: filter **clear ThreadLocal** → tránh leak sang request kế tiếp (thread pool reuse!)
+
 ### 6.2. Async propagation problem
 
 ```java

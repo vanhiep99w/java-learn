@@ -368,34 +368,109 @@ public <T> CompletableFuture<T> withCircuitBreaker(
 
 ---
 
-## 9. Internal: Completion Stack & Trigger
+## 9. Internal: Completion Stack & Trigger — cách CF hoạt động bên trong
 
 Bên trong, `CompletableFuture` duy trì một **stack** các dependent actions (Completion objects):
 
 ```java
-volatile Object result;       // kết quả hoặc AltResult(exception)
-volatile Completion stack;    // linked list các actions chờ trigger
+// CompletableFuture core fields:
+volatile Object result;       // null = chưa xong | value | AltResult(exception)
+volatile Completion stack;    // Treiber stack (lock-free, CAS-push)
 
 static abstract class Completion {
-    volatile Completion next;   // linked list
+    volatile Completion next;   // linked list (stack element)
     abstract CompletableFuture<?> tryFire(int mode);
+    // mode: SYNC(0), ASYNC(1), NESTED(-1)
 }
 ```
 
-**Flow:**
-1. `thenApply(fn)` → tạo `UniApply` completion → push vào stack
-2. Khi source complete (`result` được set):
-   - `postComplete()` → pop & fire mọi completion trong stack
-   - Mỗi completion chạy `fn` → set result cho CF tiếp theo → trigger stack tiếp
+### 9.1. Memory layout
 
 ```
-CF-1.stack → [UniApply → CF-2] → [UniAccept → CF-3] → null
-              │
-              └─ khi CF-1 complete → fire UniApply → CF-2 complete → fire stack CF-2
+┌─────────────────────────────────────────┐
+│         CompletableFuture<T>             │
+│                                          │
+│  result: null → (khi complete) → value   │
+│                                          │
+│  stack: ──→ UniApply ──→ UniAccept ──→ null
+│             (CF-2)       (CF-3)          │
+│             ↓             ↓              │
+│          dep=CF-2      dep=CF-3          │
+│          fn=lambda1    fn=lambda2        │
+└─────────────────────────────────────────┘
 ```
+
+### 9.2. Treiber Stack — CAS-based lock-free push
+
+```java
+// Push completion vào stack (simplified):
+final boolean tryPushStack(Completion c) {
+    Completion h = stack;       // read current top
+    c.next = h;                 // link new node to current top
+    return STACK.compareAndSet(this, h, c);  // CAS swap
+    // Nếu CAS fail (thread khác push đồng thời) → retry
+}
+```
+
+**Tại sao Treiber Stack?** Nhiều threads có thể gọi `thenApply()` đồng thời trên cùng CF → cần lock-free push. CAS retry đảm bảo correctness mà không cần lock.
+
+### 9.3. Flow chi tiết khi CF complete
+
+```mermaid
+sequenceDiagram
+    participant T1 as Thread hoàn thành task
+    participant CF1 as CompletableFuture-1
+    participant S as Completion Stack
+    participant CF2 as CompletableFuture-2
+
+    T1->>CF1: internalComplete(result)
+    CF1->>CF1: CAS set result (null → value)
+    CF1->>CF1: postComplete()
+    loop Pop stack
+        CF1->>S: pop Completion (CAS)
+        S-->>CF1: UniApply (fn, dep=CF-2)
+        CF1->>CF1: tryFire(NESTED)
+        Note over CF1: fn.apply(result) → newResult
+        CF1->>CF2: internalComplete(newResult)
+        CF2->>CF2: postComplete() → fire CF-2's stack
+    end
+```
+
+### 9.4. Thread execution: ai chạy completion?
+
+| Variant | Thread chạy fn |
+|---------|---------------|
+| `thenApply(fn)` | **Thread hoàn thành source** HOẶC **calling thread** (race condition!) |
+| `thenApplyAsync(fn)` | **Pool thread** (guaranteed async) |
+| `thenApplyAsync(fn, executor)` | Thread từ **executor chỉ định** |
+
+**Tại sao thenApply có thể chạy trên calling thread?**
+
+```java
+cf.thenApply(fn);  // gọi lúc cf ĐÃ complete → fn chạy ngay trên calling thread
+cf.thenApply(fn);  // gọi lúc cf CHƯA complete → fn chạy trên completing thread sau này
+```
+
+Đây là source of **unexpected behavior**: nếu `fn` tốn thời gian và bạn gọi `thenApply` trên event loop thread khi CF đã complete → **block event loop**!
+
+### 9.5. result field — encoding trick
+
+```java
+volatile Object result;  // 3 trạng thái encoded:
+// (1) null           → chưa complete
+// (2) value (Object) → success, result = value
+// (3) AltResult(ex)  → failed, result = wrapper chứa exception
+//     AltResult(null) → completed with null (phân biệt với "chưa complete")
+
+static final class AltResult {
+    final Throwable ex;  // null nếu complete thành công với null value
+}
+```
+
+**Tại sao cần AltResult?** Vì `null` đã dùng cho "chưa complete" → cần wrapper để biểu thị "complete thành công với giá trị null".
 
 > [!TIP]
-> `CompletableFuture` là **push-based** (observer pattern): khi complete → notify dependents. Khác với `Future.get()` là **pull-based** (polling/blocking).
+> `CompletableFuture` là **push-based** (observer pattern): khi complete → notify dependents. Khác với `Future.get()` là **pull-based** (polling/blocking). Hiểu internal giúp: (1) biết khi nào fn chạy trên thread nào, (2) tránh blocking event loop, (3) debug chain bằng cách nhìn stack field.
 
 ---
 

@@ -223,6 +223,31 @@ if (y == 2) {
 
 Vì x86 "mạnh" (ít reorder), nhiều bug JMM **không hiện trên x86** nhưng **nổ tung trên ARM** (server ARM, Android). Đây là bẫy kinh điển: test trên laptop Intel thấy OK, deploy ARM production → crash.
 
+### 5.4. Memory barriers — assembly mapping trên x86 và ARM
+
+JVM translate JMM semantics thành **hardware barriers** tùy kiến trúc:
+
+| JMM barrier | x86 (TSO) | ARM (weak) |
+|-------------|-----------|------------|
+| LoadLoad | no-op (x86 đảm bảo sẵn) | `dmb ishld` |
+| StoreStore | no-op | `dmb ishst` |
+| LoadStore | no-op | `dmb ish` |
+| **StoreLoad** | **`mfence`** hoặc `lock addl $0, (%rsp)` | `dmb ish` |
+
+```
+volatile write trên x86:
+  mov [address], value      ; store
+  lock addl $0, (%rsp)     ; StoreLoad barrier (flush store buffer)
+
+volatile read trên x86:
+  mov reg, [address]        ; load (no barrier needed — TSO guarantees LoadLoad)
+
+volatile write trên ARM:
+  dmb ishst                 ; StoreStore barrier
+  str value, [address]      ; store
+  dmb ish                   ; StoreLoad barrier (full fence)
+```
+
 > [!WARNING]
 > Đừng bao giờ dựa vào hành vi quan sát được trên một kiến trúc cụ thể. Chỉ dựa vào **JMM spec** — tức happens-before.
 

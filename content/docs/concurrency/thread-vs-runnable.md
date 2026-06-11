@@ -154,6 +154,45 @@ flowchart LR
 
 Để **cập nhật state + count một cách atomic** bằng CAS, không cần lock. Nếu dùng 2 biến riêng, sẽ cần synchronized để đảm bảo consistency — chậm hơn.
 
+### 4.3. addWorker — CAS loop + ReentrantLock dual phase
+
+```java
+// Phase 1: CAS increment workerCount
+retry:
+for (;;) {
+    int c = ctl.get();
+    int rs = runStateOf(c);
+    // check shutdown conditions...
+    for (;;) {
+        int wc = workerCountOf(c);
+        if (wc >= CAPACITY || wc >= (core ? corePoolSize : maximumPoolSize))
+            return false;
+        if (compareAndIncrementWorkerCount(c))  // CAS: count + 1
+            break retry;
+        c = ctl.get();
+        if (runStateOf(c) != rs)
+            continue retry;  // state changed → outer loop
+    }
+}
+// Phase 2: mainLock để thêm Worker vào HashSet
+final ReentrantLock mainLock = this.mainLock;
+mainLock.lock();
+try {
+    workers.add(w);           // HashSet<Worker>
+    workerAdded = true;
+} finally {
+    mainLock.unlock();
+}
+if (workerAdded) w.thread.start();
+```
+
+**Tại sao 2 phase?**
+- Phase 1 (CAS): nhanh, lock-free — chỉ increment count
+- Phase 2 (lock): cần lock vì `workers` là HashSet (not thread-safe) + cần atomic check state
+
+> [!NOTE]
+> `workers` HashSet dùng cho: `shutdown()` interrupt all workers, `getPoolSize()`, `getActiveCount()`. Nếu không cần track workers → CAS alone đủ.
+
 ---
 
 ## 5. Flow execute() — quyết định core, queue hay reject

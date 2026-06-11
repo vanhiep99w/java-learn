@@ -201,8 +201,51 @@ Java stack information for the threads listed above:
 ...
 ```
 
+### 5.4. JVM Deadlock Detection Algorithm — cách JVM tìm deadlock
+
+JVM dùng **wait-for graph** để phát hiện cycle:
+
+```mermaid
+flowchart TD
+    A["JVM thread dump request<br/>hoặc findDeadlockedThreads()"] --> B["Build wait-for graph"]
+    B --> C["Node = mỗi thread"]
+    C --> D["Edge: Thread A → Thread B<br/>nếu A chờ lock mà B đang giữ"]
+    D --> E{"Tìm cycle<br/>trong graph?"}
+    E -->|Có cycle| F["DEADLOCK DETECTED<br/>Report threads trong cycle"]
+    E -->|Không| G["No deadlock"]
+```
+
+**Cách JVM xây dựng wait-for graph:**
+1. Duyệt tất cả threads ở trạng thái `BLOCKED`
+2. Với mỗi blocked thread: xác định **monitor** nó đang chờ (`_waitingToLock`)
+3. Xác định **thread owner** của monitor đó
+4. Tạo edge: waiting thread → owning thread
+5. Duyệt graph tìm **strongly connected component** (cycle)
+
+```
+Ví dụ:
+  Thread-A: waiting for lock(Account#1), holds lock(Account#2)
+  Thread-B: waiting for lock(Account#2), holds lock(Account#1)
+
+  Wait-for graph:
+    Thread-A ──→ Thread-B (A chờ lock mà B giữ)
+    Thread-B ──→ Thread-A (B chờ lock mà A giữ)
+    → CYCLE → DEADLOCK
+```
+
+**ObjectMonitor structure (C++ level, HotSpot):**
+```
+ObjectMonitor {
+    _owner: Thread*        // thread hiện đang giữ lock
+    _EntryList: ObjectWaiter*   // threads BLOCKED chờ lock
+    _WaitSet: ObjectWaiter*     // threads gọi wait() (WAITING)
+    _recursions: int            // reentrant count
+    _count: int                 // số thread đang compete
+}
+```
+
 > [!NOTE]
-> JVM **chỉ detect** deadlock giữa **synchronized** (intrinsic lock). Deadlock giữa `ReentrantLock` cần dùng `ThreadMXBean.findDeadlockedThreads()` (mục 6). Deadlock liên quan đến I/O, database lock, hay distributed lock thì **JVM không biết**.
+> JVM **chỉ detect** deadlock giữa **synchronized** (intrinsic lock). Deadlock giữa `ReentrantLock` cần dùng `ThreadMXBean.findDeadlockedThreads()` (mục 6). Deadlock liên quan đến I/O, database lock, hay distributed lock thì **JVM không biết** — cần distributed deadlock detector.
 
 ---
 

@@ -175,7 +175,99 @@ flowchart TD
 - **Non-capturing lambda** (không capture biến): tạo **singleton** instance → zero allocation
 - **Capturing lambda**: tạo instance mới mỗi lần (nhưng class đã tạo sẵn)
 
-### 4.3. Tại sao invokedynamic tốt hơn anonymous class?
+### 4.3. LambdaMetafactory — chi tiết bên trong
+
+**Bước 1: Bootstrap (chỉ chạy 1 lần per call-site)**
+
+```java
+// LambdaMetafactory.metafactory() simplified:
+public static CallSite metafactory(
+    MethodHandles.Lookup caller,       // context của caller
+    String invokedName,                // tên SAM method ("accept", "apply"...)
+    MethodType invokedType,            // () → Consumer (non-capturing) hoặc (captured) → Consumer
+    MethodType samMethodType,          // void accept(Object)
+    MethodHandle implMethod,           // handle tới lambda body (private static method)
+    MethodType instantiatedMethodType  // void accept(String) — after type erasure
+) {
+    // 1. Generate bytecode cho implementation class (ASM)
+    // 2. Define class via Unsafe.defineAnonymousClass (hidden class JDK 15+)
+    // 3. Tạo ConstantCallSite → link vào invokedynamic instruction
+    return new ConstantCallSite(/* factory method handle */);
+}
+```
+
+**Bước 2: Generated class structure**
+
+```
+// Non-capturing lambda: s -> System.out.println(s)
+// LambdaMetafactory generates:
+final class EnclosingClass$$Lambda$1 implements Consumer<String> {
+    private static final EnclosingClass$$Lambda$1 INSTANCE = new EnclosingClass$$Lambda$1();
+
+    private EnclosingClass$$Lambda$1() {}
+
+    @Override
+    public void accept(String s) {
+        EnclosingClass.lambda$main$0(s);  // gọi thẳng static method chứa lambda body
+    }
+}
+// → SINGLETON! Zero allocation per invocation
+```
+
+```
+// Capturing lambda: captured variable `prefix`
+// Ví dụ: prefix -> s -> prefix + s (prefix captured)
+final class EnclosingClass$$Lambda$2 implements Function<String, String> {
+    private final String arg$1;  // captured variable
+
+    private EnclosingClass$$Lambda$2(String arg$1) {
+        this.arg$1 = arg$1;
+    }
+
+    @Override
+    public String apply(String s) {
+        return EnclosingClass.lambda$main$1(arg$1, s);
+    }
+}
+// → NEW INSTANCE mỗi lần (vì arg$1 khác nhau)
+```
+
+**Bước 3: Lambda body — compiler tạo private static method**
+
+```java
+// Source:
+list.forEach(s -> System.out.println(s.toUpperCase()));
+
+// javac tạo trong cùng class:
+private static void lambda$main$0(String s) {
+    System.out.println(s.toUpperCase());
+}
+```
+
+> [!NOTE]
+> Lambda body nằm ngay trong class gốc (private static method) → JIT có thể **inline** trực tiếp, không cần virtual dispatch qua interface. Đây là lý do lambda thường **nhanh hơn** anonymous class.
+
+### 4.4. Memory layout: Non-capturing vs Capturing
+
+```
+NON-CAPTURING (singleton — zero allocation):
+┌─────────────────────────────────────┐
+│ Lambda$$1 (SINGLETON in Metaspace)   │
+│  └─ accept() → lambda$main$0        │
+│     (no instance fields)             │
+└─────────────────────────────────────┘
+  Heap allocation: 0 bytes per call
+
+CAPTURING (new instance per call):
+┌─────────────────────────────────────┐
+│ Lambda$$2 instance (Heap)            │
+│  ├─ [Object Header]  12 bytes        │
+│  └─ arg$1: String ref  4 bytes       │
+│     Total: 16 bytes per call          │
+└─────────────────────────────────────┘
+```
+
+### 4.5. Tại sao invokedynamic tốt hơn anonymous class?
 
 | Tiêu chí | Anonymous class | Lambda (invokedynamic) |
 |----------|----------------|----------------------|
@@ -231,16 +323,54 @@ int factor = 2;                       // effectively final ✓
 Function<Integer, Integer> multiply = x -> x * factor;
 ```
 
-### 6.2. Tại sao effectively final?
+### 6.2. Tại sao effectively final? — Bytecode perspective
 
-Lambda capture **copy giá trị** vào lambda instance (không capture reference tới local variable). Nếu cho phép modify → giá trị trong lambda và giá trị trong enclosing scope **không đồng bộ** → confusing.
+Lambda capture **copy giá trị** vào lambda instance (không capture reference tới local variable). Lý do nằm ở bytecode:
+
+```java
+void example() {
+    String prefix = "Hello";   // effectively final
+    Consumer<String> c = name -> System.out.println(prefix + " " + name);
+    c.accept("World");
+}
+```
+
+**Bytecode cho lambda creation:**
+```
+ALOAD 1                    // load prefix từ local var
+INVOKEDYNAMIC accept(String)Consumer  // prefix được pass vào factory
+// → Lambda instance nhận prefix qua constructor parameter
+```
+
+**Generated lambda class:**
+```java
+class Example$$Lambda$1 implements Consumer<String> {
+    private final String arg$1;  // COPY of prefix
+
+    Example$$Lambda$1(String arg$1) {
+        this.arg$1 = arg$1;     // copy lúc creation
+    }
+
+    void accept(String name) {
+        Example.lambda$example$0(this.arg$1, name);
+    }
+}
+```
+
+**Nếu cho phép modify `prefix` sau capture:**
+- Lambda giữ **bản sao** `arg$1 = "Hello"`
+- Enclosing method đổi `prefix = "Bye"`
+- Lambda vẫn thấy `"Hello"` → **inconsistency** → Java cấm
 
 ```java
 // Nếu Java cho phép (giả sử):
 int count = 0;
 list.forEach(s -> count++);    // Lambda có BẢN SAO count
-// count vẫn = 0 → misleading
+// count ở enclosing scope vẫn = 0 → misleading, confusing
 ```
+
+> [!NOTE]
+> Đây khác với JavaScript closures — JS capture **by reference** (biến share giữa closure và enclosing scope). Java capture **by value** (copy) → cần effectively final để tránh surprise.
 
 ### 6.3. Workaround khi cần mutable state
 
