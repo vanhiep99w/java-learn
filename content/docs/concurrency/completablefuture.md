@@ -387,17 +387,17 @@ static abstract class Completion {
 ### 9.1. Memory layout
 
 ```
-┌─────────────────────────────────────────┐
-│         CompletableFuture<T>             │
-│                                          │
-│  result: null → (khi complete) → value   │
-│                                          │
-│  stack: ──→ UniApply ──→ UniAccept ──→ null
-│             (CF-2)       (CF-3)          │
-│             ↓             ↓              │
-│          dep=CF-2      dep=CF-3          │
-│          fn=lambda1    fn=lambda2        │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│         CompletableFuture<T>               │
+│                                            │
+│  result: null → (khi complete) → value     │
+│                                            │
+│  stack: ──→ UniApply ──→ UniAccept ──→ null│
+│             (CF-2)       (CF-3)            │
+│             ↓             ↓                │
+│          dep=CF-2      dep=CF-3            │
+│          fn=lambda1    fn=lambda2          │
+└────────────────────────────────────────────┘
 ```
 
 ### 9.2. Treiber Stack — CAS-based lock-free push

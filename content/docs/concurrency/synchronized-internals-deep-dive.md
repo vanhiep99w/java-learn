@@ -199,11 +199,11 @@ Object Mark Word: [ObjectMonitor* | 10]
 
 ObjectMonitor:
 ┌─────────────────────────────────────────────────┐
-│ _owner = Thread T1 (đang giữ lock)             │
+│ _owner = Thread T1 (đang giữ lock)              │
 │ _recursions = 0                                 │
-│ _EntryList: T2 → T3 → null (đang chờ acquire) │
-│ _WaitSet:   T4 → null (đã gọi wait())         │
-│ _cxq:       T5 → null (mới bị block)          │
+│ _EntryList: T2 → T3 → null (đang chờ acquire)   │
+│ _WaitSet:   T4 → null (đã gọi wait())           │
+│ _cxq:       T5 → null (mới bị block)            │
 └─────────────────────────────────────────────────┘
 ```
 

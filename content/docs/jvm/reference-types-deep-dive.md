@@ -414,7 +414,7 @@ Thread.threadLocals (ThreadLocalMap):
 ┌──────────────────────┬────────────────┐
 │ Key (WeakRef → TL)   │ Value (Strong) │
 ├──────────────────────┼────────────────┤
-│ WeakRef → threadLocal │ → MyObject     │ ← strong ref giữ value sống
+│ WeakRef → threadLocal│ → MyObject     │ ← strong ref giữ value sống
 │ null (TL đã bị GC)   │ → MyObject     │ ← LEAK! key=null nhưng value vẫn sống
 └──────────────────────┴────────────────┘
 ```

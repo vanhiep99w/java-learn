@@ -96,12 +96,12 @@ Virtual Thread = lightweight, JVM-managed, multiplexed trên carrier threads
 ┌──────────┐  ┌──────────┐  ┌──────────┐       ┌──────────┐
 │  VT #1   │  │  VT #2   │  │  VT #3   │  ...  │ VT #1M   │
 └────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘
-     │              │              │                   │
-     └──────────────┼──────────────┘                   │
-                    ▼                                   │
-         ┌───────────────────┐                         │
-         │  Carrier Thread   │ (= platform thread)     │
-         │  (ForkJoinPool)   │ ◄─────────────────────────┘
+     │             │             │                  │
+     └─────────────┼─────────────┘                  │
+                 ▼                               │
+         ┌───────────────────┐                      │
+         │  Carrier Thread   │ (= platform thread)  │
+         │  (ForkJoinPool)   │ ◄────────────────────┘
          └───────────────────┘
          ~N carriers (N ≈ CPU cores)
 ```
@@ -159,13 +159,13 @@ Carrier Thread Stack (OS):
 SAU yield (VT unmounted):
 
 Heap (Java Objects):                    Carrier Thread Stack:
-┌────────────────────────┐              ┌────────────────────┐
-│ StackChunk object       │              │ (rảnh — chạy VT khác)
-│ ├─ frame: socket.read() │              └────────────────────┘
-│ ├─ frame: processData() │
+┌──────────────────────────┐              ┌──────────────────────┐
+│ StackChunk object        │              │ (rảnh — chạy VT khác)│
+│ ├─ frame: socket.read()  │              └──────────────────────┘
+│ ├─ frame: processData()  │
 │ ├─ frame: handleRequest()│
 │ └─ metadata (PC, locals) │
-└────────────────────────┘
+└──────────────────────────┘
 
 KHI resume (mount lại — có thể carrier KHÁC):
 
@@ -215,9 +215,9 @@ Virtual threads được schedule bởi **dedicated ForkJoinPool** (không phả
 ```
 ForkJoinPool (Virtual Thread Scheduler):
 ┌─────────────────────────────────────────────────┐
-│  Worker 0: [VT-5] [VT-12] [VT-100]  ← queue    │
+│  Worker 0: [VT-5] [VT-12] [VT-100]  ← queue     │
 │  Worker 1: [VT-3] [VT-7]                        │
-│  Worker 2: [VT-1] [VT-8] [VT-50] [VT-200]      │
+│  Worker 2: [VT-1] [VT-8] [VT-50] [VT-200]       │
 │  Worker 3: []  ← rảnh → steal từ Worker 2       │
 └─────────────────────────────────────────────────┘
 ```

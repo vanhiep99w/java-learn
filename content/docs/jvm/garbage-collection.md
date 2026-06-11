@@ -132,16 +132,16 @@ Từ đó, JVM chia heap thành **generations**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          JVM Heap                                 │
+│                          JVM Heap                               │
 ├────────────────────────────────────┬────────────────────────────┤
-│          Young Generation          │       Old Generation        │
+│          Young Generation          │       Old Generation       │
 ├───────────────┬────────┬───────────┤                            │
-│     Eden      │  S0    │    S1     │          Tenured            │
-│  (new objects)│(from)  │  (to)     │    (long-lived objects)     │
+│     Eden      │  S0    │    S1     │          Tenured           │
+│  (new objects)│(from)  │  (to)     │    (long-lived objects)    │
 │    ~80%       │ ~10%   │  ~10%     │                            │
 ├───────────────┴────────┴───────────┴────────────────────────────┤
-│                        Metaspace (off-heap)                       │
-│              Class metadata, method bytecode, constant pool       │
+│                        Metaspace (off-heap)                     │
+│              Class metadata, method bytecode, constant pool     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -427,7 +427,7 @@ ZGC lưu metadata **trong chính pointer** (dùng bit cao của 64-bit address):
 ```
 64-bit pointer layout (ZGC):
 ┌──────────┬─┬─┬─┬─┬────────────────────────────────────┐
-│ unused   │M│R│F│ │        Object address (42 bits)      │
+│ unused   │M│R│F│ │        Object address (42 bits)    │
 └──────────┴─┴─┴─┴─┴────────────────────────────────────┘
              │ │ │
              │ │ └─ Finalizable
@@ -455,10 +455,10 @@ Nếu pointer chưa được remap (object đã di chuyển) → barrier **tự 
 ```
 ZGC: gần như MỌI THỨ concurrent
 ┌─────────────────────────────────────────────────────────┐
-│ Pause Mark Start (<1ms)                                  │
-│ Concurrent Mark & Remap                                  │
-│ Pause Mark End (<1ms)                                    │
-│ Concurrent Relocate                                      │
+│ Pause Mark Start (<1ms)                                 │
+│ Concurrent Mark & Remap                                 │
+│ Pause Mark End (<1ms)                                   │
+│ Concurrent Relocate                                     │
 │ (app thread tự fixup khi đọc qua load barrier)          │
 └─────────────────────────────────────────────────────────┘
 STW chỉ ở 2 điểm: Mark Start + Mark End → tổng < 1ms

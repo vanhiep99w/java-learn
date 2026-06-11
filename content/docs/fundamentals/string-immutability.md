@@ -77,28 +77,28 @@ public final class String {
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│              String object "hello" (JDK 17)                   │
+│              String object "hello" (JDK 17)                  │
 ├──────────────────────────────────────────────────────────────┤
 │  [Object Header]     12 bytes (mark word 8B + klass ptr 4B)  │
-│  [value]             4 bytes  → pointer tới byte[]            │
+│  [value]             4 bytes  → pointer tới byte[]           │
 │  [coder]             1 byte   → 0 (LATIN1)                   │
 │  [hash]              4 bytes  → 0 (chưa tính) hoặc cached    │
-│  [hashIsZero]        1 byte   → false                         │
-│  [padding]           2 bytes  → align to 8 bytes              │
+│  [hashIsZero]        1 byte   → false                        │
+│  [padding]           2 bytes  → align to 8 bytes             │
 ├──────────────────────────────────────────────────────────────┤
-│  Total String obj:   24 bytes                                 │
+│  Total String obj:   24 bytes                                │
 └──────────────────────────────────────────────────────────────┘
          │
          ▼ value points to:
 ┌──────────────────────────────────────────────────────────────┐
-│              byte[] array "hello"                              │
+│              byte[] array "hello"                            │
 ├──────────────────────────────────────────────────────────────┤
-│  [Object Header]     12 bytes                                 │
-│  [length]            4 bytes  → 5                             │
+│  [Object Header]     12 bytes                                │
+│  [length]            4 bytes  → 5                            │
 │  [data]              5 bytes  → {104, 101, 108, 108, 111}    │
-│  [padding]           3 bytes  → align to 8 bytes              │
+│  [padding]           3 bytes  → align to 8 bytes             │
 ├──────────────────────────────────────────────────────────────┤
-│  Total byte[] obj:   24 bytes                                 │
+│  Total byte[] obj:   24 bytes                                │
 └──────────────────────────────────────────────────────────────┘
 
 Total memory cho "hello": 24 + 24 = 48 bytes
@@ -189,18 +189,18 @@ Bên trong HotSpot, String Pool là một **concurrent hash table** viết bằn
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                     StringTable (C++)                        │
-│                                                              │
-│  _the_table: ConcurrentHashTable<StringTableConfig>          │
-│  ┌───────┬───────┬───────┬───────┬───────┬───────┐          │
-│  │bucket0│bucket1│bucket2│  ...  │  ...  │bucketN│          │
-│  └───┬───┴───────┴───┬───┴───────┴───────┴───────┘          │
-│      │               │                                       │
-│      ▼               ▼                                       │
-│  ┌──────┐        ┌──────┐                                    │
-│  │oop*  │──→ String "hello" (Java heap)                      │
-│  └──────┘        │oop*  │──→ String "world" (Java heap)      │
-│                  └──────┘                                     │
+│                     StringTable (C++)                      │
+│                                                            │
+│  _the_table: ConcurrentHashTable<StringTableConfig>        │
+│  ┌───────┬───────┬───────┬───────┬───────┬───────┐         │
+│  │bucket0│bucket1│bucket2│  ...  │  ...  │bucketN│         │
+│  └───┬───┴───────┴───┬───┴───────┴───────┴───────┘         │
+│      │               │                                     │
+│      ▼               ▼                                     │
+│  ┌──────┐        ┌──────┐                                  │
+│  │oop*  │──→ String "hello" (Java heap)                    │
+│  └──────┘        │oop*  │──→ String "world" (Java heap)    │
+│                  └──────┘                                  │
 └────────────────────────────────────────────────────────────┘
 
 oop* = ordinary object pointer — con trỏ tới Java object trên heap
@@ -695,13 +695,13 @@ String y = "hel";     // KHÔNG final
           Stack                        Heap / String Pool
         ┌───────┐
     a → │  ref  │ ──────────────────→ ┌─────────────────────┐
-        ├───────┤                     │ String "hello"       │ ← POOL
+        ├───────┤                     │ String "hello"      │ ← POOL
     b → │  ref  │ ──────────────────→ │ (shared by a, b, d) │
         ├───────┤                     └─────────────────────┘
-    c → │  ref  │ ──────→ ┌─────────────────────┐
-        ├───────┤         │ String "hello"       │ ← HEAP (separate object)
-    d → │  ref  │ ────┐   │ (equals same, != different ref)│
-        └───────┘     │   └─────────────────────┘
+    c → │  ref  │ ──────→ ┌─────────────────────────────────┐
+        ├───────┤         │ String "hello"                  │ ← HEAP (separate object)
+    d → │  ref  │ ────┐   │ (equals same, != different ref) │
+        └───────┘     │   └─────────────────────────────────┘
                       │
                       └──→ (trỏ về pool object — intern() returned pool ref)
 ```

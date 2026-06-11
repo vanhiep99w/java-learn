@@ -67,8 +67,8 @@ JDK 7:  16 Segment locks (cố định)
          ┌─────┬─────┬─────┬─────┐
          │Seg 0│Seg 1│...  │Seg15│   ← mỗi segment có lock riêng
          └──┬──┴──┬──┴─────┴──┬──┘
-            │     │            │
-           [bins][bins]      [bins]
+            │     │           │
+           [bins][bins]     [bins]
 
 JDK 8+: N bin locks (N = table.length, scale theo size)
          ┌──┬──┬──┬──┬──┬──┬──┬──┐

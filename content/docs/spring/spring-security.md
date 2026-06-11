@@ -53,28 +53,28 @@ Fix: cấu hình rõ ràng `.anonymous(AbstractHttpConfigurer::disable)` hoặc 
 HTTP Request
      │
      ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Servlet Container (Tomcat)             │
+┌──────────────────────────────────────────────────────────┐
+│                    Servlet Container (Tomcat)            │
 │  ┌─────────────────────────────────────────────────────┐ │
-│  │              DelegatingFilterProxy                   │ │
+│  │              DelegatingFilterProxy                  │ │
 │  │  ┌───────────────────────────────────────────────┐  │ │
-│  │  │           FilterChainProxy                     │  │ │
+│  │  │           FilterChainProxy                    │  │ │
 │  │  │  ┌─────────────────────────────────────────┐  │  │ │
-│  │  │  │     SecurityFilterChain #1               │  │  │ │
-│  │  │  │  [SecurityContextPersistence]            │  │  │ │
+│  │  │  │     SecurityFilterChain #1              │  │  │ │
+│  │  │  │  [SecurityContextPersistence]           │  │  │ │
 │  │  │  │  [CsrfFilter]                           │  │  │ │
 │  │  │  │  [LogoutFilter]                         │  │  │ │
-│  │  │  │  [UsernamePasswordAuthenticationFilter]  │  │  │ │
-│  │  │  │  [AnonymousAuthenticationFilter]         │  │  │ │
+│  │  │  │  [UsernamePasswordAuthenticationFilter] │  │  │ │
+│  │  │  │  [AnonymousAuthenticationFilter]        │  │  │ │
 │  │  │  │  [ExceptionTranslationFilter]           │  │  │ │
 │  │  │  │  [AuthorizationFilter]                  │  │  │ │
 │  │  │  └─────────────────────────────────────────┘  │  │ │
 │  │  └───────────────────────────────────────────────┘  │ │
 │  └─────────────────────────────────────────────────────┘ │
-│                                                           │
-│                    DispatcherServlet                       │
-│                    └── Controller                         │
-└─────────────────────────────────────────────────────────┘
+│                                                          │
+│                    DispatcherServlet                     │
+│                    └── Controller                        │
+└──────────────────────────────────────────────────────────┘
 ```
 
 > [!NOTE]

@@ -74,18 +74,18 @@ flowchart TD
 
 ```
 ┌─────────────────────────────────────┐
-│     Bootstrap ClassLoader            │ ← java.lang.*, java.util.* (rt.jar / modules)
-│     (native code, null parent)       │
+│     Bootstrap ClassLoader           │ ← java.lang.*, java.util.* (rt.jar / modules)
+│     (native code, null parent)      │
 └─────────────────┬───────────────────┘
                   │ delegate up
 ┌─────────────────┴───────────────────┐
-│     Platform ClassLoader             │ ← java.sql.*, javax.*, JDK extensions
-│     (jdk.internal.loader)            │
+│     Platform ClassLoader            │ ← java.sql.*, javax.*, JDK extensions
+│     (jdk.internal.loader)           │
 └─────────────────┬───────────────────┘
                   │ delegate up
 ┌─────────────────┴───────────────────┐
-│     Application ClassLoader          │ ← classpath (your code, libs)
-│     (sun.misc.Launcher$AppClassLoader)│
+│     Application ClassLoader         │ ← classpath (your code, libs)
+│   (sun.misc.Launcher$AppClassLoader)│
 └─────────────────────────────────────┘
 ```
 
@@ -188,21 +188,21 @@ class Singleton {
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         JVM Process                          │
+│                         JVM Process                         │
 ├──────────────────────────┬──────────────────────────────────┤
 │     SHARED (all threads) │          PER-THREAD              │
 ├──────────────────────────┼──────────────────────────────────┤
 │  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │      HEAP        │    │  │   JVM Stack           │        │
-│  │  (objects, GC)   │    │  │   (frame per method)  │        │
+│  │      HEAP        │    │  │   JVM Stack          │        │
+│  │  (objects, GC)   │    │  │   (frame per method) │        │
 │  └──────────────────┘    │  └──────────────────────┘        │
 │  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │   Metaspace      │    │  │   PC Register         │        │
-│  │  (class metadata)│    │  │   (current bytecode)  │        │
+│  │   Metaspace      │    │  │   PC Register        │        │
+│  │  (class metadata)│    │  │   (current bytecode) │        │
 │  └──────────────────┘    │  └──────────────────────┘        │
 │  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │   Code Cache     │    │  │   Native Method Stack │        │
-│  │  (JIT compiled)  │    │  │   (JNI calls)         │        │
+│  │   Code Cache     │    │  │   Native Method Stack│        │
+│  │  (JIT compiled)  │    │  │   (JNI calls)        │        │
 │  └──────────────────┘    │  └──────────────────────┘        │
 └──────────────────────────┴──────────────────────────────────┘
 ```
@@ -380,14 +380,14 @@ JVM dùng **vtable** (virtual method table):
 
 ```
 Dog.class metadata:
-┌─────────────────────────────┐
-│         vtable               │
-├─────────────────────────────┤
-│ [0] Object.hashCode → addr  │
-│ [1] Object.equals → addr    │
-│ [2] Animal.speak → Dog.speak addr  │  ← override
-│ [3] Dog.fetch → addr         │
-└─────────────────────────────┘
+┌───────────────────────────────────┐
+│         vtable                    │
+├───────────────────────────────────┤
+│ [0] Object.hashCode → addr        │
+│ [1] Object.equals → addr          │
+│ [2] Animal.speak → Dog.speak addr │  ← override
+│ [3] Dog.fetch → addr              │
+└───────────────────────────────────┘
 ```
 
 Dispatch: `receiver.getClass().vtable[method_index]` → **O(1)** lookup.

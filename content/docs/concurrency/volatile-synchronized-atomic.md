@@ -270,12 +270,12 @@ Giả thuyết: đa số lock chỉ có **1 thread** sử dụng. Biased lock **
 ```
 Object header (64 bits, normal):
 ┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [hash:25 | age:4 | biased:1 | lock_state:2] │
+│ Mark Word: [hash:25 | age:4 | biased:1 | lock_state:2]  │
 └─────────────────────────────────────────────────────────┘
 
 Biased state: thread_id thay vào vị trí hash
 ┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [thread_id:54 | epoch:2 | age:4 | 1 | 01]   │
+│ Mark Word: [thread_id:54 | epoch:2 | age:4 | 1 | 01]    │
 └─────────────────────────────────────────────────────────┘
 ```
 

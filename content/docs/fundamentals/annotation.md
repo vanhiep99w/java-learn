@@ -383,12 +383,12 @@ Spring Boot startup:
 
 ```
                     ┌──────────────────────────┐
-Client ──────────→  │   TransactionInterceptor  │
-                    │   (AOP Proxy)              │
-                    │                            │
-                    │  1. Get transaction        │
+Client ──────────→  │   TransactionInterceptor │
+                    │   (AOP Proxy)            │
+                    │                          │
+                    │  1. Get transaction      │
                     │  2. Call real method ──────→ RealObject.doTransfer()
-                    │  3. Commit / Rollback      │
+                    │  3. Commit / Rollback    │
                     └──────────────────────────┘
 ```
 

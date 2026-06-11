@@ -70,27 +70,27 @@ Thread pool giải quyết 3 vấn đề:
 ## 3. Kiến trúc ThreadPoolExecutor — ctl, Worker, BlockingQueue
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                 ThreadPoolExecutor                    │
-│                                                       │
+┌──────────────────────────────────────────────────────┐
+│                 ThreadPoolExecutor                   │
+│                                                      │
 │  ┌─────────┐    ┌────────────────────────┐           │
-│  │  ctl     │    │    BlockingQueue        │           │
-│  │ (state + │    │  ┌────┬────┬────┬───┐  │           │
-│  │  count)  │    │  │task│task│task│...│  │           │
+│  │  ctl    │    │    BlockingQueue       │           │
+│  │ (state +│    │  ┌────┬────┬────┬───┐  │           │
+│  │  count) │    │  │task│task│task│...│  │           │
 │  └─────────┘    │  └────┴────┴────┴───┘  │           │
-│                  └────────────┬───────────┘           │
-│                               │ poll/take              │
-│  ┌──────────────────────────┐ │                       │
-│  │       Workers (HashSet)   │◀┘                      │
+│                 └─────────────┬──────────┘           │
+│                               │ poll/take            │
+│  ┌──────────────────────────┐ │                      │
+│  │       Workers (HashSet)  │◀┘                      │
 │  │  ┌────────┐ ┌────────┐   │                        │
 │  │  │Worker 0│ │Worker 1│...│   ← mỗi Worker wrap    │
-│  │  │ thread │ │ thread │   │     một Thread thật     │
+│  │  │ thread │ │ thread │   │     một Thread thật    │
 │  │  └────────┘ └────────┘   │                        │
 │  └──────────────────────────┘                        │
-│                                                       │
-│  corePoolSize / maximumPoolSize / keepAliveTime       │
-│  RejectedExecutionHandler                             │
-└─────────────────────────────────────────────────────┘
+│                                                      │
+│  corePoolSize / maximumPoolSize / keepAliveTime      │
+│  RejectedExecutionHandler                            │
+└──────────────────────────────────────────────────────┘
 ```
 
 Tham số constructor:
@@ -456,7 +456,7 @@ ThreadPoolExecutor:                    ForkJoinPool:
 │  Shared Queue    │                   │ Worker 0 │ │ Worker 1 │ │ Worker 2 │
 │ [T1][T2][T3][T4] │                   │ [T1][T2] │ │ [T3]     │ │ []       │
 └────────┬─────────┘                   └──────────┘ └──────────┘ └─────┬────┘
-         │                                                              │
+         │                                                             │
     All workers                                            steal T3 ◀──┘
     poll từ cùng queue
 ```

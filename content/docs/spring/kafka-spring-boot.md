@@ -55,18 +55,18 @@ poll 100 messages: [1, 2, 3, ..., 50, 51, ..., 100]
 ## 2. Kafka Architecture — Broker, Topic, Partition, Replica
 
 ```
-┌─────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────┐
 │                    Kafka Cluster                      │
 │                                                       │
 │  Broker 0            Broker 1           Broker 2      │
-│  ┌──────────┐       ┌──────────┐      ┌──────────┐   │
-│  │Topic: orders│     │Topic: orders│   │Topic: orders│ │
-│  │ P0 (leader)│     │ P1 (leader)│   │ P2 (leader)│  │
-│  │ P1 (replica)│    │ P2 (replica)│  │ P0 (replica)│ │
-│  └──────────┘       └──────────┘      └──────────┘   │
+│  ┌──────────────┐  ┌──────────────┐   ┌──────────────┐│
+│  │Topic: orders │  │Topic: orders │   │Topic: orders ││
+│  │ P0 (leader)  │  │ P1 (leader)  │   │ P2 (leader)  ││
+│  │ P1 (replica) │  │ P2 (replica) │   │ P0 (replica) ││
+│  └──────────────┘  └──────────────┘   └──────────────┘│
 │                                                       │
 │  Controller: Broker 0 (quản lý partition assignment)  │
-└─────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────┘
 
 Producer ──→ Partition (by key hash) ──→ Broker (leader)
 Consumer ←── Partition (assigned by group coordinator) ←── Broker

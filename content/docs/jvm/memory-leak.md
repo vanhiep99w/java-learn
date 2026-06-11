@@ -310,22 +310,22 @@ JVM có một **daemon thread** tên `Reference Handler` (priority MAX_PRIORITY 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    GC Mark Phase                          │
-│                                                           │
-│  1. Mark all reachable objects (tri-color)                │
-│  2. Phát hiện objects chỉ reachable qua Reference         │
-│  3. Phân loại: Soft? Weak? Phantom?                       │
-│  4. Quyết định clear (dựa trên memory pressure)           │
+│                    GC Mark Phase                        │
+│                                                         │
+│  1. Mark all reachable objects (tri-color)              │
+│  2. Phát hiện objects chỉ reachable qua Reference       │
+│  3. Phân loại: Soft? Weak? Phantom?                     │
+│  4. Quyết định clear (dựa trên memory pressure)         │
 └────────────────────────┬────────────────────────────────┘
                          │ discovered list
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│              Reference Handler Thread                      │
-│                                                           │
-│  1. Nhận discovered references từ GC                      │
-│  2. Clear referent (set referent = null)                   │
-│  3. Enqueue vào ReferenceQueue (nếu có)                   │
-│  4. Notify waiting threads (FinalReference → Finalizer)   │
+│              Reference Handler Thread                   │
+│                                                         │
+│  1. Nhận discovered references từ GC                    │
+│  2. Clear referent (set referent = null)                │
+│  3. Enqueue vào ReferenceQueue (nếu có)                 │
+│  4. Notify waiting threads (FinalReference → Finalizer) │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -415,13 +415,13 @@ Thread object
   └─ threadLocals: ThreadLocalMap
        └─ Entry[] table (open addressing, power-of-2 size)
             ┌─────────────────────────────────────────────┐
-            │ Entry extends WeakReference<ThreadLocal<?>>   │
-            │                                               │
-            │  ┌─────────┐                                  │
-            │  │   key    │ ── WeakRef ──→ ThreadLocal obj   │
-            │  ├─────────┤                                  │
-            │  │  value   │ ── STRONG ──→ Your object       │
-            │  └─────────┘            (có thể rất lớn!)     │
+            │ Entry extends WeakReference<ThreadLocal<?>> │
+            │                                             │
+            │  ┌─────────┐                                │
+            │  │   key   │ ── WeakRef ──→ ThreadLocal obj │
+            │  ├─────────┤                                │
+            │  │  value  │ ── STRONG ──→ Your object      │
+            │  └─────────┘            (có thể rất lớn!)   │
             └─────────────────────────────────────────────┘
 ```
 

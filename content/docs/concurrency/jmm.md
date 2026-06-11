@@ -83,12 +83,12 @@ JMM **không** mô tả kiến trúc phần cứng cụ thể. Nó là **hợp �
 │                   JMM (Specification)                │
 │  Quy tắc happens-before, final field semantics       │
 ├──────────────────────────────────────────────────────┤
-│              JVM Implementation (HotSpot)             │
-│  Chèn memory barrier, cấm JIT reorder vi phạm JMM   │
+│              JVM Implementation (HotSpot)            │
+│  Chèn memory barrier, cấm JIT reorder vi phạm JMM    │
 ├──────────────────────────────────────────────────────┤
-│                  Hardware (CPU)                       │
-│  Mỗi kiến trúc (x86-TSO, ARM-weak) có memory model  │
-│  riêng — JVM phải "bù" bằng barrier phù hợp         │
+│                  Hardware (CPU)                      │
+│  Mỗi kiến trúc (x86-TSO, ARM-weak) có memory model   │
+│  riêng — JVM phải "bù" bằng barrier phù hợp          │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -148,12 +148,12 @@ JMM **không** đảm bảo ghi/đọc `long` và `double` là atomic trên mọ
         │  L2 $  │          │  L2 $  │          │  L2 $  │          │  L2 $  │
         └───┬────┘          └───┬────┘          └───┬────┘          └───┬────┘
             └────────┬──────────┴──────────┬────────┘                   │
-                 ┌───┴────────────────┐  ┌─┴──────────────────┐        │
-                 │     L3 $ (shared)  │  │   L3 $ (shared)    │        │
-                 └────────┬───────────┘  └─────────┬──────────┘        │
-                          └──────────┬─────────────┘                   │
-                                 ┌───┴───┐                             │
-                                 │ DRAM  │ ← Main Memory               │
+                 ┌───┴────────────────┐  ┌─┴──────────────────┐         │
+                 │     L3 $ (shared)  │  │   L3 $ (shared)    │         │
+                 └────────┬───────────┘  └─────────┬──────────┘         │
+                          └──────────┬─────────────┘                    │
+                                 ┌───┴───┐                              │
+                                 │ DRAM  │ ← Main Memory                │
                                  └───────┘
 ```
 

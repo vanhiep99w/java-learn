@@ -98,24 +98,24 @@ Pool **giới hạn** connection count, **queue** excess requests → bảo vệ
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         HikariCP                             │
+│                         HikariCP                            │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │              ConcurrentBag                             │  │
-│  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ... ┌─────┐       │  │
-│  │  │Conn1│ │Conn2│ │Conn3│ │Conn4│     │ConnN│       │  │
-│  │  │ IDLE│ │IN_USE│ │IDLE│ │REMOVED│    │ IDLE│       │  │
-│  │  └─────┘ └─────┘ └─────┘ └─────┘     └─────┘       │  │
+│  │              ConcurrentBag                            │  │
+│  │  ┌─────┐ ┌──────┐ ┌─────┐ ┌───────┐ ... ┌─────┐       │  │
+│  │  │Conn1│ │Conn2 │ │Conn3│ │Conn4  │     │ConnN│       │  │
+│  │  │ IDLE│ │IN_USE│ │IDLE │ │REMOVED│     │ IDLE│       │  │
+│  │  └─────┘ └──────┘ └─────┘ └───────┘     └─────┘       │  │
 │  └───────────────────────────────────────────────────────┘  │
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────────────────┐      │
-│  │ Housekeeping     │  │ Connection Add Thread         │      │
-│  │ (ScheduledTask)  │  │ (creates new connections)     │      │
-│  └─────────────────┘  └─────────────────────────────┘      │
-│                                                              │
+│                                                             │
+│  ┌─────────────────┐  ┌─────────────────────────────┐       │
+│  │ Housekeeping    │  │ Connection Add Thread       │       │
+│  │ (ScheduledTask) │  │ (creates new connections)   │       │
+│  └─────────────────┘  └─────────────────────────────┘       │
+│                                                             │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │  ProxyConnection / ProxyStatement / ProxyResultSet    │    │
-│  │  (intercept close() → return to pool)                 │    │
+│  │  ProxyConnection / ProxyStatement / ProxyResultSet  │    │
+│  │  (intercept close() → return to pool)               │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```

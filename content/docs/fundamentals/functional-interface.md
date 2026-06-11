@@ -252,18 +252,18 @@ private static void lambda$main$0(String s) {
 ```
 NON-CAPTURING (singleton — zero allocation):
 ┌─────────────────────────────────────┐
-│ Lambda$$1 (SINGLETON in Metaspace)   │
+│ Lambda$$1 (SINGLETON in Metaspace)  │
 │  └─ accept() → lambda$main$0        │
-│     (no instance fields)             │
+│     (no instance fields)            │
 └─────────────────────────────────────┘
   Heap allocation: 0 bytes per call
 
 CAPTURING (new instance per call):
 ┌─────────────────────────────────────┐
-│ Lambda$$2 instance (Heap)            │
-│  ├─ [Object Header]  12 bytes        │
-│  └─ arg$1: String ref  4 bytes       │
-│     Total: 16 bytes per call          │
+│ Lambda$$2 instance (Heap)           │
+│  ├─ [Object Header]  12 bytes       │
+│  └─ arg$1: String ref  4 bytes      │
+│     Total: 16 bytes per call        │
 └─────────────────────────────────────┘
 ```
 
