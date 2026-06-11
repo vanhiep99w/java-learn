@@ -2,6 +2,7 @@
   "title": "Spring Ecosystem",
   "pages": [
     "spring-overview",
+    "spring-ioc-container",
     "bean-lifecycle",
     "spring-proxy",
     "spring-transaction",
