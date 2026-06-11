@@ -3,6 +3,7 @@
   "pages": [
     "spring-overview",
     "bean-lifecycle",
+    "spring-transaction",
     "spring-security",
     "connection-pool",
     "kafka-spring-boot"
