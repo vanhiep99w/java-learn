@@ -6,6 +6,7 @@
     "bean-lifecycle",
     "spring-proxy",
     "spring-transaction",
+    "spring-boot-autoconfiguration",
     "spring-security",
     "connection-pool",
     "kafka-spring-boot"
