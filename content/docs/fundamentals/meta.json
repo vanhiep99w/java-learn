@@ -12,6 +12,7 @@
     "annotation",
     "autoboxing-unboxing",
     "final-keyword",
-    "comparable-vs-comparator"
+    "comparable-vs-comparator",
+    "string-internals-deep-dive"
   ]
 }

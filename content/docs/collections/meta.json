@@ -6,6 +6,7 @@
     "arraylist-vs-linkedlist",
     "set-implementations",
     "hashmap-deep-dive",
+    "concurrenthashmap-deep-dive",
     "concurrent-collections"
   ]
 }

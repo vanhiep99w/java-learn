@@ -7,6 +7,10 @@
     "data-race-vs-race-condition",
     "deadlock",
     "locks-optimistic-vs-pessimistic",
+    "synchronized-internals-deep-dive",
+    "aqs-deep-dive",
+    "threadpool-executor-deep-dive",
+    "forkjoin-deep-dive",
     "completablefuture"
   ]
 }
