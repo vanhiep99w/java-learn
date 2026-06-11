@@ -222,6 +222,36 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 3. **Double-check** sau khi lấy lock: vì giữa lúc đọc `f` và lấy lock, bin có thể đã bị resize/migrate
 4. **`helpTransfer`**: nếu đang resize, thread ghi **tham gia giúp** migrate thay vì chờ
 
+### 5.1. Volatile array access — tabAt/casTabAt internals
+
+```java
+// tabAt: đọc element tại index i — volatile semantics (VarHandle)
+static final <K,V> Node<K,V> tabAt(Node<K,V>[] tab, int i) {
+    return (Node<K,V>) U.getObjectVolatile(tab, ((long)i << ASHIFT) + ABASE);
+    // ASHIFT = log2(array element size), ABASE = array header size
+    // Truy cập TRỰC TIẾP memory (bypass array bounds check!) → raw address
+}
+
+// casTabAt: CAS element tại index i
+static final <K,V> boolean casTabAt(Node<K,V>[] tab, int i, Node<K,V> c, Node<K,V> v) {
+    return U.compareAndSwapObject(tab, ((long)i << ASHIFT) + ABASE, c, v);
+}
+```
+
+**Tại sao dùng Unsafe thay vì `tab[i]`?** Java array access không có volatile semantics cho từng element. `tab[i]` có thể đọc giá trị cũ từ cache. `Unsafe.getObjectVolatile` đảm bảo đọc giá trị mới nhất.
+
+### 5.2. Concurrency level: 1 bin = 1 lock
+
+```
+Ví dụ: map có 64 bin, 16 threads cùng put:
+  Thread 1 → bin[3]  ─┐
+  Thread 2 → bin[7]   │ Tất cả chạy song song!
+  Thread 3 → bin[15]  │ (khác bin → khác lock)
+  Thread 4 → bin[3]  ─┘ CHỈ thread 1 & 4 cạnh tranh (cùng bin[3])
+```
+
+Lock granularity = **N bins** (N = table.length, mặc định 16 → grow theo load). So với JDK 7 ConcurrentHashMap dùng **16 segments cố định**, JDK 8+ có granularity **tỉ lệ với table size** — tốt hơn nhiều.
+
 > [!IMPORTANT]
 > CAS vào bin rỗng là **fast path** phổ biến nhất. Khi map thưa (nhiều bin rỗng), hầu hết `put` hoàn thành mà **không lock gì cả** — giải thích throughput cực cao ở low contention.
 

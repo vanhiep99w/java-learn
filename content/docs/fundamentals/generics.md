@@ -110,11 +110,37 @@ checkcast     #6    // (Order) ← compiler insert cast ở CALLER
 > [!TIP]
 > Hiểu erasure giải thích tại sao: `new T()` bất khả, `instanceof List<String>` bất khả, `T.class` bất khả — runtime không biết `T` là gì.
 
-### 2.3. Tại sao Java chọn erasure?
+### 2.3. Signature attribute — type info vẫn sống trong .class file
+
+Dù runtime xóa generic type, `.class` file **vẫn lưu** thông tin generic trong `Signature` attribute (metadata, không ảnh hưởng execution):
+
+```
+// javap -v Cache.class → Signature of get():
+  Signature: #20  // (Ljava/lang/String;)TT;
+  //           ↑ "trả về T" — chỉ là metadata, runtime không dùng
+```
+
+**Ai dùng Signature attribute?**
+- Reflection: `Field.getGenericType()`, `Method.getGenericReturnType()`
+- Frameworks (Spring, Jackson): `TypeReference<Map<String, List<Integer>>>` → đọc generic args qua reflection
+- IDE & decompiler: hiển thị đúng generic types
+
+```java
+// Spring ví dụ: lấy generic type từ Signature attribute
+class UserService extends BaseService<User> { }
+
+// Spring đọc: UserService → superclass → BaseService<User>
+// via Class.getGenericSuperclass() → ParameterizedType.getActualTypeArguments()
+Type[] args = ((ParameterizedType) UserService.class.getGenericSuperclass())
+              .getActualTypeArguments();
+// args[0] = User.class ← framework biết entity type!
+```
+
+### 2.4. Tại sao Java chọn erasure?
 
 **Backward compatibility**: JDK 5 thêm generics mà không break binary compatibility với code Java 1.4 (raw types). Nếu dùng reification (như C# .NET) → phải thay đổi class file format, JVM, và toàn bộ ecosystem.
 
-Trade-off: type safety ở compile time, nhưng **mất type info** ở runtime.
+Trade-off: type safety ở compile time, nhưng **mất type info** ở runtime. Signature attribute là **compromise** — giữ metadata cho reflection/tools nhưng JVM execution hoàn toàn erased.
 
 ---
 

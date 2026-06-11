@@ -247,6 +247,34 @@ flowchart TD
 
 Khi cây co lại còn **≤ 6 node** (`UNTREEIFY_THRESHOLD`) sau khi remove/resize, nó **đổi ngược** về linked list. Có hai ngưỡng (8 và 6) tạo một khoảng "đệm" tránh việc treeify/untreeify liên tục quanh ranh giới.
 
+### 6.1. TreeNode internals — Red-Black Tree trong HashMap
+
+```java
+static final class TreeNode<K,V> extends LinkedHashMap.Entry<K,V> {
+    TreeNode<K,V> parent;   // parent trong cây
+    TreeNode<K,V> left;     // child trái
+    TreeNode<K,V> right;    // child phải
+    TreeNode<K,V> prev;     // linked list (vẫn giữ cho untreeify!)
+    boolean red;            // màu node (true = đỏ, false = đen)
+}
+```
+
+**TreeNode vừa là node cây VÀ linked list** — mỗi TreeNode có cả `parent/left/right` (cây) VÀ `next/prev` (list). Khi untreeify chỉ cần bỏ parent/left/right, list vẫn nguyên.
+
+**Memory cost**: `TreeNode` ~32 bytes overhead so với `Node` (~16 bytes). Treeify node ≈ gấp đôi bộ nhớ per-entry.
+
+**Tie-breaking khi key không Comparable:**
+```java
+// Nếu key không implement Comparable, dùng:
+static int tieBreakOrder(Object a, Object b) {
+    int d;
+    if (a == null || b == null ||
+        (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0)
+        d = (System.identityHashCode(a) <= System.identityHashCode(b)) ? -1 : 1;
+    return d;  // fallback: so sánh theo class name → identity hash
+}
+```
+
 > [!NOTE]
 > Treeify chỉ là **lưới an toàn**, không phải giấy phép để viết `hashCode` tệ. Cây cần key `Comparable` (hoặc dùng tie-break theo identity hash) và tốn bộ nhớ hơn node thường. Một `hashCode` tốt khiến treeify gần như **không bao giờ** xảy ra.
 
