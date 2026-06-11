@@ -365,6 +365,43 @@ Region A (Old) có field trỏ tới Region B (Young)
 
 **Write barrier**: mỗi lần app ghi reference (`obj.field = other`), JVM insert code kiểm tra cross-region reference → cập nhật RSet. Đây là overhead của G1 (~5-10% throughput).
 
+### 9.5. SATB Write Barrier — Snapshot-At-The-Beginning
+
+G1 dùng **SATB** (Snapshot-At-The-Beginning) cho concurrent marking: lưu snapshot trạng thái reference tại thời điểm mark bắt đầu.
+
+**Vấn đề:** Khi concurrent mark đang chạy, app thread có thể xóa reference → GC mất track object (false negative → object sống bị thu nhầm!)
+
+**Giải pháp:** SATB write barrier — mỗi khi app **overwrite** một reference field:
+
+```java
+// Pseudo-code SATB write barrier (injected by JIT):
+void fieldStore(Object obj, Object newRef) {
+    Object oldRef = obj.field;       // đọc ref CŨ
+    if (marking_active) {
+        SATB_enqueue(oldRef);        // lưu ref cũ vào SATB buffer
+    }
+    obj.field = newRef;              // ghi ref mới (actual store)
+}
+```
+
+**Flow:**
+1. App ghi `obj.field = newRef`
+2. Write barrier lưu **old reference** vào thread-local SATB buffer
+3. GC thread drain SATB buffers → mark những objects này là reachable
+4. Kết quả: GC **không bao giờ miss** object đang sống tại snapshot time
+
+```
+Thread-local SATB Buffer (per-thread):
+┌─────┬─────┬─────┬─────┐
+│old₁ │old₂ │old₃ │ ... │ → khi đầy → flush vào global queue
+└─────┴─────┴─────┴─────┘
+              ↓
+GC thread: drain + mark old references → safe
+```
+
+> [!NOTE]
+> SATB có thể dẫn đến **floating garbage** (object chết nhưng vẫn được giữ tới GC cycle sau). Đây là trade-off: correctness (không miss object sống) quan trọng hơn precision (thu hồi ngay mọi garbage).
+
 > [!TIP]
 > Flag `-XX:MaxGCPauseMillis=200` (default) là **target** — G1 tự adjust số region thu mỗi lần để đạt target. Giảm target = GC thường xuyên hơn, pause ngắn hơn, nhưng throughput giảm.
 

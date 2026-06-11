@@ -140,6 +140,48 @@ class Foo {
 
 **Initialization** (sau linking): chạy `<clinit>` (class initializer) — static blocks, static field assignments. JVM đảm bảo **exactly once**, **thread-safe**.
 
+### 4.1. Constant Pool Resolution — từ symbolic → direct reference
+
+Trong `.class` file, mọi reference đều là **symbolic** (text-based). Linking phase **resolve** chúng thành memory addresses:
+
+```
+Constant Pool (trong .class file):
+  #1 = Methodref   java/lang/Object.<init>:()V     ← symbolic
+  #2 = Fieldref    com/example/Foo.name:Ljava/lang/String;
+  #3 = Class       com/example/Bar
+  #7 = String      "hello"
+
+SAU Resolve:
+  #1 → trỏ thẳng vào Method* object trong Metaspace (direct pointer)
+  #2 → offset trong object layout (field access = base + offset)
+  #3 → Klass* trong Metaspace
+  #7 → oop (ordinary object pointer) trong String Pool
+```
+
+**Lazy resolution:** JVM resolve **on-demand** (lần đầu dùng), không resolve hết khi load. Nếu class #3 chưa được load → trigger loading chain.
+
+### 4.2. Class initialization lock — thread safety
+
+```java
+class Config {
+    static final Map<String, String> DEFAULTS = loadDefaults(); // <clinit>
+}
+```
+
+JVM đảm bảo `<clinit>` chỉ chạy **1 lần** dù nhiều thread access đồng thời:
+- Thread đầu tiên acquire **initialization lock** cho class
+- Các thread khác **block** cho đến khi init xong
+- Đây là lý do **Holder pattern** cho lazy singleton hoạt động thread-safe mà không cần `synchronized`:
+
+```java
+class Singleton {
+    private static class Holder {
+        static final Singleton INSTANCE = new Singleton(); // chạy khi Holder được load
+    }
+    static Singleton get() { return Holder.INSTANCE; } // trigger load Holder
+}
+```
+
 ---
 
 ## 5. Runtime Data Areas — memory layout
