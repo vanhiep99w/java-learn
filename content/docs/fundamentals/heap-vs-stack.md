@@ -54,18 +54,18 @@ JVM chia bộ nhớ runtime thành các vùng, mỗi vùng có vòng đời và 
 
 ```
 ┌───────────────────────────── JVM Process Memory ─────────────────────────────┐
-│                                                                               │
-│   HEAP  (chia sẻ toàn JVM, GC quản lý)        METASPACE (native, chia sẻ)     │
-│   ┌──────────────┬──────────────┐             ┌──────────────────────────┐    │
-│   │  Young Gen   │   Old Gen    │             │ class metadata, method,  │    │
-│   │ Eden+S0+S1   │ object sống  │             │ static field, constant   │    │
-│   └──────────────┴──────────────┘             └──────────────────────────┘    │
-│                                                                               │
-│   PER-THREAD (mỗi thread một bộ riêng)                                        │
+│                                                                              │
+│   HEAP  (chia sẻ toàn JVM, GC quản lý)        METASPACE (native, chia sẻ)    │
+│   ┌──────────────┬──────────────┐             ┌──────────────────────────┐   │
+│   │  Young Gen   │   Old Gen    │             │ class metadata, method,  │   │
+│   │ Eden+S0+S1   │ object sống  │             │ static field, constant   │   │
+│   └──────────────┴──────────────┘             └──────────────────────────┘   │
+│                                                                              │
+│   PER-THREAD (mỗi thread một bộ riêng)                                       │
 │   ┌──────────────┬──────────────┬──────────────┐                             │
-│   │  JVM Stack   │  PC Register │ Native Stack │  × N thread                  │
+│   │  JVM Stack   │  PC Register │ Native Stack │  × N thread                 │
 │   └──────────────┴──────────────┴──────────────┘                             │
-└───────────────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Vùng | Chia sẻ? | Chứa gì | Ai dọn |
@@ -84,15 +84,15 @@ Trọng tâm doc này là hai vùng bạn chạm hằng ngày: **Stack** (vòng 
 Mỗi thread có **một JVM stack**. Mỗi lần **gọi method** đẩy một **stack frame**; method **return** thì pop frame đó. Frame chứa:
 
 ```
-┌─────────── Stack Frame (một method call) ───────────┐
-│ Local Variable Array  │ slot 0: this                │
-│                       │ slot 1: tham số / biến cục bộ│
-│                       │ slot 2: ...                 │
-│───────────────────────┼─────────────────────────────│
-│ Operand Stack         │ vùng tính toán tạm (push/pop)│
-│───────────────────────┼─────────────────────────────│
+┌─────────── Stack Frame (một method call) ──────────────────┐
+│ Local Variable Array  │ slot 0: this                       │
+│                       │ slot 1: tham số / biến cục bộ      │
+│                       │ slot 2: ...                        │
+│───────────────────────┼────────────────────────────────────│
+│ Operand Stack         │ vùng tính toán tạm (push/pop)      │
+│───────────────────────┼────────────────────────────────────│
 │ Frame Data            │ ref tới constant pool, return addr │
-└─────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────┘
 ```
 
 - **Local Variable Array**: lưu tham số và biến cục bộ. `long`/`double` chiếm **2 slot**, còn lại 1 slot. `this` luôn ở slot 0 (method instance).
@@ -124,7 +124,7 @@ Mỗi thread có **một JVM stack**. Mỗi lần **gọi method** đẩy một 
 **Mọi object** (`new`) và **mọi mảng** sống trên **heap**, chia sẻ giữa các thread, do GC quản lý. Một object trong HotSpot có layout:
 
 ```
-┌──────────── Object trên Heap ────────────┐
+┌──────────── Object trên Heap ─────────────┐
 │ Object Header                             │
 │   ├─ Mark Word (8 byte): hash, GC age,    │
 │   │   lock state (biased/thin/fat)        │

@@ -56,7 +56,7 @@ Mỗi Java object trên heap bắt đầu bằng **Object Header**:
 ```
 64-bit JVM (compressed oops):
 ┌──────────────────────────────────────────────┬──────────┐
-│              Mark Word (64 bits)              │ Klass Ptr│
+│              Mark Word (64 bits)             │ Klass Ptr│
 │  (lock state, hashCode, GC age, ...)         │ (32 bits)│
 └──────────────────────────────────────────────┴──────────┘
 │←──────────── Object Header (96 bits) ───────────────────→│

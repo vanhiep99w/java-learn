@@ -42,20 +42,20 @@ Bí mật: `javac` **không** dịch ra mã máy của một CPU cụ thể. Nó
 Đây là quan hệ **bao hàm**, không phải ba thứ ngang hàng:
 
 ```
-┌─────────────────────────────────────────────┐
-│ JDK (Java Development Kit)                    │
+┌──────────────────────────────────────────────┐
+│ JDK (Java Development Kit)                   │
 │  ┌──────────────────────────────────────┐    │
-│  │ JRE (Java Runtime Environment)        │    │
-│  │  ┌──────────────────────────────┐     │    │
-│  │  │ JVM                          │     │    │
-│  │  │ (class loader, bộ thực thi,  │     │    │
-│  │  │  GC, JIT compiler)           │     │    │
-│  │  └──────────────────────────────┘     │    │
-│  │  + thư viện runtime (java.base, ...)  │    │
+│  │ JRE (Java Runtime Environment)       │    │
+│  │  ┌──────────────────────────────┐    │    │
+│  │  │ JVM                          │    │    │
+│  │  │ (class loader, bộ thực thi,  │    │    │
+│  │  │  GC, JIT compiler)           │    │    │
+│  │  └──────────────────────────────┘    │    │
+│  │  + thư viện runtime (java.base, ...) │    │
 │  └──────────────────────────────────────┘    │
-│  + công cụ dev: javac, jdb, jar, javadoc,     │
-│    jlink, jstack, jmap, jcmd, jconsole...     │
-└─────────────────────────────────────────────┘
+│  + công cụ dev: javac, jdb, jar, javadoc,    │
+│    jlink, jstack, jmap, jcmd, jconsole...    │
+└──────────────────────────────────────────────┘
 ```
 
 | Thành phần | Là gì | Chứa | Dùng để |

@@ -64,7 +64,7 @@ HTTP Request
      │
      ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    Servlet Container (Tomcat)                 │
+│                    Servlet Container (Tomcat)                │
 │                                                              │
 │  Servlet Filter Chain:                                       │
 │  [CharacterEncodingFilter]                                   │
@@ -73,7 +73,7 @@ HTTP Request
 │  [...]                                             │         │
 │                                                    ▼         │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │  FilterChainProxy (Spring Bean: "springSecurityFilterChain")│
+│  │FilterChainProxy(Spring Bean:"springSecurityFilterChain")│ │
 │  │                                                         │ │
 │  │  SecurityFilterChain #0: /api/**                        │ │
 │  │    → [SecurityContextHolderFilter]                      │ │
@@ -90,8 +90,8 @@ HTTP Request
 │  │    → [AuthorizationFilter]                              │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                                              │
-│                    DispatcherServlet                          │
-│                    └── Controller                             │
+│                    DispatcherServlet                         │
+│                    └── Controller                            │
 └──────────────────────────────────────────────────────────────┘
 ```
 
