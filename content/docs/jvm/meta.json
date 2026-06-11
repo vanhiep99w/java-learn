@@ -4,6 +4,9 @@
     "jvm-jdk-jre",
     "jvm-architecture",
     "garbage-collection",
-    "memory-leak"
+    "memory-leak",
+    "classloader-deep-dive",
+    "reference-types-deep-dive",
+    "jit-compilation-deep-dive"
   ]
 }

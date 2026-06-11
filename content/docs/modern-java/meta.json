@@ -5,6 +5,7 @@
     "optional",
     "records-sealed",
     "virtual-threads",
-    "pattern-matching"
+    "pattern-matching",
+    "reflection-dynamic-proxy-deep-dive"
   ]
 }
