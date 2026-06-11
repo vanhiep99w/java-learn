@@ -494,6 +494,39 @@ sum() = base + Σ cells[i].value
 - **High contention**: mỗi thread ghi **cell riêng** (không CAS cạnh tranh)
 - **`sum()`**: tổng hợp `base + all cells` — eventually consistent
 
+### 10.2b. Cell internals — @Contended và cache line padding
+
+```java
+// Striped64.Cell (base class of LongAdder)
+@jdk.internal.vm.annotation.Contended  // ← padding annotation!
+static final class Cell {
+    volatile long value;
+    // ...
+}
+```
+
+**`@Contended`** thêm **128 bytes padding** xung quanh mỗi Cell → mỗi Cell nằm trên **cache line riêng** (64B hoặc 128B):
+
+```
+Không padding (false sharing):
+Cache line 64B: [Cell0.value | Cell1.value | ...]
+  → Thread 0 ghi Cell0 → invalidate cache line → Thread 1 phải reload Cell1
+  → Performance collapse!
+
+Có @Contended padding:
+Cache line: [pad...pad | Cell0.value | pad...pad]
+Cache line: [pad...pad | Cell1.value | pad...pad]
+  → Thread 0 ghi Cell0 → KHÔNG ảnh hưởng Cell1
+  → Zero false sharing!
+```
+
+**Flow khi LongAdder.add(1):**
+1. CAS `base` (nếu thành công → done, 1 CAS)
+2. CAS fail → tính `cell_index = Thread.probe & (cells.length - 1)`
+3. CAS `cells[cell_index]` (nếu thành công → done)
+4. CAS fail → **rehash** probe → thử cell khác
+5. Nếu vẫn fail nhiều → **expand cells array** (double size)
+
 ### 10.3. Khi nào dùng gì
 
 | Scenario | Chọn |
