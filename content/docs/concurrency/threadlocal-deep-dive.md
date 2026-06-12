@@ -155,14 +155,14 @@ Hệ quả của thiết kế đảo ngược:
 
 ```
 ┌──────────────────┐         ┌──────────────────────────────────┐
-│ Thread-1         │         │ Thread-1.threadLocals             │
-│  threadLocals ───┼────────▶│ (ThreadLocalMap)                  │
-└──────────────────┘         │  [tenantTL → "acme"]              │
-                             │  [userTL   → User(42)]            │
+│ Thread-1         │         │ Thread-1.threadLocals            │
+│  threadLocals ───┼────────▶│ (ThreadLocalMap)                 │
+└──────────────────┘         │  [tenantTL → "acme"]             │
+                             │  [userTL   → User(42)]           │
 ┌──────────────────┐         └──────────────────────────────────┘
 │ Thread-2         │         ┌──────────────────────────────────┐
-│  threadLocals ───┼────────▶│ Thread-2.threadLocals             │
-└──────────────────┘         │  [tenantTL → "globex"]            │
+│  threadLocals ───┼────────▶│ Thread-2.threadLocals            │
+└──────────────────┘         │  [tenantTL → "globex"]           │
                              └──────────────────────────────────┘
         ▲                              ▲
         │                              │
