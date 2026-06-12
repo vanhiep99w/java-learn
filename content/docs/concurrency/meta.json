@@ -10,6 +10,7 @@
     "synchronized-internals-deep-dive",
     "aqs-deep-dive",
     "threadpool-executor-deep-dive",
+    "threadlocal-deep-dive",
     "forkjoin-deep-dive",
     "completablefuture"
   ]
