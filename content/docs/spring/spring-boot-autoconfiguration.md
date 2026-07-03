@@ -5,7 +5,7 @@ description: "Mổ xẻ chi tiết cơ chế auto-configuration trong Spring Boo
 
 ## Mục lục
 
-- [Bối cảnh: Chỉ thêm dependency — bean tự xuất hiện?](#1-bối-cảnh-chỉ-thêm-dependency--bean-tự-xuất-hiện)
+- [Thêm dependency, bean tự xuất hiện — auto-configuration là gì](#1-thêm-dependency-bean-tự-xuất-hiện--auto-configuration-là-gì)
 - [@EnableAutoConfiguration — annotation kích hoạt cỗ máy](#2-enableautoconfiguration--annotation-kích-hoạt-cỗ-máy)
 - [AutoConfigurationImportSelector — load danh sách từ đâu?](#3-autoconfigurationimportselector--load-danh-sách-từ-đâu)
 - [DeferredImportSelector — tại sao auto-config chạy SAU user config?](#4-deferredimportselector--tại-sao-auto-config-chạy-sau-user-config)
@@ -23,7 +23,9 @@ description: "Mổ xẻ chi tiết cơ chế auto-configuration trong Spring Boo
 
 ---
 
-## 1. Bối cảnh: Chỉ thêm dependency — bean tự xuất hiện?
+## 1. Thêm dependency, bean tự xuất hiện — auto-configuration là gì
+
+Auto-configuration là cơ chế lõi khiến Spring Boot "chạy được ngay": thay vì bắt bạn khai báo từng `@Bean` cho `DataSource`, `EntityManagerFactory`, `TransactionManager`..., nó **quét classpath**, thấy class/property nào có mặt thì **có điều kiện** (`@Conditional`) kích hoạt cấu hình mặc định tương ứng. Nó quan trọng vì đây là thứ thu hẹp khoảng cách giữa "thêm một dependency" và "có một service chạy được" — và cũng là nguồn của mọi tình huống "bean tự xuất hiện/biến mất" mà dev không hiểu. Nguyên tắc sống còn của auto-config là **"user bean luôn thắng"**: nhờ cơ chế hoãn (deferred), cấu hình của bạn được parse trước, auto-config chỉ tạo bean mặc định khi bạn chưa define.
 
 Bạn tạo project Spring Boot mới. Chỉ thêm `spring-boot-starter-data-jpa` vào `pom.xml`:
 
@@ -57,6 +59,8 @@ public class UserService {
 
 > [!IMPORTANT]
 > Auto-configuration = **"opinionated defaults with easy override"**. Spring Boot tạo bean mặc định nếu bạn không define. Hễ bạn define `@Bean DataSource` riêng → auto-config bean bị **skip**. Hiểu cơ chế này = hiểu vì sao bean xuất hiện/biến mất khi thêm/bớt dependency hoặc config.
+
+Phần còn lại của doc sẽ đi qua: `@EnableAutoConfiguration` (§2) → `AutoConfigurationImportSelector` (§3) → `DeferredImportSelector` chạy sau user config (§4) → `@Conditional` engine (§5) → condition evaluation order (§6) → ordering giữa auto-config (§7) → mổ xẻ `DataSourceAutoConfiguration` (§8) → module 150+ auto-config (§9) → custom starter (§10) → failure analysis (§11) → condition report debug (§12) → AOT & GraalVM native (§13) → anti-patterns (§14) → cheat sheet (§15).
 
 ---
 

@@ -5,7 +5,7 @@ description: "Mổ xẻ ba Set: HashSet/LinkedHashSet được backing bởi Has
 
 ## Mục lục
 
-- [Bối cảnh: set lọc trùng mà "mất" phần tử](#1-bối-cảnh-set-lọc-trùng-mà-mất-phần-tử)
+- [TreeSet nuốt phần tử: vì sao lọc trùng lại làm mất dữ liệu](#1-treeset-nuốt-phần-tử-vì-sao-lọc-trùng-lại-làm-mất-dữ-liệu)
 - [Sự thật: Set chỉ là Map đội lốt](#2-sự-thật-set-chỉ-là-map-đội-lốt)
 - [HashSet — HashMap với value giả PRESENT](#3-hashset--hashmap-với-value-giả-present)
 - [LinkedHashSet — thêm doubly-linked giữ thứ tự chèn](#4-linkedhashset--thêm-doubly-linked-giữ-thứ-tự-chèn)
@@ -19,9 +19,11 @@ description: "Mổ xẻ ba Set: HashSet/LinkedHashSet được backing bởi Has
 
 ---
 
-## 1. Bối cảnh: set lọc trùng mà "mất" phần tử
+## 1. TreeSet nuốt phần tử: vì sao lọc trùng lại làm mất dữ liệu
 
-Bạn gom danh sách user vào `TreeSet` để vừa lọc trùng vừa sort theo điểm:
+`HashSet`, `LinkedHashSet` và `TreeSet` là ba implementation `Set` chính của Java, tất cả đều loại trùng — nhưng cách chúng định nghĩa "trùng" khác nhau, được backing bởi ba cấu trúc dữ liệu khác nhau. Chúng quan trọng vì chọn sai loại không chỉ ảnh hưởng hiệu năng (O(1) vs O(log n)) mà còn cho **kết quả sai**: phần tử hợp lệ có thể bị "nuốt" mất mà không ném exception.
+
+Ví dụ bất ngờ: gom user vào `TreeSet` để vừa lọc trùng vừa sort theo điểm —
 
 ```java
 record User(String id, int score) {}
@@ -36,6 +38,8 @@ System.out.println(top.size());   // 1, không phải 2!
 
 > [!IMPORTANT]
 > Ba `Set` này hành xử khác nhau **không phải ngẫu nhiên** — chúng được xây trên ba cấu trúc backing khác nhau. `HashSet`/`LinkedHashSet` dùng `equals`+`hashCode`; `TreeSet` dùng `compareTo`/`Comparator`. Hiểu Set là hiểu **Map nào đang đứng sau nó**.
+
+Phần còn lại của doc sẽ đi qua: sự thật Set chỉ là Map đội lốt (§2) → HashSet = HashMap với value giả PRESENT (§3) → LinkedHashSet thêm doubly-linked giữ thứ tự chèn (§4) → TreeSet = Red-Black Tree qua TreeMap (§5) → vì sao TreeSet dùng compareTo không dùng equals (§6) → so sánh ba loại về thứ tự/độ phức tạp/null (§7) → API điều hướng NavigableSet của TreeSet (§8) → chọn Set nào & tuning (§9) → anti-patterns (§10) → cheat sheet (§11).
 
 ---
 

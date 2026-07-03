@@ -7,7 +7,7 @@ description: "Đào sâu nhóm pattern khởi tạo trong Java: Singleton (doubl
 
 ## Mục lục
 
-- [Bối cảnh: `new` ở khắp nơi và cái giá của nó](#1-bối-cảnh-new-ở-khắp-nơi-và-cái-giá-của-nó)
+- [`new` ở khắp nơi và cái giá của nó](#1-new-ở-khắp-nơi-và-cái-giá-của-nó)
 - [Singleton — và mọi cách làm sai](#2-singleton--và-mọi-cách-làm-sai)
 - [Factory Method](#3-factory-method)
 - [Abstract Factory](#4-abstract-factory)
@@ -20,9 +20,9 @@ description: "Đào sâu nhóm pattern khởi tạo trong Java: Singleton (doubl
 
 ---
 
-## 1. Bối cảnh: `new` ở khắp nơi và cái giá của nó
+## 1. `new` ở khắp nơi và cái giá của nó
 
-`new ConcreteClass()` rải khắp code trông vô hại, nhưng nó khoá bạn vào **lớp cụ thể** ngay tại điểm tạo:
+Các creational pattern (Singleton, Factory Method, Abstract Factory, Builder, Prototype) **tách logic "tạo cái gì và như thế nào" ra khỏi "dùng nó"**, để đổi loại object, kiểm soát số lượng, hay xây object phức tạp mà không phải sửa từng chỗ `new`. Chúng quan trọng vì `new ConcreteClass()` rải khắp code trông vô hại nhưng khoá bạn vào **lớp cụ thể** ngay tại điểm tạo — muốn đổi implementation (vd Stripe → PayPal) là phải lùng sửa mọi chỗ.
 
 ```java
 // Mỗi chỗ new là một chỗ phải sửa khi đổi implementation
@@ -33,6 +33,8 @@ Creational patterns **tách logic "tạo cái gì và như thế nào" ra khỏi
 
 > [!IMPORTANT]
 > Vấn đề cốt lõi các creational pattern giải quyết: **giảm coupling tới lớp cụ thể** (liên hệ DIP/OCP). Code dùng object chỉ nên biết *interface*, còn "object nào, tạo ra sao" do một nơi tập trung quyết định.
+
+Phần còn lại của doc sẽ đi qua: Singleton và mọi cách làm sai (§2) → Factory Method (§3) → Abstract Factory (§4) → Builder thuần hoá constructor khổng lồ (§5) → Prototype deep vs shallow copy (§6) → các pattern trong JDK (§7) → so sánh & khi nào dùng cái nào (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

@@ -5,7 +5,7 @@ description: "Mổ xẻ Memory Leak trong Java: tại sao có GC vẫn leak, GC 
 
 ## Mục lục
 
-- [Bối cảnh: OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được](#1-bối-cảnh-oom-sau-3-ngày--gc-chạy-liên-tục-nhưng-không-cứu-được)
+- [OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được](#1-oom-sau-3-ngày--gc-chạy-liên-tục-nhưng-không-cứu-được)
 - [Memory Leak trong Java — GC không phải thuốc chữa bách bệnh](#2-memory-leak-trong-java--gc-không-phải-thuốc-chữa-bách-bệnh)
 - [GC Roots & Reachability — ai quyết định object sống hay chết](#3-gc-roots--reachability--ai-quyết-định-object-sống-hay-chết)
 - [GC Mark Phase — cách JVM duyệt object graph](#4-gc-mark-phase--cách-jvm-duyệt-object-graph)
@@ -21,7 +21,7 @@ description: "Mổ xẻ Memory Leak trong Java: tại sao có GC vẫn leak, GC 
 
 ---
 
-## 1. Bối cảnh: OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được
+## 1. OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được
 
 Service xử lý event từ Kafka. Mỗi event được log vào cache "gần đây" để debug:
 
@@ -55,6 +55,8 @@ GC chạy liên tục nhưng **thu hồi gần như không gì** — vì `recent
 
 > [!IMPORTANT]
 > Memory leak trong Java **không phải** "quên free memory" (như C/C++). Nó là **object vẫn reachable qua reference chain nhưng ứng dụng không bao giờ dùng nữa**. GC thấy object reachable → không thu hồi → heap đầy dần.
+
+Phần còn lại của doc sẽ đi qua: memory leak trong Java & vì sao GC không cứu (§2) → GC Roots & reachability (§3) → GC mark phase (§4) → reference types Strong/Soft/Weak/Phantom (§5) → reference processing pipeline (§6) → 10 nguyên nhân leak phổ biến (§7) → ThreadLocal leak (§8) → ClassLoader leak & Metaspace OOM (§9) → heap dump (§10) → MAT (§11) → production monitoring (§12).
 
 ---
 

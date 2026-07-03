@@ -7,7 +7,7 @@ description: "Đào sâu 5 nguyên tắc SOLID với ví dụ vi phạm và các
 
 ## Mục lục
 
-- [Bối cảnh: vì sao codebase "thối rữa" theo thời gian](#1-bối-cảnh-vì-sao-codebase-thối-rữa-theo-thời-gian)
+- [Vì sao codebase "thối rữa" theo thời gian](#1-vì-sao-codebase-thối-rữa-theo-thời-gian)
 - [S — Single Responsibility Principle](#2-s--single-responsibility-principle)
 - [O — Open/Closed Principle](#3-o--openclosed-principle)
 - [L — Liskov Substitution Principle](#4-l--liskov-substitution-principle)
@@ -20,11 +20,9 @@ description: "Đào sâu 5 nguyên tắc SOLID với ví dụ vi phạm và các
 
 ---
 
-## 1. Bối cảnh: vì sao codebase "thối rữa" theo thời gian
+## 1. Vì sao codebase "thối rữa" theo thời gian
 
-Một service `OrderService` ban đầu sạch sẽ. Sáu tháng sau nó dài 2000 dòng: tính giá, gọi payment, gửi email, ghi log, xuất PDF hoá đơn, validate. Mỗi lần đổi format email là phải đụng vào class xử lý tiền — và mỗi lần đụng là một lần nguy cơ làm hỏng logic thanh toán.
-
-Đây là **coupling** (gắn kết chặt) và thiếu **cohesion** (gom đúng việc). SOLID (Robert C. Martin) là 5 nguyên tắc để hệ thống **dễ thay đổi**: thêm tính năng mà không phải sửa code cũ, và sửa một chỗ không làm vỡ chỗ khác.
+SOLID (Robert C. Martin) là 5 nguyên tắc giữ code **dễ thay đổi**: thêm tính năng mà không phải sửa code cũ, sửa một chỗ không làm vỡ chỗ khác (low coupling, high cohesion). Chúng quan trọng vì codebase dù viết sạch ban đầu cũng "thối rữa" (code rot) theo thời gian — một service phình lên 2000 dòng gánh đủ thứ trách nhiệm, mỗi lần sửa nhỏ đều rủi ro phá logic lân cận. Gốc rễ của sự thối rữa là **coupling** chặt (sửa chỗ này kéo theo chỗ kia) và **cohesion** thấp (một class gánh nhiều trách nhiệm không liên quan).
 
 ```mermaid
 flowchart LR
@@ -40,6 +38,8 @@ flowchart LR
 
 > [!IMPORTANT]
 > SOLID không phải mục tiêu — nó là **phương tiện** để đạt mục tiêu thật: code chịu được thay đổi mà không lan ra (low coupling, high cohesion). Đừng áp dụng SOLID máy móc; áp dụng khi nó *giảm chi phí thay đổi trong tương lai*.
+
+Phần còn lại của doc sẽ đi qua: Single Responsibility (§2) → Open/Closed (§3) → Liskov Substitution (§4) → Interface Segregation (§5) → Dependency Inversion (§6) → liên hệ SOLID với design patterns (§7) → khi nào ĐỪNG cứng nhắc (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

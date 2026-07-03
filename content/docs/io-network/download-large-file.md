@@ -7,7 +7,7 @@ description: "Đào sâu kỹ thuật tải/truyền file lớn an toàn bộ nh
 
 ## Mục lục
 
-- [Bối cảnh: vì sao "tải file" lại khó khi file lớn](#1-bối-cảnh-vì-sao-tải-file-lại-khó-khi-file-lớn)
+- [Tải file lớn mà không nổ RAM](#1-tải-file-lớn-mà-không-nổ-ram)
 - [Quy tắc số một: stream, đừng buffer toàn bộ](#2-quy-tắc-số-một-stream-đừng-buffer-toàn-bộ)
 - [HTTP Range request & resume download](#3-http-range-request--resume-download)
 - [Tải song song nhiều phần (multipart/parallel)](#4-tải-song-song-nhiều-phần-multipartparallel)
@@ -20,7 +20,7 @@ description: "Đào sâu kỹ thuật tải/truyền file lớn an toàn bộ nh
 
 ---
 
-## 1. Bối cảnh: vì sao "tải file" lại khó khi file lớn
+## 1. Tải file lớn mà không nổ RAM
 
 Tải file 5MB thì code nào cũng chạy. Tải file 50GB phơi bày mọi sai lầm:
 
@@ -38,6 +38,8 @@ Tải file lớn đúng cách phải giải quyết: **bộ nhớ** (stream), **
 
 > [!IMPORTANT]
 > Khác biệt tư duy: file nhỏ coi như "một giá trị" (nạp rồi dùng); file lớn coi như "một **luồng** đi qua" (đọc khúc nào ghi khúc đó, không bao giờ giữ toàn bộ). Mọi kỹ thuật dưới đây đều xoay quanh nguyên tắc này.
+
+Phần còn lại của doc sẽ đi qua: quy tắc stream cơ bản (§2) → HTTP Range request & resume (§3) → tải song song nhiều phần (§4) → zero-copy với transferTo/sendfile (§5) → checksum & atomic rename (§6) → xử lý lỗi/retry (§7) → phía server (§8) → anti-patterns (§9).
 
 ---
 

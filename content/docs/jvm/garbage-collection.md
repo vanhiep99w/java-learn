@@ -5,7 +5,7 @@ description: "Mổ xẻ GC trong JVM: GC Roots & reachability, generational hypo
 
 ## Mục lục
 
-- [Bối cảnh: Full GC 12 giây — service mất 300 request](#1-bối-cảnh-full-gc-12-giây--service-mất-300-request)
+- [Full GC 12 giây — service mất 300 request](#1-full-gc-12-giây--service-mất-300-request)
 - [GC Roots & Reachability — ai sống, ai chết?](#2-gc-roots--reachability--ai-sống-ai-chết)
 - [Generational Hypothesis — vì sao chia Young/Old](#3-generational-hypothesis--vì-sao-chia-youngold)
 - [Heap Layout: Eden, Survivor, Old, Metaspace](#4-heap-layout-eden-survivor-old-metaspace)
@@ -23,7 +23,7 @@ description: "Mổ xẻ GC trong JVM: GC Roots & reachability, generational hypo
 
 ---
 
-## 1. Bối cảnh: Full GC 12 giây — service mất 300 request
+## 1. Full GC 12 giây — service mất 300 request
 
 Bạn vận hành một order service Spring Boot. SLA yêu cầu p99 < 200ms. Một ngày dashboard hiện: **p99 nhảy lên 12.000ms**, error rate tăng vọt, rồi tự hồi phục sau 12 giây. Pattern này lặp lại mỗi 4-5 phút.
 
@@ -51,6 +51,8 @@ Pause time: **8-15ms** — giảm **1000x**. Không đổi code, chỉ đổi **
 
 > [!IMPORTANT]
 > GC không hỏng vì "Java chậm". Nó hỏng vì bạn **không hiểu** collector đang dùng, heap được chia như thế nào, và object của bạn sống bao lâu. Doc này mổ xẻ từng lớp.
+
+Phần còn lại của doc sẽ đi qua: GC Roots & reachability (§2) → generational hypothesis (§3) → heap layout Eden/Survivor/Old/Metaspace (§4) → ba thuật toán Mark-Sweep/Copying/Mark-Compact (§5) → stop-the-world (§6) → Serial & Parallel collector (§7) → CMS (§8) → G1 (§9) → ZGC (§10) → so sánh 5 collector (§11) → đọc GC log (§12) → tuning flags (§13) → anti-patterns (§14).
 
 ---
 

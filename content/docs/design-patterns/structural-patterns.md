@@ -7,7 +7,7 @@ description: "Đào sâu nhóm pattern cấu trúc trong Java: Adapter (object v
 
 ## Mục lục
 
-- [Bối cảnh: ba pattern "bọc object" trông giống nhau](#1-bối-cảnh-ba-pattern-bọc-object-trông-giống-nhau)
+- [Ba pattern "bọc object" trông giống nhau](#1-ba-pattern-bọc-object-trông-giống-nhau)
 - [Adapter — làm hai interface không khớp nói chuyện được](#2-adapter--làm-hai-interface-không-khớp-nói-chuyện-được)
 - [Decorator — thêm hành vi động bằng cách bọc](#3-decorator--thêm-hành-vi-động-bằng-cách-bọc)
 - [Proxy — đại diện kiểm soát truy cập](#4-proxy--đại-diện-kiểm-soát-truy-cập)
@@ -20,9 +20,9 @@ description: "Đào sâu nhóm pattern cấu trúc trong Java: Adapter (object v
 
 ---
 
-## 1. Bối cảnh: ba pattern "bọc object" trông giống nhau
+## 1. Ba pattern "bọc object" trông giống nhau
 
-Adapter, Decorator, và Proxy đều **bọc một object khác** và đều có cùng "hình dạng" code:
+Các structural pattern (Adapter, Decorator, Proxy, Facade, Composite, Bridge, Flyweight) **lắp ghép object thành cấu trúc lớn hơn** — dịch interface, thêm hành vi, kiểm soát truy cập, hay gom subsystem phức tạp. Chúng đáng học kỹ vì ba pattern phổ biến nhất (Adapter, Decorator, Proxy) đều **bọc một object khác** và có "hình dạng" code gần như giống hệt nhau, khác biệt duy nhất nằm ở **ý định** (intent).
 
 ```java
 class Wrapper implements SomeInterface {
@@ -40,6 +40,8 @@ Khác biệt **không** nằm ở code mà ở **ý định** (intent):
 
 > [!IMPORTANT]
 > Đây là lý do design pattern được phân loại theo **ý định**, không theo cấu trúc code. Ba pattern này gần như giống hệt về mặt UML, nhưng giải quyết ba vấn đề khác nhau. Nhớ ý định = chọn đúng tên khi giao tiếp với đồng đội.
+
+Phần còn lại của doc sẽ đi qua: Adapter đổi interface (§2) → Decorator thêm hành vi động (§3) → Proxy kiểm soát truy cập (§4) → phân biệt Adapter vs Decorator vs Proxy (§5) → Facade một cửa cho subsystem (§6) → Composite cây đệ quy (§7) → Bridge & Flyweight (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

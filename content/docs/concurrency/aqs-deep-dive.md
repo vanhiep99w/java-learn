@@ -5,7 +5,7 @@ description: "Mổ xẻ AQS — nền tảng của ReentrantLock, Semaphore, Cou
 
 ## Mục lục
 
-- [Bối cảnh: tự viết Lock bằng CAS — và thất bại](#1-bối-cảnh-tự-viết-lock-bằng-cas--và-thất-bại)
+- [Tự viết Lock bằng CAS — và thất bại](#1-tự-viết-lock-bằng-cas--và-thất-bại)
 - [AQS là gì — framework xây synchronizer](#2-aqs-là-gì--framework-xây-synchronizer)
 - [State — một int quyết định mọi thứ](#3-state--một-int-quyết-định-mọi-thứ)
 - [CLH Queue biến thể — hàng đợi thread chờ lock](#4-clh-queue-biến-thể--hàng-đợi-thread-chờ-lock)
@@ -21,7 +21,9 @@ description: "Mổ xẻ AQS — nền tảng của ReentrantLock, Semaphore, Cou
 
 ---
 
-## 1. Bối cảnh: tự viết Lock bằng CAS — và thất bại
+## 1. Tự viết Lock bằng CAS — và thất bại
+
+`AbstractQueuedSynchronizer` (AQS) là khung sườn nằm dưới hầu hết `ReentrantLock`, `Semaphore`, `CountDownLatch`, `ReentrantReadWriteLock` và `Condition`. Hiểu nó là hiểu cách mọi synchronizer của Java xếp hàng thread, park/unpark và xoay quanh một biến `state` duy nhất. Cách nhanh nhất thấy vì sao cần AQS là thử **tự viết lock** chỉ bằng CAS — và xem nó gãy ở đâu.
 
 Bạn thử viết spin lock đơn giản:
 
@@ -47,6 +49,8 @@ Vấn đề:
 3. **Không hỗ trợ timeout**: không thể "chờ tối đa 5s rồi bỏ".
 4. **Không hỗ trợ interrupt**: thread bị interrupt vẫn spin.
 5. **Không reentrant**: cùng thread lock lần 2 → deadlock chính nó.
+
+Cả 5 vấn đề trên đều là thứ AQS giải quyết sẵn — queue, park/unpark, interrupt, timeout, fairness đều nằm trong một abstract class. Phần còn lại của doc sẽ đi qua: AQS là gì và gồm gì (§2) → biến `state` (§3) → CLH queue (§4) → acquire/release exclusive (§5) → shared mode (§6) → cách ReentrantLock/Semaphore/CountDownLatch/ReadWriteLock đắp lên AQS (§7–§10) → ConditionObject (§11) → cancellation/timeout (§12).
 
 > [!IMPORTANT]
 > Doug Lea thiết kế AQS để giải quyết **tất cả** vấn đề trên trong **một framework** duy nhất. Thay vì mỗi synchronizer tự viết queue + park/unpark + cancel, chúng chia sẻ AQS làm nền tảng — chỉ cần override `tryAcquire`/`tryRelease`.

@@ -7,7 +7,7 @@ description: "Phân biệt rạch ròi hai khái niệm hay bị gộp: data rac
 
 ## Mục lục
 
-- [Bối cảnh: hai bug, hai nguyên nhân, hay bị gọi nhầm tên](#1-bối-cảnh-hai-bug-hai-nguyên-nhân-hay-bị-gọi-nhầm-tên)
+- [Hai bug, hai nguyên nhân, hay bị gọi nhầm tên](#1-hai-bug-hai-nguyên-nhân-hay-bị-gọi-nhầm-tên)
 - [Data race — định nghĩa chính xác theo JMM](#2-data-race--định-nghĩa-chính-xác-theo-jmm)
 - [Vì sao data race nguy hiểm: visibility & reordering](#3-vì-sao-data-race-nguy-hiểm-visibility--reordering)
 - [Race condition — lỗi logic theo thứ tự](#4-race-condition--lỗi-logic-theo-thứ-tự)
@@ -20,7 +20,9 @@ description: "Phân biệt rạch ròi hai khái niệm hay bị gộp: data rac
 
 ---
 
-## 1. Bối cảnh: hai bug, hai nguyên nhân, hay bị gọi nhầm tên
+## 1. Hai bug, hai nguyên nhân, hay bị gọi nhầm tên
+
+"Data race" và "race condition" thường bị gộp làm một, nhưng chúng là hai lỗi **khác hẳn về bản chất**: một cái thuộc mô hình bộ nhớ (JMM), một cái thuộc logic chương trình. Phân biệt rạch ròi hai khái niệm này là nền tảng để sửa đúng — `volatile`/`Atomic` xoá được data race nhưng không xoá được race condition. Bắt đầu từ ví dụ kinh điển.
 
 Đây là `counter++` chạy trên 2 thread, mỗi thread tăng 1 triệu lần:
 
@@ -35,6 +37,8 @@ Kết quả cuối **nhỏ hơn 2.000.000** — kinh điển. Nhưng vì sao? C�
 
 1. **Data race**: hai thread đọc/ghi `value` đồng thời không đồng bộ → JMM không đảm bảo thread này thấy giá trị mới nhất của thread kia (visibility), thậm chí compiler/CPU được phép sắp xếp lại lệnh.
 2. **Race condition**: `value++` gồm 3 bước (read-modify-write); hai thread xen kẽ → một update bị "đè" (lost update) — đây là lỗi *logic* về thứ tự, độc lập với vấn đề bộ nhớ.
+
+Phần còn lại của doc sẽ đi qua: định nghĩa chính xác data race theo JMM (§2) → vì sao nó nguy hiểm — visibility & reordering (§3) → race condition là gì (§4) → 4 tổ hợp có/không data race × có/không race condition (§5) → benign vs harmful (§6) → cách phát hiện (§7) → cách khắc phục (§8).
 
 > [!IMPORTANT]
 > **Data race** là khái niệm ở tầng **mô hình bộ nhớ** (memory model — về visibility & ordering). **Race condition** là khái niệm ở tầng **logic chương trình** (về thứ tự các thao tác tạo kết quả sai). Một chương trình có thể có cái này mà không có cái kia. Gộp chúng làm một là sai lầm phổ biến nhất khi nói về concurrency.

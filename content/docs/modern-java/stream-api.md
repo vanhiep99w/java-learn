@@ -5,7 +5,7 @@ description: "Mổ xẻ Stream API Java: lazy evaluation pipeline, Spliterator, 
 
 ## Mục lục
 
-- [Bối cảnh: Xử lý 10 triệu record — for loop 8s, stream 0.9s](#1-bối-cảnh-xử-lý-10-triệu-record--for-loop-8s-stream-09s)
+- [Xử lý 10 triệu record — for loop 8s, stream 0.9s](#1-xử-lý-10-triệu-record--for-loop-8s-stream-09s)
 - [Stream Pipeline Architecture — Source, Intermediate, Terminal](#2-stream-pipeline-architecture--source-intermediate-terminal)
 - [Lazy Evaluation — không gì chạy cho tới terminal](#3-lazy-evaluation--không-gì-chạy-cho-tới-terminal)
 - [Spliterator — nền tảng split & traverse](#4-spliterator--nền-tảng-split--traverse)
@@ -21,9 +21,9 @@ description: "Mổ xẻ Stream API Java: lazy evaluation pipeline, Spliterator, 
 
 ---
 
-## 1. Bối cảnh: Xử lý 10 triệu record — for loop 8s, stream 0.9s
+## 1. Xử lý 10 triệu record — for loop 8s, stream 0.9s
 
-Bạn có danh sách 10 triệu giao dịch, cần: lọc status = COMPLETED, map sang amount, tính tổng. Cách cổ điển:
+Stream API là một **pipeline lười (lazy)** gồm source → intermediate ops → terminal op, cho phép khai báo *cái gì* thay vì *làm thế nào* và tự động song song hoá qua `parallelStream`. Nó quan trọng vì cùng bài toán xử lý 10 triệu bản ghi, code khai báo ngắn gọn mà còn **nhanh hơn** for-loop thủ công khi tận dụng được song song.
 
 ```java
 long total = 0;
@@ -58,6 +58,8 @@ List<Transaction> sorted = linkedList.parallelStream()
 
 > [!IMPORTANT]
 > Stream API không magic. Hiệu năng phụ thuộc: **(1)** data source (array vs linked), **(2)** operation type (stateless vs stateful), **(3)** element count, **(4)** per-element cost. Doc này mổ xẻ từng yếu tố.
+
+Phần còn lại của doc sẽ đi qua: kiến trúc pipeline Source/Intermediate/Terminal (§2) → lazy evaluation & Sink chain (§3) → Spliterator (§4) → intermediate ops stateless vs stateful (§5) → terminal ops (§6) → short-circuiting (§7) → collector internals (§8) → parallel stream & ForkJoinPool (§9) → khi nào parallel nhanh/chậm (§10) → so sánh stream vs loop (§11) → anti-patterns (§12) → cheat sheet (§13).
 
 ---
 

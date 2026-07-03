@@ -5,7 +5,7 @@ description: "Mổ xẻ String trong Java: tại sao immutable (security, cachin
 
 ## Mục lục
 
-- [Bối cảnh: Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap](#1-bối-cảnh-full-gc-4-giây--2-triệu-string-duplicate-chiếm-60-heap)
+- [Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap](#1-full-gc-4-giây--2-triệu-string-duplicate-chiếm-60-heap)
 - [String là gì — cấu trúc nội bộ qua các phiên bản JDK](#2-string-là-gì--cấu-trúc-nội-bộ-qua-các-phiên-bản-jdk)
 - [Tại sao String immutable — 5 lý do thiết kế](#3-tại-sao-string-immutable--5-lý-do-thiết-kế)
 - [String Pool — intern table và intern()](#4-string-pool--intern-table-và-intern)
@@ -19,7 +19,9 @@ description: "Mổ xẻ String trong Java: tại sao immutable (security, cachin
 
 ---
 
-## 1. Bối cảnh: Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap
+## 1. Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap
+
+**String** là class đặc biệt nhất trong JDK: `final`, **immutable**, được JVM đối xử riêng với **String Pool** (intern table) và **Compact Strings** (JDK 9+, 1 byte/char cho ASCII). Vì immutable mà nó an toàn chia sẻ giữa thread, cache hashCode và dùng làm key. Nhưng chính việc mỗi parse sinh ra String object mới khiến string thường chiếm 25–40% heap — và là mục tiêu số một để tối ưu bộ nhớ.
 
 Service nhận JSON event từ Kafka, parse rồi lưu vào list:
 
@@ -47,6 +49,8 @@ Fix: `event.setCountry(event.getCountry().intern())` → tất cả `"VN"` trỏ
 
 > [!IMPORTANT]
 > String thường chiếm **25-40% heap** của ứng dụng Java. Hiểu String Pool, intern, compact string, và deduplication là chìa khoá tối ưu bộ nhớ.
+
+Phần còn lại của doc sẽ đi qua: cấu trúc nội bộ String qua các JDK (§2) → 5 lý do immutable (§3) → String Pool & intern() (§4) → Compact Strings (§5) → concatenation từ StringBuilder đến invokedynamic (§6) → StringBuilder vs StringBuffer (§7) → hashCode caching (§8) → G1 String Deduplication (§9) → == vs equals (§10) → anti-patterns & tóm tắt (§11).
 
 ---
 

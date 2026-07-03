@@ -5,7 +5,7 @@ description: "Mổ xẻ ClassLoader trong JVM: parent delegation model, Bootstra
 
 ## Mục lục
 
-- [Bối cảnh: deploy lại mà class cũ vẫn sống — memory leak 2GB](#1-bối-cảnh-deploy-lại-mà-class-cũ-vẫn-sống--memory-leak-2gb)
+- [Redeploy mà class cũ vẫn sống — memory leak 2GB](#1-redeploy-mà-class-cũ-vẫn-sống--memory-leak-2gb)
 - [ClassLoader là gì — mỗi class có một "danh tính kép"](#2-classloader-là-gì--mỗi-class-có-một-danh-tính-kép)
 - [Parent Delegation Model — tìm class từ trên xuống](#3-parent-delegation-model--tìm-class-từ-trên-xuống)
 - [Ba ClassLoader mặc định — Bootstrap, Platform, Application](#4-ba-classloader-mặc-định--bootstrap-platform-application)
@@ -21,7 +21,7 @@ description: "Mổ xẻ ClassLoader trong JVM: parent delegation model, Bootstra
 
 ---
 
-## 1. Bối cảnh: deploy lại mà class cũ vẫn sống — memory leak 2GB
+## 1. Redeploy mà class cũ vẫn sống — memory leak 2GB
 
 Team vận hành Tomcat với 50+ webapp. Mỗi lần **hot redeploy** (undeploy → deploy lại WAR mới), heap monitor cho thấy Metaspace **chỉ tăng, không giảm**. Sau 10 lần redeploy: Metaspace từ 128MB → 2.1GB → `OutOfMemoryError: Metaspace`.
 
@@ -35,6 +35,8 @@ WebappClassLoader (current)       → 3000 class definitions     ← ACTIVE
 
 > [!IMPORTANT]
 > Để GC thu hồi **class metadata**, cần thu hồi **ClassLoader**. Để thu hồi ClassLoader, **không còn reference nào** trỏ tới nó hoặc bất kỳ class nào nó load. Một `static` field, một thread chưa stop, một JDBC driver chưa deregister — đủ để giữ toàn bộ ClassLoader sống mãi.
+
+Phần còn lại của doc sẽ đi qua: ClassLoader là gì & class identity (§2) → parent delegation model (§3) → ba ClassLoader mặc định (§4) → loading → linking → initializing (§5) → Class.forName vs loadClass (§6) → custom ClassLoader (§7) → context ClassLoader (§8) → hot-reload (§9) → ClassLoader leak & Metaspace OOM (§10) → module system JDK 9+ (§11) → SPI & ServiceLoader (§12).
 
 ---
 

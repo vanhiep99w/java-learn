@@ -5,7 +5,7 @@ description: "Mổ xẻ chi tiết IoC Container trong Spring: DefaultListableBe
 
 ## Mục lục
 
-- [Bối cảnh: @Autowired có 3 bean cùng type — ai được chọn?](#1-bối-cảnh-autowired-có-3-bean-cùng-type--ai-được-chọn)
+- [@Autowired có 3 bean cùng type — ai được chọn](#1-autowired-có-3-bean-cùng-type--ai-được-chọn)
 - [Container Architecture — BeanFactory vs ApplicationContext](#2-container-architecture--beanfactory-vs-applicationcontext)
 - [DefaultListableBeanFactory — class "thần thánh" 4000 dòng](#3-defaultlistablebeanfactory--class-thần-thánh-4000-dòng)
 - [BeanDefinition — blueprint trước khi bean tồn tại](#4-beandefinition--blueprint-trước-khi-bean-tồn-tại)
@@ -23,7 +23,9 @@ description: "Mổ xẻ chi tiết IoC Container trong Spring: DefaultListableBe
 
 ---
 
-## 1. Bối cảnh: @Autowired có 3 bean cùng type — ai được chọn?
+## 1. @Autowired có 3 bean cùng type — ai được chọn
+
+IoC Container là **lớp sâu nhất** của Spring: nó nắm giữ **BeanDefinition** (metadata mỗi bean), **singleton cache** (instance thực), và **dependency resolution algorithm** — bộ máy quyết định khi `@Autowired` một type có nhiều hơn một bean thì chọn cái nào. Mọi thứ khác (AOP, Transaction, Security, Boot auto-config) đều chạy **bên trên** container. Nắm container nghĩa là nắm được: bean sinh ra từ đâu, khi inject type có nhiều candidate thì ưu tiên theo thứ tự nào, và circular dependency được khéo léo xử lý ra sao. Khi xảy ra `NoUniqueBeanDefinitionException` hay "inject nhầm bean", câu trả lời gần như luôn nằm ở `DefaultListableBeanFactory` — class "thần thánh" ~4000 dòng đứng sau mọi `@Autowired`.
 
 Bạn có 3 `DataSource` bean trong application:
 
@@ -69,6 +71,8 @@ Không exception, không warning — Spring chọn `primaryDs` vì có `@Primary
 
 > [!IMPORTANT]
 > IoC Container là **lớp sâu nhất** của Spring — mọi thứ khác (AOP, Transaction, Security, Boot) chạy **bên trên** container. `DefaultListableBeanFactory` là nơi mọi bean được tạo, inject, quản lý. Doc này mổ xẻ từng cơ chế bên trong.
+
+Phần còn lại của doc sẽ đi qua: kiến trúc container `BeanFactory` vs `ApplicationContext` (§2) → `DefaultListableBeanFactory` 4000 dòng (§3) → `BeanDefinition` blueprint (§4) → `ConfigurationClassPostProcessor` (§5) → dependency resolution algorithm (§6) → circular dependency three-level cache (§7) → `FactoryBean` vs `@Bean` (§8) → `@Conditional` & auto-configuration (§9) → `Environment` & `PropertySource` (§10) → `ApplicationEvent` system (§11) → bean scope (§12) → parent-child context (§13) → anti-patterns (§14) → cheat sheet (§15).
 
 ---
 

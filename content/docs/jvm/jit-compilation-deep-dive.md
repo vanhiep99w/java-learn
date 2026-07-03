@@ -5,7 +5,7 @@ description: "Mổ xẻ JIT compilation trong HotSpot JVM: interpreter → C1 �
 
 ## Mục lục
 
-- [Bối cảnh: cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery](#1-bối-cảnh-cùng-code-chạy-chậm-lần-đầu-rồi-nhanh-100--warmup-mystery)
+- [Cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery](#1-cùng-code-chạy-chậm-lần-đầu-rồi-nhanh-100--warmup-mystery)
 - [Interpreter → JIT: tại sao không compile trước hết?](#2-interpreter--jit-tại-sao-không-compile-trước-hết)
 - [Tiered Compilation — 5 level từ interpreter đến C2 optimized](#3-tiered-compilation--5-level-từ-interpreter-đến-c2-optimized)
 - [Profiling & Invocation Counter — khi nào method được compile?](#4-profiling--invocation-counter--khi-nào-method-được-compile)
@@ -22,7 +22,7 @@ description: "Mổ xẻ JIT compilation trong HotSpot JVM: interpreter → C1 �
 
 ---
 
-## 1. Bối cảnh: cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery
+## 1. Cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery
 
 Benchmark naive: đo thời gian `fibonacci(40)`:
 
@@ -46,6 +46,8 @@ Lần 30+:    C2 compiled (aggressive optimized native code)         ~8ms
 
 > [!IMPORTANT]
 > Java không "interpreted language" cũng không "compiled language" — nó là **mixed-mode**: bắt đầu interpret, thu thập profile, rồi compile thành native code **tốt hơn** static compiler (C/C++) có thể làm — vì nó biết runtime behavior thực tế.
+
+Phần còn lại của doc sẽ đi qua: vì sao JIT chứ không compile trước hết (§2) → tiered compilation 5 level (§3) → profiling & invocation counter (§4) → C1 compiler (§5) → C2 compiler (§6) → inlining (§7) → escape analysis (§8) → on-stack replacement (§9) → deoptimization (§10) → code cache (§11) → GraalVM JIT (§12) → diagnostic flags & JIT output (§13).
 
 ---
 

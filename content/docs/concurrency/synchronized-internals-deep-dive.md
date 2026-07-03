@@ -5,7 +5,7 @@ description: "Mổ xẻ synchronized trong JVM: Object header mark word, lock es
 
 ## Mục lục
 
-- [Bối cảnh: lock 1 method mà throughput tụt 10× — lock contention](#1-bối-cảnh-lock-1-method-mà-throughput-tụt-10--lock-contention)
+- [Lock 1 method mà throughput tụt 10× — lock contention](#1-lock-1-method-mà-throughput-tụt-10--lock-contention)
 - [Object Header — Mark Word chứa lock state](#2-object-header--mark-word-chứa-lock-state)
 - [Lock Escalation — 4 cấp độ lock](#3-lock-escalation--4-cấp-độ-lock)
 - [Biased Locking — lock "miễn phí" cho single thread](#4-biased-locking--lock-miễn-phí-cho-single-thread)
@@ -21,7 +21,9 @@ description: "Mổ xẻ synchronized trong JVM: Object header mark word, lock es
 
 ---
 
-## 1. Bối cảnh: lock 1 method mà throughput tụt 10× — lock contention
+## 1. Lock 1 method mà throughput tụt 10× — lock contention
+
+`synchronized` là cơ chế khoá nguyên thuỷ của Java, nhưng bên trong nó **không phải một cơ chế đơn lẻ** mà là cả hệ thống escalation: biased lock → thin lock → fat lock, chọn cấp rẻ nhất có thể dựa vào contention. Hiểu escalation này là hiểu khi nào `synchronized` gần như miễn phí và khi nào nó sập throughput. Bắt đầu từ một service bị chậm bất thường khi scale thread.
 
 Service xử lý order có counter synchronized:
 
@@ -43,6 +45,8 @@ Threads    Ops/s       Avg latency
 16         1,200,000   ~13 µs
 32           800,000   ~40 µs    ← context switch + OS scheduler overhead
 ```
+
+Phần còn lại của doc sẽ đi qua: object header & mark word (§2) → 4 cấp lock escalation (§3) → biased/thin/fat lock chi tiết (§4–§6) → monitor enter/exit bytecode (§7) → wait/notify internals (§8) → lock coarsening/elimination (§9–§10) → adaptive spinning (§11) → synchronized vs ReentrantLock (§12).
 
 > [!IMPORTANT]
 > `synchronized` **không chậm** — lock **contention** chậm. Khi chỉ 1 thread dùng, biased lock gần như zero-cost. Khi nhiều thread tranh nhau, lock escalate → heavyweight → OS context switch. Hiểu escalation = hiểu khi nào synchronized "rẻ" và khi nào "đắt".

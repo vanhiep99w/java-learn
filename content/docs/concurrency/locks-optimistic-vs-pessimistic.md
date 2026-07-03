@@ -5,7 +5,7 @@ description: "Mổ xẻ khóa lạc quan vs bi quan: CAS (compare-and-swap) & l�
 
 ## Mục lục
 
-- [Bối cảnh: số liệu đếm sai dưới tải cao](#1-bối-cảnh-số-liệu-đếm-sai-dưới-tải-cao)
+- [Counter đếm sai dưới tải cao — synchronized vs AtomicInteger vs LongAdder](#1-counter-đếm-sai-dưới-tải-cao--synchronized-vs-atomicinteger-vs-longadder)
 - [Hai triết lý: bi quan vs lạc quan](#2-hai-triết-lý-bi-quan-vs-lạc-quan)
 - [Pessimistic lock — synchronized & ReentrantLock](#3-pessimistic-lock--synchronized--reentrantlock)
 - [CAS — trái tim của optimistic lock](#4-cas--trái-tim-của-optimistic-lock)
@@ -19,7 +19,9 @@ description: "Mổ xẻ khóa lạc quan vs bi quan: CAS (compare-and-swap) & l�
 
 ---
 
-## 1. Bối cảnh: số liệu đếm sai dưới tải cao
+## 1. Counter đếm sai dưới tải cao — synchronized vs AtomicInteger vs LongAdder
+
+Lock không chỉ có `synchronized`. Có cả một quang phổ từ **bi quan** (chặn thread khác, park) tới **lạc quan** (cho làm, kiểm tra lúc commit). Chọn đúng triết lý quyết định hiệu năng — `AtomicInteger` có thể nhanh hơn `synchronized` 4×, nhưng sai hoàn cảnh thì `LongAdder` lại thắng cả hai. Bắt đầu từ một counter đếm sai.
 
 Một bộ đếm lượt xem dùng biến `int` thường, nhiều thread cùng `++`:
 
@@ -47,6 +49,8 @@ synchronized counter                    ~  45 M ops/s
 AtomicInteger (CAS)                      ~ 180 M ops/s   ← không khóa, không park thread
 LongAdder (striped)                      ~ 850 M ops/s   ← chia ô, contention thấp nhất
 ```
+
+Phần còn lại của doc sẽ đi qua: hai triết lý bi quan vs lạc quan (§2) → pessimistic lock (§3) → CAS — gốc rễ optimistic (§4) → AtomicInteger/CAS loop (§5) → ABA problem (§6) → StampedLock optimistic read (§7) → optimistic ở tầng DB với `@Version` (§8) → cách chọn theo mức contention (§9).
 
 > [!IMPORTANT]
 > "Lock" không chỉ có `synchronized`. Có cả một quang phổ từ **bi quan** (chặn thread khác) tới **lạc quan** (cho làm, kiểm tra lúc commit). Chọn đúng phụ thuộc vào **mức tranh chấp (contention)**. Hiểu hai triết lý này là hiểu vì sao `AtomicInteger` nhanh hơn `synchronized`, và khi nào điều ngược lại đúng.

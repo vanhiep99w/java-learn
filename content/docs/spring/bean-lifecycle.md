@@ -5,7 +5,7 @@ description: "Mổ xẻ vòng đời Spring Bean: từ BeanDefinition scanning �
 
 ## Mục lục
 
-- [Bối cảnh: @Autowired là null — bean chưa init xong mà đã dùng](#1-bối-cảnh-autowired-là-null--bean-chưa-init-xong-mà-đã-dùng)
+- [@Autowired null, @Transactional câm — dùng dependency lúc sai phase](#1-autowired-null-transactional-câm--dùng-dependency-lúc-sai-phase)
 - [Lifecycle tổng quan — 11 bước từ definition đến destruction](#2-lifecycle-tổng-quan--11-bước-từ-definition-đến-destruction)
 - [BeanDefinition — metadata trước khi bean tồn tại](#3-beandefinition--metadata-trước-khi-bean-tồn-tại)
 - [BeanFactoryPostProcessor — sửa definition trước instantiation](#4-beanfactorypostprocessor--sửa-definition-trước-instantiation)
@@ -22,9 +22,11 @@ description: "Mổ xẻ vòng đời Spring Bean: từ BeanDefinition scanning �
 
 ---
 
-## 1. Bối cảnh: @Autowired là null — bean chưa init xong mà đã dùng
+## 1. @Autowired null, @Transactional câm — dùng dependency lúc sai phase
 
-Production incident: `NullPointerException` trên field `@Autowired`:
+Bean Lifecycle là **trình tự cố định** Spring đi qua để biến một class thành bean sẵn sàng dùng: từ lúc scan `BeanDefinition`, instantiate, inject dependency, chạy init callback, đến khi tạo AOP proxy và cuối cùng destroy. Nắm lifecycle không phải để thuộc lòng từng hook — mà để biết **chính xác tại thời điểm nào** một thứ trở nên available. Đa số bug "Spring không hoạt động" đều là người code chạm tới dependency hoặc AOP ở **sai phase**: gọi `@Autowired` field trong constructor (chưa inject), hoặc gọi `@Transactional` method nội bộ (chưa qua proxy).
+
+Production incident điển hình — `NullPointerException` trên field `@Autowired`:
 
 ```java
 @Service
@@ -54,6 +56,8 @@ public class UserService {
 
 > [!IMPORTANT]
 > Hiểu Bean Lifecycle = hiểu **khi nào** dependency available, **khi nào** proxy wrap bean, **tại sao** self-call bypass AOP. Đây không phải kiến thức "lý thuyết" — nó giải thích 80% bug "Spring không hoạt động như expected".
+
+Phần còn lại của doc sẽ đi qua: 11 bước lifecycle tổng quan (§2) → `BeanDefinition` metadata (§3) → `BeanFactoryPostProcessor` sửa definition (§4) → instantiation & DI (§5) → `BeanPostProcessor` hook (§6) → init callbacks (§7) → AOP proxy creation (§8) → circular dependency three-level cache (§9) → bean scopes (§10) → destruction & shutdown (§11) → `SmartLifecycle` ordering (§12) → anti-patterns (§13) → cheat sheet (§14).
 
 ---
 

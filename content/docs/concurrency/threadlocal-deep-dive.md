@@ -5,7 +5,7 @@ description: "Mổ xẻ ThreadLocal từ bên trong: vì sao map nằm trong Thr
 
 ## Mục lục
 
-- [Bối cảnh: truyền context xuyên 7 tầng method](#1-bối-cảnh-truyền-context-xuyên-7-tầng-method)
+- [Truyền context xuyên 7 tầng method](#1-truyền-context-xuyên-7-tầng-method)
 - [ThreadLocal là gì — mỗi thread một bản sao](#2-threadlocal-là-gì--mỗi-thread-một-bản-sao)
 - [Đảo ngược quyền sở hữu — map nằm trong Thread, không nằm trong ThreadLocal](#3-đảo-ngược-quyền-sở-hữu--map-nằm-trong-thread-không-nằm-trong-threadlocal)
 - [ThreadLocalMap — open addressing chứ không phải HashMap](#4-threadlocalmap--open-addressing-chứ-không-phải-hashmap)
@@ -24,7 +24,9 @@ description: "Mổ xẻ ThreadLocal từ bên trong: vì sao map nằm trong Thr
 
 ---
 
-## 1. Bối cảnh: truyền context xuyên 7 tầng method
+## 1. Truyền context xuyên 7 tầng method
+
+`ThreadLocal` là **per-thread storage** của Java — một biến nhìn như `static` (truy cập mọi nơi không cần truyền) nhưng mỗi thread thấy một giá trị riêng. Đây là cách Spring lưu transaction, security context, request locale xuyên suốt call stack. Nhưng bên trong nó là một map đảo ngược quyền sở hữu kỳ lạ, và dùng sai trong thread pool sẽ gây memory leak — và cả rò rỉ dữ liệu giữa các request.
 
 Bạn có một web app. Tại `Controller` bạn biết `userId`, `tenantId`, `traceId`. Nhưng tầng `Repository` ở tận đáy stack cũng cần `tenantId` để chọn schema. Giải pháp ngây thơ: truyền tham số xuyên suốt.
 
@@ -64,6 +66,8 @@ try {
 // Repository (đáy stack):
 String schema = TenantContext.get();   // lấy đúng tenant của request hiện tại
 ```
+
+Phần còn lại của doc sẽ đi qua: ThreadLocal là gì (§2) → tại sao map nằm trong Thread (§3) → ThreadLocalMap open-addressing (§4) → vì sao key yếu (§5) → magic number 0x61c88647 (§6) → set/get/remove chi tiết (§7–§9) → memory leak trong pool (§10) → InheritableThreadLocal (§11–§12) → Spring & SimpleDateFormat (§13) → ScopedValue cho Virtual Thread (§14).
 
 > [!IMPORTANT]
 > `ThreadLocal` không phải để "tăng tốc đa luồng" hay "tránh lock" theo nghĩa thông thường. Bản chất nó là **per-thread storage** — kho lưu trữ gắn liền với từng thread. Hai use case kinh điển: (1) **truyền context ngầm** (tenant, user, trace, transaction); (2) **tái sử dụng object không thread-safe** (như `SimpleDateFormat`) mà không cần đồng bộ hoá.

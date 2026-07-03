@@ -5,7 +5,7 @@ description: "Mổ xẻ bộ nhớ JVM: stack frame & local variable array, heap
 
 ## Mục lục
 
-- [Bối cảnh: StackOverflowError lúc 2 giờ sáng](#1-bối-cảnh-stackoverflowerror-lúc-2-giờ-sáng)
+- [StackOverflowError lúc 2 giờ sáng](#1-stackoverflowerror-lúc-2-giờ-sáng)
 - [Bản đồ bộ nhớ runtime của JVM](#2-bản-đồ-bộ-nhớ-runtime-của-jvm)
 - [Stack — frame, local array và operand stack](#3-stack--frame-local-array-và-operand-stack)
 - [Heap — object layout, header và reference](#4-heap--object-layout-header-và-reference)
@@ -20,7 +20,9 @@ description: "Mổ xẻ bộ nhớ JVM: stack frame & local variable array, heap
 
 ---
 
-## 1. Bối cảnh: StackOverflowError lúc 2 giờ sáng
+## 1. StackOverflowError lúc 2 giờ sáng
+
+JVM chia bộ nhớ runtime thành các vùng khác nhau: **stack** (per-thread, lưu stack frame của từng method call, tự pop khi return) và **heap** (chia sẻ toàn JVM, chứa mọi object và mảng, do GC dọn). Hiểu heap vs stack là hiểu *cái gì sống ở đâu, sống bao lâu, và ai dọn nó* — nền tảng để đọc mọi lỗi bộ nhớ của JVM, từ `StackOverflowError` đến `OutOfMemoryError`.
 
 Một service xử lý cây danh mục lồng nhau crash với `StackOverflowError`. Hàm đệ quy duyệt cây trông hoàn toàn bình thường:
 
@@ -45,6 +47,8 @@ Exception in thread "main" java.lang.StackOverflowError
 
 > [!IMPORTANT]
 > `StackOverflowError` và `OutOfMemoryError` là **hai vùng nhớ khác nhau** cạn kiệt theo **hai cơ chế khác nhau**. Hiểu heap vs stack là hiểu *cái gì sống ở đâu, sống bao lâu, và ai dọn nó* — nền tảng để đọc mọi lỗi bộ nhớ của JVM.
+
+Phần còn lại của doc sẽ đi qua: bản đồ bộ nhớ runtime JVM (§2) → stack frame & local array (§3) → heap object layout & reference (§4) → giá trị nằm ở đâu (§5) → hiểu lầm "Java truyền tham chiếu" (§6) → escape analysis (§7) → TLAB (§8) → StackOverflowError vs OutOfMemoryError (§9) → tinh chỉnh -Xss/-Xmx (§10) → anti-patterns (§11) → cheat sheet (§12).
 
 ---
 
