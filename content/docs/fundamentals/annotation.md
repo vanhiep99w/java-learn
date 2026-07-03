@@ -5,7 +5,7 @@ description: "Mổ xẻ Annotation trong Java: @interface syntax, RetentionPolic
 
 ## Mục lục
 
-- [Bối cảnh: @Transactional không hoạt động — gọi internal method](#1-bối-cảnh-transactional-không-hoạt-động--gọi-internal-method)
+- [@Transactional không hoạt động khi gọi internal method](#1-transactional-không-hoạt-động-khi-gọi-internal-method)
 - [Annotation là gì — metadata, không phải code](#2-annotation-là-gì--metadata-không-phải-code)
 - [RetentionPolicy — annotation sống ở đâu?](#3-retentionpolicy--annotation-sống-ở-đâu)
 - [ElementType — annotation gắn vào đâu?](#4-elementtype--annotation-gắn-vào-đâu)
@@ -19,7 +19,9 @@ description: "Mổ xẻ Annotation trong Java: @interface syntax, RetentionPolic
 
 ---
 
-## 1. Bối cảnh: @Transactional không hoạt động — gọi internal method
+## 1. @Transactional không hoạt động khi gọi internal method
+
+**Annotation** là metadata gắn vào code element (class, method, field...) để đánh dấu, mô tả, hoặc hướng dẫn công cụ xử lý. Bản thân annotation **không có logic** — giá trị nằm ở *processor* đọc và hành động theo nó (compiler, framework, AOP proxy). Khi annotation "không hoạt động", vấn đề luôn ở processor, không phải annotation — và `@Transactional` là ví dụ kinh điển.
 
 Service chuyển tiền:
 
@@ -51,6 +53,8 @@ Client → Proxy.transfer() → RealObject.transfer() → RealObject.doTransfer(
 
 > [!IMPORTANT]
 > Annotation **không** có logic — nó chỉ là metadata. Logic nằm ở **processor** (compiler plugin, runtime framework, AOP proxy). Hiểu processor xử lý annotation thế nào là chìa khoá tránh bug "annotation không hoạt động".
+
+Phần còn lại của doc sẽ đi qua: bản chất annotation (§2) → RetentionPolicy (§3) → ElementType (§4) → meta-annotations (§5) → reflection runtime processing (§6) → annotation trong bytecode (§7) → compile-time APT (§8) → Spring annotation internals (§9) → custom annotation (§10) → anti-patterns & tóm tắt (§11).
 
 ---
 

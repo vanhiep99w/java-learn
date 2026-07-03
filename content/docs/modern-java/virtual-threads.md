@@ -5,7 +5,7 @@ description: "Mổ xẻ Virtual Threads JDK 21+: từ platform thread OS-level s
 
 ## Mục lục
 
-- [Bối cảnh: 10.000 concurrent requests — nhưng chỉ 200 thread](#1-bối-cảnh-10000-concurrent-requests--nhưng-chỉ-200-thread)
+- [10.000 concurrent requests — nhưng chỉ 200 thread](#1-10000-concurrent-requests--nhưng-chỉ-200-thread)
 - [Platform Thread vs Virtual Thread — kiến trúc cơ bản](#2-platform-thread-vs-virtual-thread--kiến-trúc-cơ-bản)
 - [Continuation — trái tim của Virtual Thread](#3-continuation--trái-tim-của-virtual-thread)
 - [Scheduler — ForkJoinPool và work-stealing](#4-scheduler--forkjoinpool-và-work-stealing)
@@ -22,9 +22,9 @@ description: "Mổ xẻ Virtual Threads JDK 21+: từ platform thread OS-level s
 
 ---
 
-## 1. Bối cảnh: 10.000 concurrent requests — nhưng chỉ 200 thread
+## 1. 10.000 concurrent requests — nhưng chỉ 200 thread
 
-Bạn xây API gateway xử lý 10.000 request đồng thời. Mỗi request gọi downstream service, chờ ~100ms response. Mô hình cổ điển: **1 thread / request**.
+Virtual thread là lightweight thread do **JVM quản lý** (không phải OS), ghép (multiplex) hàng triệu task lên chỉ vài carrier thread — biến mỗi blocking I/O thành "unmount & yield" thay vì chiếm cứng OS thread. Nó quan trọng vì mô hình cổ điển "1 platform thread / request" bế tắc khi cần 10.000 request đồng thời: pool 200 thread thì request xếp hàng, còn 10.000 thread thì ngốn tới **10GB RAM** chỉ cho stack.
 
 ```java
 ExecutorService pool = Executors.newFixedThreadPool(200);
@@ -67,6 +67,8 @@ Virtual threads:              p99 = 105ms      (10MB RAM, smooth)
 
 > [!IMPORTANT]
 > Virtual threads không nhanh hơn platform threads trên CPU-bound work. Chúng nhanh hơn vì **không lãng phí thread khi I/O block** — cho phép scale tới hàng triệu concurrent task mà không tốn RAM hay OS resources.
+
+Phần còn lại của doc sẽ đi qua: platform thread vs virtual thread (§2) → continuation và cơ chế yield/resume (§3) → scheduler ForkJoinPool work-stealing (§4) → mount/unmount giữa carrier (§5) → pinning và cách tránh (§6) → memory footprint (§7) → API thực hành (§8) → Structured Concurrency (§9) → Scoped Values thay ThreadLocal (§10) → migration strategy (§11) → so sánh VT vs platform vs reactive (§12) → anti-patterns (§13) → cheat sheet (§14).
 
 ---
 

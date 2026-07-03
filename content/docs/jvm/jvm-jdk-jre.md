@@ -7,7 +7,7 @@ description: "Phân biệt JVM/JRE/JDK ở mức cấu trúc thật: javac sinh 
 
 ## Mục lục
 
-- [Bối cảnh: "Write once, run anywhere" thực sự xảy ra thế nào](#1-bối-cảnh-write-once-run-anywhere-thực-sự-xảy-ra-thế-nào)
+- [Write once, run anywhere — thực sự xảy ra thế nào](#1-write-once-run-anywhere--thực-sự-xảy-ra-thế-nào)
 - [Ba lớp lồng nhau: JDK ⊃ JRE ⊃ JVM](#2-ba-lớp-lồng-nhau-jdk--jre--jvm)
 - [javac — từ .java tới bytecode .class](#3-javac--từ-java-tới-bytecode-class)
 - [Class file format & constant pool](#4-class-file-format--constant-pool)
@@ -20,7 +20,7 @@ description: "Phân biệt JVM/JRE/JDK ở mức cấu trúc thật: javac sinh 
 
 ---
 
-## 1. Bối cảnh: "Write once, run anywhere" thực sự xảy ra thế nào
+## 1. Write once, run anywhere — thực sự xảy ra thế nào
 
 Bạn viết `Hello.java` trên macOS, gửi file `Hello.class` cho đồng nghiệp chạy trên Linux ARM và Windows x64 — **không recompile**, vẫn chạy. Điều này nghe hiển nhiên nhưng nó là kết quả của một kiến trúc rất có chủ đích:
 
@@ -34,6 +34,8 @@ Bí mật: `javac` **không** dịch ra mã máy của một CPU cụ thể. Nó
 
 > [!IMPORTANT]
 > Tính khả chuyển của Java **không** nằm ở ngôn ngữ — nó nằm ở **bytecode + JVM**. Bất kỳ ngôn ngữ nào sinh ra `.class` hợp lệ (Kotlin, Scala, Groovy, Clojure) đều "run anywhere" như Java. JVM là nền tảng, Java chỉ là một trong nhiều khách hàng của nó.
+
+Phần còn lại của doc sẽ đi qua: ba lớp lồng nhau JDK ⊃ JRE ⊃ JVM (§2) → javac từ .java tới bytecode (§3) → class file format & constant pool (§4) → JVM thực thi interpreter + JIT (§5) → tiered compilation C1/C2 (§6) → AOT, GraalVM Native Image & jlink (§7) → JRE biến mất từ Java 11 (§8) → so sánh & khi nào quan tâm cái gì (§9).
 
 ---
 

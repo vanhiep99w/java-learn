@@ -5,7 +5,7 @@ description: "Mổ xẻ chi tiết cơ chế transaction trong Spring: AOP proxy
 
 ## Mục lục
 
-- [Bối cảnh: @Transactional mà dữ liệu vẫn mất](#1-bối-cảnh-transactional-mà-dữ-liệu-vẫn-mất)
+- [@Transactional mà dữ liệu vẫn mất — gọi nội bộ, proxy vô hình](#1-transactional-mà-dữ-liệu-vẫn-mất--gọi-nội-bộ-proxy-vô-hình)
 - [Spring Transaction nhìn từ 10.000 feet — AOP Proxy](#2-spring-transaction-nhìn-từ-10000-feet--aop-proxy)
 - [Proxy được tạo như thế nào — JDK Dynamic Proxy vs CGLIB](#3-proxy-được-tạo-như-thế-nào--jdk-dynamic-proxy-vs-cglib)
 - [TransactionInterceptor — trái tim của @Transactional](#4-transactioninterceptor--trái-tim-của-transactional)
@@ -25,7 +25,9 @@ description: "Mổ xẻ chi tiết cơ chế transaction trong Spring: AOP proxy
 
 ---
 
-## 1. Bối cảnh: @Transactional mà dữ liệu vẫn mất
+## 1. @Transactional mà dữ liệu vẫn mất — gọi nội bộ, proxy vô hình
+
+`@Transactional` trong Spring **không phải phép thuật**: nó chỉ là metadata báo cho một **proxy AOP** biết phải mở/commit/rollback transaction quanh method nào. Proxy là người thực sự điều khiển transaction — begin, bind connection vào ThreadLocal, gọi method thật, rồi commit hoặc rollback tuỳ kết quả. Vì vậy annotation **chỉ có hiệu lực khi lời gọi đi qua proxy**; nếu method tự gọi method khác trong cùng class (self-invocation), lời gọi `this` đi thẳng tới target và **bỏ qua proxy hoàn toàn** → transaction không bao giờ được mở → từng câu SQL auto-commit riêng lẻ → dữ liệu inconsistent. Đây là root cause của đại đa số bug "đã `@Transactional` mà dữ liệu vẫn hỏng".
 
 Bạn viết một service chuyển tiền. Logic rõ ràng: trừ tài khoản A, cộng tài khoản B, ghi log giao dịch — tất cả trong một method `@Transactional`:
 
@@ -56,6 +58,8 @@ Nguyên nhân: `batchTransfer()` gọi `transfer()` **từ bên trong cùng clas
 
 > [!IMPORTANT]
 > `@Transactional` **không** phải phép thuật. Nó chỉ hoạt động khi method được gọi **qua proxy**. Hiểu proxy đi qua đâu, bind connection ra sao, rollback khi nào — đó là hiểu Spring Transaction. Doc này mổ xẻ từng lớp từ annotation đến `COMMIT` SQL.
+
+Phần còn lại của doc sẽ đi qua: AOP proxy nhìn từ 10.000 feet (§2) → JDK vs CGLIB proxy (§3) → `TransactionInterceptor` (§4) → `PlatformTransactionManager` (§5) → `TransactionSynchronizationManager` ThreadLocal (§6) → flow đầy đủ đến COMMIT (§7) → propagation 7 chế độ (§8) → isolation level (§9) → rollback rules (§10) → self-invocation trap (§11) → read-only optimization (§12) → savepoint & NESTED (§13) → programmatic transaction (§14) → anti-patterns (§15) → so sánh các cách quản lý TX (§16) → cheat sheet (§17).
 
 ---
 

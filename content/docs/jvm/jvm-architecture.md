@@ -5,7 +5,7 @@ description: "Mổ xẻ kiến trúc JVM: ClassLoader hierarchy (Bootstrap/Platf
 
 ## Mục lục
 
-- [Bối cảnh: "Java chậm" — tại sao Netflix, LinkedIn chạy Java ở scale tỷ request/ngày?](#1-bối-cảnh-java-chậm--tại-sao-netflix-linkedin-chạy-java-ở-scale-tỷ-requestngày)
+- [Java chậm? Vì sao Netflix, LinkedIn chạy Java ở scale tỷ request](#1-java-chậm-vì-sao-netflix-linkedin-chạy-java-ở-scale-tỷ-request)
 - [JVM tổng quan — từ .java đến machine code](#2-jvm-tổng-quan--từ-java-đến-machine-code)
 - [ClassLoader — hierarchy & delegation model](#3-classloader--hierarchy--delegation-model)
 - [Linking: Verify → Prepare → Resolve](#4-linking-verify--prepare--resolve)
@@ -23,7 +23,7 @@ description: "Mổ xẻ kiến trúc JVM: ClassLoader hierarchy (Bootstrap/Platf
 
 ---
 
-## 1. Bối cảnh: "Java chậm" — tại sao Netflix, LinkedIn chạy Java ở scale tỷ request/ngày?
+## 1. Java chậm? Vì sao Netflix, LinkedIn chạy Java ở scale tỷ request
 
 Năm 2003, "Java chậm" là sự thật — interpreted bytecode, không optimize. Năm 2024, Java xử lý:
 - Netflix: **hàng tỷ API call/ngày**, microservices trên JVM
@@ -41,6 +41,8 @@ After 100K calls: C2 compile → on par with / faster than C++
 
 > [!IMPORTANT]
 > JVM không "chạy bytecode" — nó **biên dịch bytecode thành native code tối ưu** dựa trên runtime behavior thực tế. Đây là adaptive optimization mà AOT compiler (GCC, LLVM) không có được.
+
+Phần còn lại của doc sẽ đi qua: tổng quan từ .java đến machine code (§2) → ClassLoader hierarchy (§3) → linking verify/prepare/resolve (§4) → runtime data areas (§5) → bytecode instruction set (§6) → execution engine interpreter → JIT (§7) → tiered compilation C1/C2 (§8) → method dispatch (§9) → inlining (§10) → deoptimization (§11) → GraalVM & AOT (§12) → diagnostic JIT log (§13) → anti-patterns (§14).
 
 ---
 

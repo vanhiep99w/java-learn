@@ -5,7 +5,7 @@ description: "Mổ xẻ HikariCP: ConcurrentBag lock-free connection borrowing, 
 
 ## Mục lục
 
-- [Bối cảnh: 500ms query thành 5s — connection pool exhausted](#1-bối-cảnh-500ms-query-thành-5s--connection-pool-exhausted)
+- [Query 500ms bỗng thành 5s — connection pool cạn kiệt](#1-query-500ms-bỗng-thành-5s--connection-pool-cạn-kiệt)
 - [Tại sao cần Connection Pool?](#2-tại-sao-cần-connection-pool)
 - [HikariCP Architecture — tổng quan kiến trúc](#3-hikaricp-architecture--tổng-quan-kiến-trúc)
 - [ConcurrentBag — lock-free connection borrowing](#4-concurrentbag--lock-free-connection-borrowing)
@@ -23,7 +23,9 @@ description: "Mổ xẻ HikariCP: ConcurrentBag lock-free connection borrowing, 
 
 ---
 
-## 1. Bối cảnh: 500ms query thành 5s — connection pool exhausted
+## 1. Query 500ms bỗng thành 5s — connection pool cạn kiệt
+
+Connection pool (HikariCP, mặc định của Spring Boot 2.0+) là lớp **giữ một tập connection tái sử dụng** giữa app và database, thay vì mở/đóng connection mới mỗi query. Nó là tuyến phòng thủ trực tiếp cho database: giới hạn số connection, hàng đợi các request thừa, reuse connection đã tốn tiền TCP+auth để mở. Khi pool **cạn kiệt** (exhausted) — thường do leak hoặc sizing sai — triệu chứng không phải một query chậm, mà **toàn bộ** API bị nghẽn: mọi thread đều chờ mượn connection cho đến timeout. Đây là lý do pool sizing và leak detection thuộc nhóm cấu hình sống còn nhất của service thật.
 
 Production alert: p99 latency API `/orders` nhảy từ 500ms lên **5,000ms**. Database load bình thường. Network OK.
 
@@ -66,6 +68,8 @@ spring.datasource.hikari.leak-detection-threshold=2000  # warn nếu >2s không 
 
 > [!IMPORTANT]
 > Connection pool không phải "set and forget". Pool exhaustion = **tất cả** queries chậm (không chỉ query có vấn đề). Leak detection + proper sizing + monitoring = tam giác sống còn.
+
+Phần còn lại của doc sẽ đi qua: vì sao cần pool (§2) → kiến trúc HikariCP (§3) → `ConcurrentBag` lock-free borrowing (§4) → `FastList` tối ưu (§5) → connection lifecycle (§6) → pool sizing (§7) → housekeeping (§8) → leak detection (§9) → health check (§10) → config thực chiến (§11) → metrics (§12) → so sánh các pool (§13) → anti-patterns (§14) → cheat sheet (§15).
 
 ---
 

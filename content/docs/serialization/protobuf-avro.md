@@ -7,7 +7,7 @@ description: "Đào sâu hai định dạng serialization nhị phân: Protobuf 
 
 ## Mục lục
 
-- [Bối cảnh: vì sao JSON và Java Serializable không đủ](#1-bối-cảnh-vì-sao-json-và-java-serializable-không-đủ)
+- [Vì sao JSON và Java Serializable không đủ](#1-vì-sao-json-và-java-serializable-không-đủ)
 - [Protobuf — schema-first & wire format](#2-protobuf--schema-first--wire-format)
 - [Bên trong wire format: tag, varint, ZigZag](#3-bên-trong-wire-format-tag-varint-zigzag)
 - [Field number là hợp đồng — schema evolution của Protobuf](#4-field-number-là-hợp-đồng--schema-evolution-của-protobuf)
@@ -20,7 +20,7 @@ description: "Đào sâu hai định dạng serialization nhị phân: Protobuf 
 
 ---
 
-## 1. Bối cảnh: vì sao JSON và Java Serializable không đủ
+## 1. Vì sao JSON và Java Serializable không đủ
 
 JSON tuyệt vời cho API public: người đọc được, ngôn ngữ nào cũng parse. Nhưng ở quy mô lớn (hàng triệu message/giây giữa các microservice, lưu vào Kafka/data lake), JSON lộ điểm yếu:
 
@@ -38,6 +38,8 @@ Còn `java.io.Serializable` thì:
 > **Java Serializable bị xem là sai lầm thiết kế** (Effective Java Item 85): nó là lỗ hổng bảo mật khổng lồ (deserialization of untrusted data → RCE — hàng loạt CVE), gắn chặt với class Java (không cross-language), `serialVersionUID` mong manh, và hiệu năng kém. **Không bao giờ** dùng Java native serialization cho dữ liệu qua mạng/lưu trữ lâu dài. Protobuf/Avro sinh ra để thay thế.
 
 Protobuf (Google) và Avro (Apache, từ Hadoop) giải quyết bằng **schema + nhị phân nhỏ gọn + cross-language + schema evolution**.
+
+Phần còn lại của doc sẽ đi qua: Protobuf schema-first & wire format (§2) → bên trong wire format: tag, varint, ZigZag (§3) → field number là hợp đồng & schema evolution (§4) → Avro schema đi kèm dữ liệu (§5) → reader vs writer schema resolution (§6) → Schema Registry (§7) → so sánh Protobuf/Avro/JSON/Java Serializable (§8) → anti-patterns (§9).
 
 ---
 

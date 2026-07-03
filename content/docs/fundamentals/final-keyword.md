@@ -5,7 +5,7 @@ description: "Mổ xẻ final ở 3 cấp: variable/field/param, method, class. 
 
 ## Mục lục
 
-- [Bối cảnh: object "đã khởi tạo xong" mà thread khác thấy field rỗng](#1-bối-cảnh-object-đã-khởi-tạo-xong-mà-thread-khác-thấy-field-rỗng)
+- [Object khởi tạo xong mà thread khác thấy field rỗng](#1-object-khởi-tạo-xong-mà-thread-khác-thấy-field-rỗng)
 - [Ba cấp độ của final](#2-ba-cấp-độ-của-final)
 - [final variable & effectively final](#3-final-variable--effectively-final)
 - [final ≠ immutable — sai lầm phổ biến nhất](#4-final--immutable--sai-lầm-phổ-biến-nhất)
@@ -19,7 +19,9 @@ description: "Mổ xẻ final ở 3 cấp: variable/field/param, method, class. 
 
 ---
 
-## 1. Bối cảnh: object "đã khởi tạo xong" mà thread khác thấy field rỗng
+## 1. Object khởi tạo xong mà thread khác thấy field rỗng
+
+**`final`** áp lên ba thứ khác nhau: biến/field (gán đúng một lần), method (cấm override) và class (cấm kế thừa). Ở tầng nông nó chỉ là cú pháp, nhưng với **field** nó còn là một bảo đảm của **Java Memory Model**: khi constructor kết thúc bình thường, mọi thread đọc object qua reference đã publish đều thấy final field *đã khởi tạo đúng* — không cần `synchronized` hay `volatile`. Hiểu `final` đầy đủ nghĩa là hiểu nó tác động tới compiler, JIT và CPU memory model.
 
 Bạn có một config bất biến, dựng một lần rồi chia sẻ qua nhiều thread **không** dùng lock:
 
@@ -49,6 +51,8 @@ class Config {
 
 > [!IMPORTANT]
 > `final` không chỉ là "không cho gán lại". Với **field**, nó là một **bảo đảm của Java Memory Model**: mọi thread thấy object qua reference đã publish đều thấy final field **đã khởi tạo đúng**. Hiểu `final` đầy đủ nghĩa là hiểu nó tác động tới **compiler, JIT và CPU memory model**, không chỉ cú pháp.
+
+Phần còn lại của doc sẽ đi qua: ba cấp độ của final (§2) → final variable & effectively final (§3) → final ≠ immutable (§4) → final field & JMM safe publication (§5) → final method & devirtualization (§6) → final class (§7) → final + JIT constant folding (§8) → final với lambda & inner class (§9) → anti-patterns (§10) → cheat sheet (§11).
 
 ---
 

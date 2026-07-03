@@ -5,7 +5,7 @@ description: "Mổ xẻ Functional Interface và Lambda trong Java: @FunctionalI
 
 ## Mục lục
 
-- [Bối cảnh: Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào](#1-bối-cảnh-anonymous-class-tạo-hàng-nghìn-class-file--lambda-giải-quyết-thế-nào)
+- [Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào](#1-anonymous-class-tạo-hàng-nghìn-class-file--lambda-giải-quyết-thế-nào)
 - [Functional Interface — hợp đồng 1 abstract method](#2-functional-interface--hợp-đồng-1-abstract-method)
 - [4 gia đình built-in — Function, Consumer, Supplier, Predicate](#3-4-gia-đình-built-in--function-consumer-supplier-predicate)
 - [Lambda Bytecode — invokedynamic & LambdaMetafactory](#4-lambda-bytecode--invokedynamic--lambdametafactory)
@@ -18,7 +18,9 @@ description: "Mổ xẻ Functional Interface và Lambda trong Java: @FunctionalI
 
 ---
 
-## 1. Bối cảnh: Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào
+## 1. Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào
+
+**Functional interface** (interface có đúng 1 abstract method) là nền tảng của **lambda** và **method reference** trong Java 8+. Lambda không chỉ là anonymous class rút gọn — nó có cơ chế bytecode hoàn toàn khác (`invokedynamic` + `LambdaMetafactory`) sinh implementation tại runtime thay vì biên dịch thành `.class` riêng. Hiểu sự khác biệt đó giúp tối ưu hiệu năng và tránh pitfall.
 
 Trước Java 8, mỗi callback là anonymous class:
 
@@ -43,6 +45,8 @@ Ngắn gọn hơn, nhưng quan trọng hơn: **không tạo .class file**. Lambd
 
 > [!IMPORTANT]
 > Lambda không chỉ là "anonymous class rút gọn" — nó có **cơ chế bytecode hoàn toàn khác** (`invokedynamic` thay vì `new ClassName$1()`). Hiểu sự khác biệt giúp optimize performance và tránh pitfall.
+
+Phần còn lại của doc sẽ đi qua: hợp đồng functional interface (§2) → 4 gia đình built-in Function/Consumer/Supplier/Predicate (§3) → lambda bytecode & invokedynamic (§4) → method reference 4 loại (§5) → effectively final & closure (§6) → type inference (§7) → Comparator composition (§8) → advanced patterns currying/memoization/decorator (§9) → anti-patterns & tóm tắt (§10).
 
 ---
 

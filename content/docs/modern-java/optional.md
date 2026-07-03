@@ -7,7 +7,7 @@ description: "Đào sâu Optional: bản chất value-based class & cảnh báo 
 
 ## Mục lục
 
-- [Bối cảnh: NPE — "lỗi tỉ đô" và lời hứa của Optional](#1-bối-cảnh-npe--lỗi-tỉ-đô-và-lời-hứa-của-optional)
+- [NPE — "lỗi tỉ đô" và lời hứa của Optional](#1-npe--lỗi-tỉ-đô-và-lời-hứa-của-optional)
 - [Optional là gì — value-based class](#2-optional-là-gì--value-based-class)
 - [Tạo Optional: of / ofNullable / empty](#3-tạo-optional-of--ofnullable--empty)
 - [Biến đổi: map / flatMap / filter](#4-biến-đổi-map--flatmap--filter)
@@ -20,9 +20,9 @@ description: "Đào sâu Optional: bản chất value-based class & cảnh báo 
 
 ---
 
-## 1. Bối cảnh: NPE — "lỗi tỉ đô" và lời hứa của Optional
+## 1. NPE — "lỗi tỉ đô" và lời hứa của Optional
 
-Tony Hoare gọi việc phát minh ra `null` (1965) là "lỗi tỉ đô". Vấn đề: kiểu `String` *nói dối* — nó hứa trả về một chuỗi nhưng có thể trả `null`, và compiler không cảnh báo.
+`Optional<T>` là một container chứa 0 hoặc 1 giá trị, đưa sự "có thể vắng mặt" vào **chữ ký method** để compiler ép caller xử lý thay vì âm thầm ném `NullPointerException`. Nó quan trọng vì NPE — do Tony Hoare gọi là "lỗi tỉ đô" — xuất phát từ việc kiểu `String` *nói dối*: hứa trả chuỗi nhưng có thể trả `null`, mà compiler không cảnh báo.
 
 ```java
 // Trước Optional — null ẩn trong kiểu trả về, dễ quên kiểm
@@ -42,6 +42,8 @@ String city = u.flatMap(User::getAddress)
 
 > [!IMPORTANT]
 > Giá trị thật của `Optional` không phải "tránh NPE" mà là **đẩy quyết định xử lý-vắng-mặt vào thời điểm compile**, vào chữ ký method. Một method trả `Optional<User>` *bắt buộc* caller nghĩ tới trường hợp rỗng — điều mà `null` âm thầm bỏ qua.
+
+Phần còn lại của doc sẽ đi qua: bản chất value-based class (§2) → các factory tạo Optional (§3) → biến đổi `map`/`flatMap`/`filter` (§4) → lấy giá trị `orElse`/`orElseGet`/`orElseThrow` và bẫy eager (§5) → kết hợp với Stream (§6) → khi nào KHÔNG dùng (§7) → chi phí hiệu năng (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

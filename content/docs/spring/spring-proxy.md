@@ -5,7 +5,7 @@ description: "Mổ xẻ chi tiết cơ chế proxy trong Spring: JDK Dynamic Pro
 
 ## Mục lục
 
-- [Bối cảnh: @Cacheable hoạt động, nhưng @Retry thì không](#1-bối-cảnh-cacheable-hoạt-động-nhưng-retry-thì-không)
+- [@Cacheable chạy, @Retry câm — khi proxy bị self-call bỏ qua](#1-cacheable-chạy-retry-câm--khi-proxy-bị-self-call-bỏ-qua)
 - [Proxy Pattern — ý tưởng nền tảng](#2-proxy-pattern--ý-tưởng-nền-tảng)
 - [JDK Dynamic Proxy — Proxy.newProxyInstance() bên trong](#3-jdk-dynamic-proxy--proxynewproxyinstance-bên-trong)
 - [CGLIB Proxy — bytecode generation và FastClass](#4-cglib-proxy--bytecode-generation-và-fastclass)
@@ -23,7 +23,9 @@ description: "Mổ xẻ chi tiết cơ chế proxy trong Spring: JDK Dynamic Pro
 
 ---
 
-## 1. Bối cảnh: @Cacheable hoạt động, nhưng @Retry thì không
+## 1. @Cacheable chạy, @Retry câm — khi proxy bị self-call bỏ qua
+
+Proxy là object trung gian **cùng kiểu** với bean thật mà Spring tự tạo để bọc bean khi có AOP advice (`@Transactional`, `@Cacheable`, `@Async`, `@Retryable`...). Mọi annotation AOP trong Spring **không tự thực thi** — chúng chỉ là metadata; **proxy mới là người chạy** advice trước/sau khi gọi method thật. Nắm cơ chế này quan trọng vì nó giải thích hai hiện tượng gây mất ngủ: annotation **âm thầm vô hiệu** khi đặt trên method `final`/`private` (CGLIB không override được), và khi method tự gọi nhau trong cùng class (**self-invocation**) — lời gọi `this` đi thẳng tới target, **bỏ qua proxy**, nên mọi annotation trên method bị gọi đều câm lặng.
 
 Bạn xây một service gọi API bên ngoài. Để tối ưu, bạn dùng `@Cacheable` cache kết quả, và `@Retryable` retry khi API timeout:
 
@@ -53,6 +55,8 @@ Bạn tưởng annotation là "phép thuật" — nhưng thực ra, **mọi th�
 
 > [!IMPORTANT]
 > Trong Spring, `@Transactional`, `@Cacheable`, `@Async`, `@Retryable`, `@Secured`, `@Validated`... đều hoạt động qua **cùng cơ chế proxy**. Hiểu một = hiểu tất cả. Doc này mổ xẻ proxy từ bytecode đến interceptor chain.
+
+Phần còn lại của doc sẽ đi qua: Proxy pattern nền tảng (§2) → JDK Dynamic Proxy internals (§3) → CGLIB bytecode & FastClass (§4) → benchmark JDK vs CGLIB (§5) → `ProxyFactory` API (§6) → `AbstractAutoProxyCreator` (§7) → Advisor/Advice/Pointcut (§8) → interceptor chain (§9) → `@EnableAspectJAutoProxy` (§10) → scoped proxy (§11) → self-invocation & cách giải (§12) → debugging proxy (§13) → anti-patterns (§14) → cheat sheet (§15).
 
 ---
 

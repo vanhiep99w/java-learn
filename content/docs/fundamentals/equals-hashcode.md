@@ -5,7 +5,7 @@ description: "Mổ xẻ hợp đồng giữa equals() và hashCode(): vì sao ph
 
 ## Mục lục
 
-- [Bối cảnh: entry vừa put xong đã "biến mất"](#1-bối-cảnh-entry-vừa-put-xong-đã-biến-mất)
+- [Entry vừa put xong đã biến mất](#1-entry-vừa-put-xong-đã-biến-mất)
 - [Hai method, hai vai trò khác nhau](#2-hai-method-hai-vai-trò-khác-nhau)
 - [Mặc định trong Object — định danh, không phải giá trị](#3-mặc-định-trong-object--định-danh-không-phải-giá-trị)
 - [Hợp đồng equals — 5 điều khoản](#4-hợp-đồng-equals--5-điều-khoản)
@@ -21,7 +21,9 @@ description: "Mổ xẻ hợp đồng giữa equals() và hashCode(): vì sao ph
 
 ---
 
-## 1. Bối cảnh: entry vừa put xong đã "biến mất"
+## 1. Entry vừa put xong đã biến mất
+
+**`equals()`** và **`hashCode()`** là cặp method `Object` định nghĩa để trả lời hai câu hỏi khác nhau: "hai object có bằng nhau về giá trị không?" và "object này nằm ở bucket nào?". Chúng phối hợp để làm nên `HashMap`/`HashSet`. Hợp đồng bắt buộc: nếu `a.equals(b)` thì hai object **phải** cùng hashCode. Override một mà quên cái kia là lỗi #1 khi làm việc với collection dạng hash — và hậu quả là entry vẫn nằm trong map nhưng không bao giờ tìm lại được.
 
 Bạn xây cache giỏ hàng. Key là một POJO `CartKey(userId, region)`. Bạn override `equals` để hai key cùng `userId` + `region` được coi là một, nhưng **quên** `hashCode`:
 
@@ -55,6 +57,8 @@ Hai key `equals` nhau, nhưng `get` trả `null`. Entry vẫn nằm trong map (`
 > Bug không nằm ở `equals` — nó hoàn toàn đúng. Bug nằm ở chỗ **thiếu `hashCode`**. Hai `CartKey` "bằng nhau" lại sinh ra **hai hashCode khác nhau** (mặc định của `Object` dựa trên địa chỉ object), nên HashMap tính ra **hai bucket khác nhau** và không bao giờ gặp lại entry cũ.
 
 Đây là lỗi #1 khi làm việc với `HashMap`/`HashSet`. Để hiểu vì sao, ta phải mổ xẻ chính xác hai method này làm gì và HashMap gọi chúng lúc nào.
+
+Phần còn lại của doc sẽ đi qua: hai method hai vai trò (§2) → mặc định trong Object (§3) → hợp đồng equals 5 điều khoản (§4) → hợp đồng hashCode 3 điều khoản (§5) → HashMap dùng cặp method này thế nào (§6) → khung viết equals (§7) → khung viết hashCode (§8) → kế thừa phá đối xứng (§9) → mutable key trap (§10) → record (§11) → anti-patterns (§12) → cheat sheet (§13).
 
 ---
 

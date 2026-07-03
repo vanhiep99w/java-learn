@@ -5,7 +5,7 @@ description: "Mổ xẻ record & sealed: record bytecode (field final, accessor,
 
 ## Mục lục
 
-- [Bối cảnh: 80 dòng boilerplate cho một DTO 3 field](#1-bối-cảnh-80-dòng-boilerplate-cho-một-dto-3-field)
+- [80 dòng boilerplate cho một DTO 3 field](#1-80-dòng-boilerplate-cho-một-dto-3-field)
 - [record — class dữ liệu bất biến](#2-record--class-dữ-liệu-bất-biến)
 - [record sinh ra gì — đọc bytecode](#3-record-sinh-ra-gì--đọc-bytecode)
 - [invokedynamic & ObjectMethods bootstrap](#4-invokedynamic--objectmethods-bootstrap)
@@ -19,9 +19,9 @@ description: "Mổ xẻ record & sealed: record bytecode (field final, accessor,
 
 ---
 
-## 1. Bối cảnh: 80 dòng boilerplate cho một DTO 3 field
+## 1. 80 dòng boilerplate cho một DTO 3 field
 
-Một DTO bất biến đơn giản trước Java 16 cần một núi boilerplate dễ sai:
+`record` là một nominal tuple bất biến — compiler tự sinh field, constructor, accessor, `equals`/`hashCode`/`toString` chuẩn theo giá trị; còn `sealed` cho phép kiểm soát chính xác cây kế thừa để bật pattern matching toàn vẹn. Chúng quan trọng vì trước Java 16, một DTO bất biến 3 field cần **constructor + equals + hashCode + toString** viết tay — mỗi lần thêm field phải sửa bốn chỗ, quên một cái là bug.
 
 ```java
 final class Point {
@@ -43,6 +43,8 @@ record Point(int x, int y) {}    // tự sinh tất cả: field, ctor, accessor,
 
 > [!IMPORTANT]
 > `record` không chỉ là "đường cú pháp ngắn gọn" — nó là **nominal tuple bất biến** với ngữ nghĩa do compiler đảm bảo, sinh `equals`/`hashCode`/`toString` **đúng theo giá trị** qua một cơ chế bytecode hiện đại (`invokedynamic`). `sealed` bổ sung mảnh còn thiếu: **kiểm soát đóng** cây kế thừa để bật pattern matching đầy đủ. Hai thứ cùng nhau cho Java khả năng mô hình hóa dữ liệu kiểu hàm (ADT).
+
+Phần còn lại của doc sẽ đi qua: bản chất record bất biến (§2) → record sinh gì trong bytecode (§3) → `invokedynamic` & ObjectMethods bootstrap (§4) → compact constructor & copy phòng thủ (§5) → giới hạn record, khi nào KHÔNG dùng (§6) → `sealed` kế thừa có kiểm soát (§7) → `PermittedSubclasses` & exhaustive switch (§8) → bộ đôi sealed + record thành ADT (§9) → anti-patterns (§10) → cheat sheet (§11).
 
 ---
 

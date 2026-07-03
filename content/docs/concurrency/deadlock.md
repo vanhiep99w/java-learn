@@ -5,7 +5,7 @@ description: "Mổ xẻ Deadlock trong Java: 4 điều kiện Coffman, lock orde
 
 ## Mục lục
 
-- [Bối cảnh: Service "treo" — không crash, không log, không response](#1-bối-cảnh-service-treo--không-crash-không-log-không-response)
+- [Service treo — không crash, không log, không response](#1-service-treo--không-crash-không-log-không-response)
 - [Deadlock là gì — định nghĩa chính xác](#2-deadlock-là-gì--định-nghĩa-chính-xác)
 - [4 điều kiện Coffman — phá 1 là thoát](#3-4-điều-kiện-coffman--phá-1-là-thoát)
 - [Reproduce deadlock — ví dụ kinh điển](#4-reproduce-deadlock--ví-dụ-kinh-điển)
@@ -19,9 +19,11 @@ description: "Mổ xẻ Deadlock trong Java: 4 điều kiện Coffman, lock orde
 
 ---
 
-## 1. Bối cảnh: Service "treo" — không crash, không log, không response
+## 1. Service treo — không crash, không log, không response
 
-Hệ thống chuyển tiền giữa tài khoản. Mỗi transaction khoá cả hai tài khoản nguồn và đích:
+**Deadlock** là bug **im lặng nhất** của concurrent code: các thread giữ resource rồi chờ nhau thành một vòng tròn, không thread nào tiến lên — và JVM không throw, không log, không crash. Thread chỉ "biến mất" khỏi xử lý. Đến khi load balancer rút server khỏi pool thì mọi người mới ngả ngửa.
+
+Hãy xem nó xảy ra thế nào. Một hệ thống chuyển tiền, mỗi giao dịch khoá cả hai tài khoản nguồn và đích:
 
 ```java
 public void transfer(Account from, Account to, BigDecimal amount) {
@@ -34,11 +36,13 @@ public void transfer(Account from, Account to, BigDecimal amount) {
 }
 ```
 
-Trên dev: chạy tốt. Production, 2 request đồng thời:
-- Thread 1: `transfer(A, B, 100)` — lock A, đợi B
-- Thread 2: `transfer(B, A, 50)` — lock B, đợi A
+Trên dev: chạy ngon lành. Lên production, chỉ cần hai request gõ cửa cùng lúc đúng một nhịp:
+- Thread 1: `transfer(A, B, 100)` — giữ A, chờ B
+- Thread 2: `transfer(B, A, 50)` — giữ B, chờ A
 
-Kết quả: cả hai thread **chờ nhau vĩnh viễn**. Service không crash, không exception, không log. Health check timeout. Load balancer đánh dead. Alert: "service không response".
+Cả hai giữ chìa khoá của nhau, nên cùng chờ nhau … vĩnh viễn. Health check timeout, load balancer rút server khỏi pool, cảnh báo nổi lên.
+
+Đó là deadlock trong hình thái kinh điển nhất. Phần còn lại của doc sẽ đi qua: **định nghĩa chính xác** (§2) → **4 điều kiện Coffman** khiến nó xảy ra và cách phá (§3) → **phát hiện** qua thread dump & JMX (§5–6) → **phòng tránh** bằng lock ordering & tryLock (§7–8) → rồi mở rộng sang cả **deadlock ở tầng database** (§10).
 
 ```
 thread dump:

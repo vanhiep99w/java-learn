@@ -7,7 +7,7 @@ description: "Đào sâu 4 mức truy cập Java: public/protected/default/priva
 
 ## Mục lục
 
-- [Bối cảnh: "protected sao tôi vẫn không gọi được?"](#1-bối-cảnh-protected-sao-tôi-vẫn-không-gọi-được)
+- [protected gây bẫy khi truy cập khác package](#1-protected-gây-bẫy-khi-truy-cập-khác-package)
 - [Bốn mức truy cập & bảng phạm vi](#2-bốn-mức-truy-cập--bảng-phạm-vi)
 - [private — và bí mật synthetic accessor](#3-private--và-bí-mật-synthetic-accessor)
 - [protected — quy tắc "khác package" gây bẫy](#4-protected--quy-tắc-khác-package-gây-bẫy)
@@ -20,7 +20,9 @@ description: "Đào sâu 4 mức truy cập Java: public/protected/default/priva
 
 ---
 
-## 1. Bối cảnh: "protected sao tôi vẫn không gọi được?"
+## 1. protected gây bẫy khi truy cập khác package
+
+**Access modifier** (public/protected/default/private) quyết định *ai được nhìn thấy và gọi tới* một class, field hay method. Nó không phải cơ chế bảo mật mà là **công cụ thiết kế API**: mức truy cập hẹp nhất = bề mặt API nhỏ nhất = tự do refactor mà không phá vỡ client. Nhưng `protected` có một điều khoản ít người nhớ, khiến nó trở thành nguồn bug phổ biến nhất.
 
 ```java
 // package shapes
@@ -44,6 +46,8 @@ Cùng là `protected`, cùng là lớp con, nhưng `this.area()` được phép 
 
 > [!IMPORTANT]
 > Access modifier không phải bảo mật — nó là **công cụ thiết kế API**. Mức truy cập quyết định *bạn được phép thay đổi gì mà không phá vỡ client*. `public` = hợp đồng vĩnh viễn; `private` = tự do tái cấu trúc. Chọn mức **hẹp nhất có thể**.
+
+Phần còn lại của doc sẽ đi qua: bảng 4 mức truy cập & phạm vi (§2) → private và synthetic accessor (§3) → quy tắc "khác package" của protected (§4) → default (§5) → access flag trong bytecode (§6) → JPMS (§7) → quy tắc thiết kế (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

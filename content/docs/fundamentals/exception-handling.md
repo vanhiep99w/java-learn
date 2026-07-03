@@ -5,7 +5,7 @@ description: "Mổ xẻ Exception trong Java: cây Throwable (Error/Exception/Ru
 
 ## Mục lục
 
-- [Bối cảnh: API chậm 10x — exception dùng thay control flow](#1-bối-cảnh-api-chậm-10x--exception-dùng-thay-control-flow)
+- [API chậm 10x khi dùng exception thay control flow](#1-api-chậm-10x-khi-dùng-exception-thay-control-flow)
 - [Cây phân cấp Throwable — Error, Exception, RuntimeException](#2-cây-phân-cấp-throwable--error-exception-runtimeexception)
 - [Checked vs Unchecked — cuộc tranh luận chưa có hồi kết](#3-checked-vs-unchecked--cuộc-tranh-luận-chưa-có-hồi-kết)
 - [JVM Exception Table — cách JVM dispatch exception](#4-jvm-exception-table--cách-jvm-dispatch-exception)
@@ -18,7 +18,9 @@ description: "Mổ xẻ Exception trong Java: cây Throwable (Error/Exception/Ru
 
 ---
 
-## 1. Bối cảnh: API chậm 10x — exception dùng thay control flow
+## 1. API chậm 10x khi dùng exception thay control flow
+
+**Exception** là cơ chế Java dành cho *tình huống bất thường* (exceptional) — lỗi recovery được (IO, network) hoặc bug lập trình (NPE, illegal argument). Mỗi lần `throw`, JVM phải `fillInStackTrace()` crawl toàn bộ call stack để ghi lại stack trace, rồi unwinding duyệt ngược các exception table — đắt gấp hàng trăm lần một nhánh `if`. Dùng exception thay control flow (như kiểm tra format input phổ thông) là anti-pattern kinh điển bóp nghẹt hiệu năng.
 
 Service validate input. Developer dùng exception để kiểm tra format:
 
@@ -56,6 +58,8 @@ public boolean isValidEmail(String email) {
 
 > [!IMPORTANT]
 > Exception dành cho **tình huống bất thường** (exceptional), không phải control flow thay if/else. Chi phí throw+catch = `fillInStackTrace()` crawl stack + unwinding — đắt hơn branch prediction hàng trăm lần.
+
+Phần còn lại của doc sẽ đi qua: cây Throwable (§2) → checked vs unchecked (§3) → JVM exception table & bytecode (§4) → try-with-resources & suppressed (§5) → exception cost & fillInStackTrace (§6) → multi-catch & rethrow (§7) → custom exception hierarchy (§8) → Spring error handling & ProblemDetail (§9) → anti-patterns & tóm tắt (§10).
 
 ---
 

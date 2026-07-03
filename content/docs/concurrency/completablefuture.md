@@ -5,7 +5,7 @@ description: "Mổ xẻ CompletableFuture: ForkJoinPool execution, async composi
 
 ## Mục lục
 
-- [Bối cảnh: 5 API call tuần tự — 2.5s latency, parallel chỉ 600ms](#1-bối-cảnh-5-api-call-tuần-tự--25s-latency-parallel-chỉ-600ms)
+- [5 API call tuần tự — 2.5s latency, parallel chỉ 600ms](#1-5-api-call-tuần-tự--25s-latency-parallel-chỉ-600ms)
 - [CompletableFuture vs Future — tại sao cần nó](#2-completablefuture-vs-future--tại-sao-cần-nó)
 - [Execution Thread — ai chạy cái gì, ở đâu?](#3-execution-thread--ai-chạy-cái-gì-ở-đâu)
 - [Composition: thenApply vs thenCompose vs thenCombine](#4-composition-thenapply-vs-thencompose-vs-thencombine)
@@ -20,7 +20,9 @@ description: "Mổ xẻ CompletableFuture: ForkJoinPool execution, async composi
 
 ---
 
-## 1. Bối cảnh: 5 API call tuần tự — 2.5s latency, parallel chỉ 600ms
+## 1. 5 API call tuần tự — 2.5s latency, parallel chỉ 600ms
+
+`CompletableFuture` là công cụ của Java để **orchestrate nhiều tác vụ async** — chạy song song I/O, compose kết quả, xử lý exception và timeout mà không cần callback hell hay block thread. Bài toán điển hình cho thấy vì sao nó đáng dùng: một trang cần dữ liệu từ 5 microservices.
 
 Bạn xây trang product detail cần dữ liệu từ 5 microservices:
 
@@ -48,6 +50,8 @@ CompletableFuture.allOf(productF, reviewsF, pricingF, invF, recF).join();
 // Tổng: max(500, 400, 300, 200, 600) = 600ms — giảm 70%!
 return new ProductDetail(productF.join(), reviewsF.join(), ...);
 ```
+
+Latency giảm từ tổng (2s) xuống max (600ms) chỉ bằng cách song song hoá. Phần còn lại của doc sẽ đi qua: vì sao `CompletableFuture` hơn `Future` (§2) → thread nào chạy callback nào (§3) → composition `thenApply`/`thenCompose`/`thenCombine` (§4) → exception handling (§5) → allOf/anyOf (§6) → timeout & cancellation (§7) → pattern thực chiến (§8) → bên trong Completion Stack (§9).
 
 > [!IMPORTANT]
 > `CompletableFuture` không phải "async for fun" — nó giải quyết bài toán: **orchestrate I/O-bound tasks song song** + **compose kết quả** mà không cần callback hell hay blocking thread.

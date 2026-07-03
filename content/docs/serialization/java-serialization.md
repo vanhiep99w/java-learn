@@ -5,7 +5,7 @@ description: "Mổ xẻ Java Serialization: wire format & stream magic 0xACED, s
 
 ## Mục lục
 
-- [Bối cảnh: thêm một field, cả hệ thống không đọc được dữ liệu cũ](#1-bối-cảnh-thêm-một-field-cả-hệ-thống-không-đọc-được-dữ-liệu-cũ)
+- [Thêm một field, cả hệ thống không đọc được dữ liệu cũ](#1-thêm-một-field-cả-hệ-thống-không-đọc-được-dữ-liệu-cũ)
 - [Cơ chế: Serializable, ObjectOutputStream & wire format](#2-cơ-chế-serializable-objectoutputstream--wire-format)
 - [serialVersionUID — hợp đồng phiên bản](#3-serialversionuid--hợp-đồng-phiên-bản)
 - [transient & static — cái gì KHÔNG được ghi](#4-transient--static--cái-gì-không-được-ghi)
@@ -19,7 +19,7 @@ description: "Mổ xẻ Java Serialization: wire format & stream magic 0xACED, s
 
 ---
 
-## 1. Bối cảnh: thêm một field, cả hệ thống không đọc được dữ liệu cũ
+## 1. Thêm một field, cả hệ thống không đọc được dữ liệu cũ
 
 Một hệ thống cache session bằng Java Serialization vào Redis. Một hôm dev thêm một field vào class `Session`, deploy, và mọi session cũ bùng nổ:
 
@@ -33,6 +33,8 @@ Class không khai báo `serialVersionUID`, nên JVM **tự tính** một giá tr
 
 > [!IMPORTANT]
 > Java Serialization gắn chặt với **chính xác cấu trúc class** ở thời điểm ghi. Đây vừa là nguồn lỗi tương thích phiên bản, vừa là gốc rễ của lỗ hổng bảo mật nghiêm trọng nhất Java từng có. Hiểu nó là hiểu vì sao cộng đồng (và chính kiến trúc sư Java) khuyên **tránh dùng nó** cho dữ liệu mới.
+
+Phần còn lại của doc sẽ đi qua: cơ chế Serializable & wire format (§2) → serialVersionUID (§3) → transient & static (§4) → tùy biến writeObject/readObject/readResolve (§5) → object graph & reference dùng chung (§6) → deserialization lỗ hổng bảo mật gadget chain (§7) → phòng thủ ObjectInputFilter (§8) → vì sao nên dùng JSON/Protobuf (§9) → anti-patterns (§10).
 
 ---
 

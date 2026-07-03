@@ -5,7 +5,7 @@ description: "Mổ xẻ Apache Kafka với Spring Boot: broker/topic/partition a
 
 ## Mục lục
 
-- [Bối cảnh: Message mất — consumer commit trước khi xử lý xong](#1-bối-cảnh-message-mất--consumer-commit-trước-khi-xử-lý-xong)
+- [Message mất — consumer commit trước khi xử lý xong](#1-message-mất--consumer-commit-trước-khi-xử-lý-xong)
 - [Kafka Architecture — Broker, Topic, Partition, Replica](#2-kafka-architecture--broker-topic-partition-replica)
 - [Producer Internals — batching, acks, idempotent](#3-producer-internals--batching-acks-idempotent)
 - [Consumer Group Protocol — coordinator & rebalancing](#4-consumer-group-protocol--coordinator--rebalancing)
@@ -19,7 +19,9 @@ description: "Mổ xẻ Apache Kafka với Spring Boot: broker/topic/partition a
 
 ---
 
-## 1. Bối cảnh: Message mất — consumer commit trước khi xử lý xong
+## 1. Message mất — consumer commit trước khi xử lý xong
+
+Kafka là hệ thống log phân tán lưu message theo partition, mỗi message có **offset** tăng dần và **chỉ biến mất** khỏi trách nhiệm của consumer khi offset đã được **commit**. Quyết định *khi nào* commit offset chính là quyết định giữa ba ngữ nghĩa delivery: **at-most-once** (commit trước xử lý → có thể mất message), **at-least-once** (commit sau xử lý → có thể xử lý trùng), và **exactly-once** (xử lý + commit cùng transaction). Cấu hình này không phụ thuộc vào cluster — nó nằm trong tay consumer, và sai một dòng `enable.auto.commit=true` có thể nuốt hàng nghìn message một cách **im lặng**.
 
 Order service nhận event từ Kafka:
 
@@ -49,6 +51,8 @@ poll 100 messages: [1, 2, 3, ..., 50, 51, ..., 100]
 
 > [!IMPORTANT]
 > `enable.auto.commit=true` (default Kafka client) commit offset **theo thời gian**, không theo xử lý. Spring Kafka mặc định **tắt** auto-commit và dùng `AckMode.BATCH` (commit sau khi xử lý hết batch). Nhưng nếu override config sai → message loss.
+
+Phần còn lại của doc sẽ đi qua: kiến trúc Kafka broker/topic/partition (§2) → producer internals batching/acks/idempotent (§3) → consumer group protocol & rebalancing (§4) → offset management & commit strategies (§5) → `KafkaTemplate` producer trong Spring (§6) → `@KafkaListener` consumer trong Spring (§7) → error handling retry/DLT (§8) → exactly-once semantics (§9) → production tuning & monitoring (§10) → anti-patterns & tóm tắt (§11).
 
 ---
 

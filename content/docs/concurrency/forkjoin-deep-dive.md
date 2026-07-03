@@ -5,7 +5,7 @@ description: "Mổ xẻ Fork/Join framework: work-stealing algorithm, ForkJoinPo
 
 ## Mục lục
 
-- [Bối cảnh: parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy](#1-bối-cảnh-parallel-sort-100m-phần-tử--8-core-nhưng-chỉ-2-core-busy)
+- [Parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy](#1-parallel-sort-100m-phần-tử--8-core-nhưng-chỉ-2-core-busy)
 - [Fork/Join là gì — divide-and-conquer + work-stealing](#2-forkjoin-là-gì--divide-and-conquer--work-stealing)
 - [ForkJoinPool architecture — WorkQueue deque per worker](#3-forkjoinpool-architecture--workqueue-deque-per-worker)
 - [Work-Stealing algorithm — idle worker lấy task từ busy worker](#4-work-stealing-algorithm--idle-worker-lấy-task-từ-busy-worker)
@@ -21,7 +21,9 @@ description: "Mổ xẻ Fork/Join framework: work-stealing algorithm, ForkJoinPo
 
 ---
 
-## 1. Bối cảnh: parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy
+## 1. Parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy
+
+Fork/Join là framework của Java cho **recursive divide-and-conquer** song song, nổi bật nhờ **work-stealing**: worker hết việc tự lấy task từ worker bận mà không cần central scheduler. Nó cũng là engine chạy `parallelStream()` và `CompletableFuture` mặc định. Cách rõ nhất để thấy vì sao cần nó là viết divide-and-conquer rồi phát hiện CPU gần như không dùng tới.
 
 Bạn viết parallel merge sort: chia array đôi, fork 2 task, join kết quả:
 
@@ -46,6 +48,8 @@ class MergeSort extends RecursiveAction {
 ```
 
 Kết quả: 8 core nhưng CPU utilization chỉ 25% — 6 core idle hầu hết thời gian. Vấn đề: **threshold quá lớn** → chỉ tạo ít task → ít việc để steal. Hoặc: **join() block** sớm trước khi worker kịp steal.
+
+Phần còn lại của doc sẽ đi qua: Fork/Join & work-stealing là gì (§2) → kiến trúc ForkJoinPool/WorkQueue (§3) → thuật toán work-stealing (§4) → vòng đời `fork()`/`join()`/`compute()` (§5–§8) → common pool & parallel Stream (§9–§10) → pitfalls với blocking (§11) → tuning (§12).
 
 > [!IMPORTANT]
 > Fork/Join nhanh không phải vì "tạo nhiều thread" — mà vì **work-stealing**: worker idle tự lấy việc từ worker busy. Nhưng work-stealing chỉ hiệu quả khi có **đủ task nhỏ** để distribute. Quá ít task = load imbalance. Quá nhiều = overhead.

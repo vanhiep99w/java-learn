@@ -5,7 +5,7 @@ description: "Mổ xẻ 4 loại reference trong Java: Strong, Weak, Soft, Phant
 
 ## Mục lục
 
-- [Bối cảnh: cache 2GB không chịu GC — OOM chỉ vì Strong reference](#1-bối-cảnh-cache-2gb-không-chịu-gc--oom-chỉ-vì-strong-reference)
+- [Cache 2GB không chịu GC — OOM chỉ vì Strong reference](#1-cache-2gb-không-chịu-gc--oom-chỉ-vì-strong-reference)
 - [4 loại reference — từ mạnh đến yếu](#2-4-loại-reference--từ-mạnh-đến-yếu)
 - [GC Reachability Analysis — khi nào object "chết"?](#3-gc-reachability-analysis--khi-nào-object-chết)
 - [SoftReference — cache tự co khi sắp OOM](#4-softreference--cache-tự-co-khi-sắp-oom)
@@ -20,7 +20,7 @@ description: "Mổ xẻ 4 loại reference trong Java: Strong, Weak, Soft, Phant
 
 ---
 
-## 1. Bối cảnh: cache 2GB không chịu GC — OOM chỉ vì Strong reference
+## 1. Cache 2GB không chịu GC — OOM chỉ vì Strong reference
 
 Service image-processing cache kết quả resize vào `HashMap<String, BufferedImage>`:
 
@@ -46,6 +46,8 @@ Map<String, SoftReference<BufferedImage>> cache = new ConcurrentHashMap<>();
 
 > [!IMPORTANT]
 > Strong reference = "tôi CẦN object này". GC **tuyệt đối không** thu hồi object có strong reference. Cache dùng strong reference = cache chỉ phình, không bao giờ co → OOM chắc chắn nếu data unbounded.
+
+Phần còn lại của doc sẽ đi qua: 4 loại reference từ mạnh đến yếu (§2) → GC reachability analysis (§3) → SoftReference cho cache (§4) → WeakReference (§5) → WeakHashMap internals (§6) → PhantomReference & cleanup (§7) → ReferenceQueue (§8) → Finalizer & Cleaner (§9) → ThreadLocal memory leak (§10) → so sánh & decision matrix (§11).
 
 ---
 

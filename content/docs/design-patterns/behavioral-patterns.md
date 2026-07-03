@@ -7,7 +7,7 @@ description: "Đào sâu nhóm pattern hành vi trong Java: Strategy (lambda ho�
 
 ## Mục lục
 
-- [Bối cảnh: chuỗi if-else hành vi và sự cứng nhắc](#1-bối-cảnh-chuỗi-if-else-hành-vi-và-sự-cứng-nhắc)
+- [Chuỗi if-else hành vi và sự cứng nhắc](#1-chuỗi-if-else-hành-vi-và-sự-cứng-nhắc)
 - [Strategy — đóng gói thuật toán có thể hoán đổi](#2-strategy--đóng-gói-thuật-toán-có-thể-hoán-đổi)
 - [Observer — pub/sub và bẫy memory leak](#3-observer--pubsub-và-bẫy-memory-leak)
 - [Template Method — khung cố định, chi tiết mở](#4-template-method--khung-cố-định-chi-tiết-mở)
@@ -20,9 +20,9 @@ description: "Đào sâu nhóm pattern hành vi trong Java: Strategy (lambda ho�
 
 ---
 
-## 1. Bối cảnh: chuỗi if-else hành vi và sự cứng nhắc
+## 1. Chuỗi if-else hành vi và sự cứng nhắc
 
-Hành vi thay đổi theo điều kiện thường bắt đầu bằng `if-else`, rồi phình to:
+Các behavioral pattern (Strategy, Observer, Template Method, Chain of Responsibility, Command, State...) trả lời câu hỏi: **làm sao để object phối hợp và để hành vi thay đổi linh hoạt** mà không biến code thành đống `if-else` cứng nhắc. Chúng quan trọng vì hành vi thay đổi theo điều kiện thường bắt đầu bằng một `if-else` bé xíu, rồi phình to — mỗi nhánh thêm vào là một chỗ phải sửa, vi phạm Open/Closed Principle.
 
 ```java
 // Mỗi cách tính phí ship là một nhánh — thêm cách mới phải sửa hàm này (vi phạm OCP)
@@ -38,6 +38,8 @@ Behavioral patterns trả lời câu hỏi: **làm sao để object phối hợp
 
 > [!IMPORTANT]
 > Phần lớn behavioral pattern là cách *thay thế điều kiện rẽ nhánh bằng đa hình*. Khi bạn thấy `switch`/`if-else` lớn dựa trên "loại" hay "trạng thái", gần như luôn có một behavioral pattern (Strategy/State/Command) làm code mở rộng được mà không sửa code cũ.
+
+Phần còn lại của doc sẽ đi qua: Strategy hoán đổi thuật toán (§2) → Observer pub/sub và bẫy memory leak (§3) → Template Method khung cố định (§4) → Chain of Responsibility (§5) → Command đóng gói hành động (§6) → Iterator & State (§7) → phân biệt Strategy vs State vs Command (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

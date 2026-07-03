@@ -5,7 +5,7 @@ description: "Mổ xẻ ThreadPoolExecutor: ctl bit-field (runState + workerCoun
 
 ## Mục lục
 
-- [Bối cảnh: OutOfMemoryError — newCachedThreadPool nuốt hết RAM](#1-bối-cảnh-outofmemoryerror--newcachedthreadpool-nuốt-hết-ram)
+- [OutOfMemoryError — newCachedThreadPool nuốt hết RAM](#1-outofmemoryerror--newcachedthreadpool-nuốt-hết-ram)
 - [Tại sao cần Thread Pool](#2-tại-sao-cần-thread-pool)
 - [Kiến trúc ThreadPoolExecutor — ctl, Worker, BlockingQueue](#3-kiến-trúc-threadpoolexecutor--ctl-worker-blockingqueue)
 - [ctl — 32 bit chứa 2 thông tin](#4-ctl--32-bit-chứa-2-thông-tin)
@@ -22,7 +22,9 @@ description: "Mổ xẻ ThreadPoolExecutor: ctl bit-field (runState + workerCoun
 
 ---
 
-## 1. Bối cảnh: OutOfMemoryError — newCachedThreadPool nuốt hết RAM
+## 1. OutOfMemoryError — newCachedThreadPool nuốt hết RAM
+
+`ThreadPoolExecutor` của Java có một quy tắc dispatch dễ bị bẻ gãy: **core → queue → max → reject**. Các factory `Executors.*` trông tiện lợi nhưng giấu queue vô hạn hoặc thread vô hạn bên trong, biến thành bom OOM chờ nổ trên production. Cách rõ nhất để thấy là một service dùng `newCachedThreadPool` đón traffic.
 
 Service xử lý HTTP request, mỗi request spawn một task:
 
@@ -47,6 +49,8 @@ Exception in thread "main" java.lang.OutOfMemoryError: unable to create native t
 ```
 
 Nguyên nhân: `newCachedThreadPool()` tạo pool với `maximumPoolSize = Integer.MAX_VALUE` và `SynchronousQueue` (queue không chứa gì). Mỗi task tới mà không có thread rảnh → tạo thread mới → **không giới hạn**.
+
+Phần còn lại của doc sẽ đi qua: vì sao cần thread pool (§2) → kiến trúc ThreadPoolExecutor (§3) → biến `ctl` 32-bit (§4) → flow `execute()` (§5) → Worker main loop (§6) → BlockingQueue strategies (§7) → RejectionHandler (§8) → keep-alive (§9) → shutdown (§10) → Executors factory pitfalls (§11) → ForkJoinPool vs ThreadPoolExecutor (§12) → sizing formula (§13).
 
 > [!IMPORTANT]
 > `Executors.newCachedThreadPool()` và `Executors.newFixedThreadPool()` (dùng `LinkedBlockingQueue` unbounded) là hai "bẫy" phổ biến nhất. Production nên **tự tạo** `ThreadPoolExecutor` với bound rõ ràng cho cả pool size và queue.

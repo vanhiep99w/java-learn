@@ -5,7 +5,7 @@ description: "Mổ xẻ String trong JVM: String Pool (intern()), Compact String
 
 ## Mục lục
 
-- [Bối cảnh: 500MB heap toàn String trùng lặp](#1-bối-cảnh-500mb-heap-toàn-string-trùng-lặp)
+- [500MB heap toàn String trùng lặp](#1-500mb-heap-toàn-string-trùng-lặp)
 - [Cấu trúc nội bộ — byte[] + coder (JDK 9+)](#2-cấu-trúc-nội-bộ--byte--coder-jdk-9)
 - [Immutability — vì sao String là final + không đổi được](#3-immutability--vì-sao-string-là-final--không-đổi-được)
 - [String Pool — intern() và constant pool](#4-string-pool--intern-và-constant-pool)
@@ -20,7 +20,9 @@ description: "Mổ xẻ String trong JVM: String Pool (intern()), Compact String
 
 ---
 
-## 1. Bối cảnh: 500MB heap toàn String trùng lặp
+## 1. 500MB heap toàn String trùng lặp
+
+**String** trong JVM phức tạp hơn vẻ ngoài: `final` + **immutable** + backing `byte[]` với `coder` LATIN1/UTF16 (JDK 9+), cộng thêm **String Pool**, concatenation tối ưu bằng `invokedynamic`, và **G1 String Deduplication**. Mỗi cơ chế đó là một đòn bẩy tiết kiệm RAM — vì string thường chiếm 25–40% heap, hiểu internals là cách giảm hàng trăm MB mà không đổi logic code.
 
 Service xử lý log có heap 2GB. Memory profiler: 40% heap = **`char[]`** (pre-JDK 9) / **`byte[]`** (JDK 9+). Top dominator: `String` objects — hàng triệu instance có cùng nội dung (`"INFO"`, `"ERROR"`, `"GET"`, `"/api/v1/users"`...).
 
@@ -34,6 +36,8 @@ Heap dump analysis:
 
 > [!IMPORTANT]
 > String thường chiếm **25-40% heap** của Java application. Hiểu internals (pool, compact strings, dedup) là hiểu cách tiết kiệm hàng trăm MB RAM mà không đổi logic code.
+
+Phần còn lại của doc sẽ đi qua: cấu trúc nội bộ byte[] + coder (§2) → immutability (§3) → String Pool & intern() (§4) → Compact Strings LATIN1 vs UTF16 (§5) → concatenation từ StringBuilder đến invokedynamic (§6) → == vs equals (§7) → G1 String Deduplication (§8) → substring copy hay share (§9) → hashCode caching (§10) → performance patterns & anti-patterns (§11) → cheat sheet (§12).
 
 ---
 

@@ -5,7 +5,7 @@ description: "Mổ xẻ ArrayList vs LinkedList ở mức internal: mảng độ
 
 ## Mục lục
 
-- [Bối cảnh: LinkedList "tối ưu cho insert" mà chậm gấp 20 lần](#1-bối-cảnh-linkedlist-tối-ưu-cho-insert-mà-chậm-gấp-20-lần)
+- [LinkedList "tối ưu cho insert" mà chậm gấp 20 lần](#1-linkedlist-tối-ưu-cho-insert-mà-chậm-gấp-20-lần)
 - [ArrayList — mảng động bên trong](#2-arraylist--mảng-động-bên-trong)
 - [Cơ chế grow: 1.5x & System.arraycopy](#3-cơ-chế-grow-15x--systemarraycopy)
 - [LinkedList — doubly linked list bên trong](#4-linkedlist--doubly-linked-list-bên-trong)
@@ -19,9 +19,11 @@ description: "Mổ xẻ ArrayList vs LinkedList ở mức internal: mảng độ
 
 ---
 
-## 1. Bối cảnh: LinkedList "tối ưu cho insert" mà chậm gấp 20 lần
+## 1. LinkedList "tối ưu cho insert" mà chậm gấp 20 lần
 
-Một dev đọc bảng Big-O thấy "LinkedList insert đầu O(1), ArrayList O(n)" nên đổi cấu trúc dữ liệu của một hàng đợi xử lý:
+Bảng Big-O dễ cho cảm giác sai rằng `LinkedList` tốt hơn `ArrayList` khi thao tác nhiều với đầu danh sách — và đó là cạm bẫy mà cả dev kinh nghiệm hay vấp. Bài này sẽ chỉ ra vì sao **trên thực tế `ArrayList` thắng gần như mọi tình huống**, và điều thực sự quyết định tốc độ không phải Big-O mà là cách dữ liệu nằm trong RAM.
+
+Bắt đầu từ một lỗi rất hay gặp. Đọc thấy *"LinkedList insert đầu O(1), ArrayList O(n)"*, một dev đổi hàng đợi xử lý event sang `LinkedList` để "tối ưu":
 
 ```java
 List<Event> queue = new LinkedList<>();
@@ -32,7 +34,7 @@ for (int i = 0; i < events.size(); i++) {
 }
 ```
 
-Kết quả: chậm hơn `ArrayList` **~20 lần** và tốn gấp nhiều lần bộ nhớ. Vấn đề: `LinkedList.get(i)` phải **duyệt** từ đầu (hoặc cuối) tới chỉ số i — vòng lặp này là **O(n²)** tổng thể. Bảng Big-O "đúng" nhưng đã bị áp sai ngữ cảnh.
+Kết quả: chậm hơn `ArrayList` **~20 lần** và tốn bộ nhớ gấp nhiều lần. Bảng Big-O "đúng" nhưng bị áp sai chỗ — vì `LinkedList.get(i)` phải **duyệt** từ đầu (hoặc cuối) tới chỉ số i, nên cả vòng lặp trên hoá ra **O(n²)**.
 
 ```text
 Benchmark (1M phần tử)            Mode  Cnt     Score    Units
@@ -41,6 +43,8 @@ LinkedList.getByIndexLoop        avgt    5    41.7      ms     ← O(n) mỗi ge
 ArrayList.iterate                avgt    5     1.8      ms
 LinkedList.iterate               avgt    5     9.4      ms     ← pointer chasing, cache miss
 ```
+
+Phần còn lại của doc sẽ bóc tách vì sao lại vậy: **cấu trúc bên trong** từng loại (§2–§4), vì sao **Big-O trên giấy lừa dối** khi chạm vào phần cứng thật (§5), **cache locality** — yếu tố quyết định mà Big-O bỏ qua (§6), rồi đến các vấn đề khác như fail-fast iterator (§7), xóa khi duyệt (§8), và cuối cùng là câu hỏi thực tế: *khi nào mới thực sự nên chọn LinkedList?* (§9).
 
 > [!IMPORTANT]
 > Big-O bỏ qua **hằng số** và **phần cứng** — nhưng trên CPU thật, **cache locality** và **allocation** mới quyết định tốc độ. ArrayList thắng gần như mọi tình huống thực tế. Hiểu hai cấu trúc này là hiểu *dữ liệu nằm thế nào trong RAM*, không chỉ bảng Big-O.

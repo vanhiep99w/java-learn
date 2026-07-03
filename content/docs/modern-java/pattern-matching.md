@@ -7,7 +7,7 @@ description: "Đào sâu pattern matching Java: switch expression (arrow/yield, 
 
 ## Mục lục
 
-- [Bối cảnh: tháp instanceof-then-cast và chuỗi if-else](#1-bối-cảnh-tháp-instanceof-then-cast-và-chuỗi-if-else)
+- [Tháp instanceof-then-cast và chuỗi if-else](#1-tháp-instanceof-then-cast-và-chuỗi-if-else)
 - [Switch expression — arrow, yield, và là biểu thức](#2-switch-expression--arrow-yield-và-là-biểu-thức)
 - [Pattern matching for instanceof & flow scoping](#3-pattern-matching-for-instanceof--flow-scoping)
 - [Pattern matching for switch (Java 21)](#4-pattern-matching-for-switch-java-21)
@@ -20,9 +20,9 @@ description: "Đào sâu pattern matching Java: switch expression (arrow/yield, 
 
 ---
 
-## 1. Bối cảnh: tháp instanceof-then-cast và chuỗi if-else
+## 1. Tháp instanceof-then-cast và chuỗi if-else
 
-Code Java "đời cũ" để xử lý đa hình theo kiểu thường trông thế này:
+Pattern matching (Java 16–21) gộp **kiểm tra kiểu + ép kiểu + gán biến** thành một bước và biến `switch` thành một biểu thức an toàn-toàn-vẹn (exhaustive). Nó quan trọng vì cách cũ — kiểm `instanceof` rồi **cast lại** chính object vừa kiểm, xếp thành chuỗi `if-else` dài — vừa thừa thãi vừa dễ quên một nhánh.
 
 ```java
 // Trước pattern matching — lặp tên, cast tay, dễ sai
@@ -53,6 +53,8 @@ String describe(Object o) {
 
 > [!IMPORTANT]
 > Pattern matching không chỉ là "đường cú pháp" (syntactic sugar). Nó cho compiler **suy luận đủ trường hợp** (exhaustiveness) với `sealed` type — biến lỗi "quên một nhánh" từ bug runtime thành lỗi compile. Đây là bước Java tiến về lập trình kiểu *algebraic data types* như trong các ngôn ngữ hàm.
+
+Phần còn lại của doc sẽ đi qua: switch expression với arrow/yield (§2) → pattern matching cho `instanceof` và flow scoping (§3) → pattern matching cho switch (§4) → record pattern destructuring lồng nhau (§5) → guarded pattern với `when` (§6) → exhaustiveness, sealed & xử lý null (§7) → compiler sinh invokedynamic bên dưới (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

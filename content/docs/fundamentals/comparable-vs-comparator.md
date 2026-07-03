@@ -5,7 +5,7 @@ description: "Mổ xẻ Comparable vs Comparator: natural ordering vs external o
 
 ## Mục lục
 
-- [Bối cảnh: sort crash với "violates its general contract"](#1-bối-cảnh-sort-crash-với-violates-its-general-contract)
+- [Sort crash với "violates its general contract"](#1-sort-crash-với-violates-its-general-contract)
 - [Hai cách định nghĩa thứ tự](#2-hai-cách-định-nghĩa-thứ-tự)
 - [Hợp đồng tổng thứ tự (total order)](#3-hợp-đồng-tổng-thứ-tự-total-order)
 - [Vì sao TimSort phát hiện được vi phạm](#4-vì-sao-timsort-phát-hiện-được-vi-phạm)
@@ -19,7 +19,9 @@ description: "Mổ xẻ Comparable vs Comparator: natural ordering vs external o
 
 ---
 
-## 1. Bối cảnh: sort crash với "violates its general contract"
+## 1. Sort crash với "violates its general contract"
+
+**Comparable** (`compareTo`) và **Comparator** (`compare`) là hai cách Java định nghĩa thứ tự cho object — natural ordering ở trong class, external ordering ở ngoài. Nhưng con số `-1/0/1` mà chúng trả về không phải tùy tiện: nó phải là một **total order** (thứ tự toàn phần) đúng về mặt toán học. Vi phạm hợp đồng này không cho ra kết quả "hơi sai" mà có thể crash giữa production.
 
 Một báo cáo sắp xếp danh sách nhân viên theo "độ ưu tiên" chạy ổn nhiều tháng, rồi một ngày crash giữa production với exception khó hiểu:
 
@@ -45,6 +47,8 @@ Khi hai phần tử **cùng priority** và **cùng không VIP**, `compare(a,b)` 
 
 > [!IMPORTANT]
 > Lỗi không phải ở `sort` — nó ở `compare`. So sánh trong Java phải là một **total order** (quan hệ thứ tự toàn phần) đúng về mặt toán học. Vi phạm hợp đồng này không phải "kết quả hơi sai" mà có thể là `IllegalArgumentException`, vòng lặp sai, hoặc TreeMap mất phần tử. Hiểu Comparable/Comparator là hiểu **hợp đồng** đứng sau con số `-1/0/1`.
+
+Phần còn lại của doc sẽ đi qua: hai cách định nghĩa thứ tự (§2) → hợp đồng total order (§3) → vì sao TimSort phát hiện vi phạm (§4) → bẫy int subtraction overflow (§5) → consistency với equals & TreeSet (§6) → Comparator chaining (§7) → null handling & reversed (§8) → chọn Comparable hay Comparator (§9) → anti-patterns (§10) → cheat sheet (§11).
 
 ---
 

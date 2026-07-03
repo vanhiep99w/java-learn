@@ -5,7 +5,7 @@ description: "Mổ xẻ ba cơ chế đồng bộ: volatile (visibility + memory
 
 ## Mục lục
 
-- [Bối cảnh: Counter tăng 1 triệu lần — kết quả sai 37%](#1-bối-cảnh-counter-tăng-1-triệu-lần--kết-quả-sai-37)
+- [Counter tăng 1 triệu lần — kết quả sai 37%](#1-counter-tăng-1-triệu-lần--kết-quả-sai-37)
 - [CPU Cache & Visibility Problem](#2-cpu-cache--visibility-problem)
 - [volatile — visibility guarantee & memory barrier](#3-volatile--visibility-guarantee--memory-barrier)
 - [volatile KHÔNG phải atomic — count++ vẫn race](#4-volatile-không-phải-atomic--count-vẫn-race)
@@ -22,7 +22,9 @@ description: "Mổ xẻ ba cơ chế đồng bộ: volatile (visibility + memory
 
 ---
 
-## 1. Bối cảnh: Counter tăng 1 triệu lần — kết quả sai 37%
+## 1. Counter tăng 1 triệu lần — kết quả sai 37%
+
+Java có ba cơ chế đồng bộ cốt lõi — `volatile`, `synchronized`, và `Atomic`/CAS — mỗi cái giải một bài toán khác nhau: visibility, mutual exclusion, và atomicity không khoá. Dùng sai tool cho sai problem là nguyên nhân của những bug đồng bộ âm thầm. Bắt đầu bằng một counter mà cả `plain int` lẫn `volatile int` đều tính sai.
 
 Bạn xây metrics counter cho service. 10 thread cùng tăng counter, mỗi thread 100.000 lần. Kỳ vọng: 1.000.000.
 
@@ -63,6 +65,8 @@ volatile int + ++          : 781,923  ← STILL WRONG
 synchronized block         : 1,000,000 ✓  (throughput: 12M ops/s)
 AtomicInteger              : 1,000,000 ✓  (throughput: 45M ops/s)
 ```
+
+Phần còn lại của doc sẽ đi qua: CPU cache & visibility (§2) → volatile & memory barrier (§3) → vì sao volatile không atomic cho `++` (§4) → synchronized & happens-before (§5) → biased/thin/fat lock (§6) → Atomic* & CAS (§7) → CAS spin loop từ assembly (§8) → ABA problem (§9) → LongAdder (§10) → VarHandle (§11).
 
 > [!IMPORTANT]
 > Ba cơ chế giải quyết **ba vấn đề khác nhau**: volatile = visibility, synchronized = mutual exclusion + visibility + atomicity (compound), Atomic = lock-free atomicity. Dùng sai tool cho sai problem = bug âm thầm.

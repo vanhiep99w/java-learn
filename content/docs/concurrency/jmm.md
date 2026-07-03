@@ -5,7 +5,7 @@ description: "Mổ xẻ JMM: visibility & ordering, happens-before chain, CPU ca
 
 ## Mục lục
 
-- [Bối cảnh: Bug "vô hình" — field đã ghi nhưng thread khác đọc thấy 0](#1-bối-cảnh-bug-vô-hình--field-đã-ghi-nhưng-thread-khác-đọc-thấy-0)
+- [Bug "vô hình" — field đã ghi nhưng thread khác đọc thấy 0](#1-bug-vô-hình--field-đã-ghi-nhưng-thread-khác-đọc-thấy-0)
 - [JMM là gì — hợp đồng giữa lập trình viên và JVM](#2-jmm-là-gì--hợp-đồng-giữa-lập-trình-viên-và-jvm)
 - [Ba thuộc tính nền tảng: Visibility, Ordering, Atomicity](#3-ba-thuộc-tính-nền-tảng-visibility-ordering-atomicity)
 - [CPU Cache Coherence — tại sao visibility là vấn đề thực](#4-cpu-cache-coherence--tại-sao-visibility-là-vấn-đề-thực)
@@ -21,7 +21,9 @@ description: "Mổ xẻ JMM: visibility & ordering, happens-before chain, CPU ca
 
 ---
 
-## 1. Bối cảnh: Bug "vô hình" — field đã ghi nhưng thread khác đọc thấy 0
+## 1. Bug "vô hình" — field đã ghi nhưng thread khác đọc thấy 0
+
+Java Memory Model (JMM) là **hợp đồng giữa lập trình viên và JVM** quy định khi nào một ghi từ thread A chắc chắn hiển thị với thread B, và compiler/CPU được phép reorder tới đâu. Không hiểu JMM, bạn sẽ gặp những bug "vô hình" — code đúng về logic, chạy tốt trên máy dev, nhưng production thì thread đọc mãi giá trị cũ. Bắt đầu từ một flag dừng đơn giản.
 
 Bạn viết một flag đơn giản để báo hiệu thread worker dừng lại:
 
@@ -60,6 +62,8 @@ while (cached) {              // loop mãi mãi
 ```
 
 Thêm `volatile` vào `running` → buộc mỗi lần lặp phải đọc lại từ main memory → worker thấy `false` → dừng.
+
+Phần còn lại của doc sẽ đi qua: JMM là gì (§2) → ba thuộc tính visibility/ordering/atomicity (§3) → cache coherence & MESI (§4) → reordering (§5) → happens-before (§6) → memory barriers (§7) → volatile & synchronized dưới góc JMM (§8–§9) → final field (§10) → double-checked locking (§11) → jcstress (§12).
 
 > [!IMPORTANT]
 > Bug này **không phải** lỗi logic, không phải race condition kiểu mất update. Nó là **visibility failure** — thread ghi giá trị mới nhưng thread khác không nhìn thấy. JMM tồn tại để quy định chính xác khi nào một ghi từ thread A **đảm bảo** hiển thị với thread B.

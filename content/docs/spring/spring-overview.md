@@ -7,7 +7,7 @@ description: "Bản đồ hệ sinh thái Spring: IoC container & Dependency Inj
 
 ## Mục lục
 
-- [Bối cảnh: Spring giải quyết vấn đề gì](#1-bối-cảnh-spring-giải-quyết-vấn-đề-gì)
+- [IoC và AOP — hai cơ chế nền của mọi thứ Spring làm](#1-ioc-và-aop--hai-cơ-chế-nền-của-mọi-thứ-spring-làm)
 - [IoC & Dependency Injection — trái tim của Spring](#2-ioc--dependency-injection--trái-tim-của-spring)
 - [Container: BeanFactory vs ApplicationContext](#3-container-beanfactory-vs-applicationcontext)
 - [Bean lifecycle & scope](#4-bean-lifecycle--scope)
@@ -20,7 +20,9 @@ description: "Bản đồ hệ sinh thái Spring: IoC container & Dependency Inj
 
 ---
 
-## 1. Bối cảnh: Spring giải quyết vấn đề gì
+## 1. IoC và AOP — hai cơ chế nền của mọi thứ Spring làm
+
+Spring **không phải một framework web** — cốt lõi của nó chỉ là hai cơ chế: **IoC** (Inversion of Control), một container *tạo và lắp ráp* object (bean) thay để bạn tự `new` và nối dây, và **AOP**, lớp *proxy* bọc bean để rải code cắt ngang như transaction, cache, security. Mọi module khác (MVC, Data, Security, Boot) đều xây trên hai nền này; các annotation bạn viết (`@Service`, `@Transactional`, `@RestController`) chỉ là mặt tiền tiện lợi gói quanh IoC và AOP. Hiểu đúng hai cơ chế này là chìa khoá giải mã mọi "ma thuật" của Spring — và cũng là cách tránh những bug thầm lặng như self-invocation làm `@Transactional` vô hiệu.
 
 Không có Spring, code Java doanh nghiệp đầy "dây nối" thủ công: mỗi class tự `new` dependency của nó, tự quản vòng đời, tự mở/đóng transaction, tự lo cấu hình:
 
@@ -42,6 +44,8 @@ Vấn đề: coupling chặt (khoá cứng lớp cụ thể), khó test (không 
 
 > [!IMPORTANT]
 > Spring không phải "một framework web" — nó là một **container quản lý object** (bean) + **AOP**. Mọi thứ khác (MVC, Data, Security) xây trên hai nền này. Hiểu IoC + AOP = hiểu 80% Spring; phần còn lại chỉ là annotation tiện lợi gói quanh hai cơ chế đó.
+
+Phần còn lại của doc sẽ đi qua: IoC & Dependency Injection (§2) → Container `BeanFactory` vs `ApplicationContext` (§3) → bean lifecycle & scope (§4) → AOP & `@Transactional` (§5) → Spring Boot auto-configuration & starter (§6) → các module chính (§7) → kiểu inject & best practice (§8) → anti-patterns (§9) → cheat sheet (§10).
 
 ---
 

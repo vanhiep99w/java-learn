@@ -7,7 +7,7 @@ description: "Đào sâu các kỹ thuật stream dữ liệu qua mạng/IO: chu
 
 ## Mục lục
 
-- [Bối cảnh: bài toán "dữ liệu lớn hơn RAM" và "kết quả đến dần"](#1-bối-cảnh-bài-toán-dữ-liệu-lớn-hơn-ram-và-kết-quả-đến-dần)
+- [Streaming — xử lý dữ liệu khi nó đến, không nạp hết](#1-streaming--xử-lý-dữ-liệu-khi-nó-đến-không-nạp-hết)
 - [Streaming ở tầng IO — đọc/ghi theo luồng](#2-streaming-ở-tầng-io--đọcghi-theo-luồng)
 - [Chunked transfer encoding — stream qua HTTP/1.1](#3-chunked-transfer-encoding--stream-qua-http11)
 - [Server push: SSE vs WebSocket vs Long-polling](#4-server-push-sse-vs-websocket-vs-long-polling)
@@ -20,7 +20,7 @@ description: "Đào sâu các kỹ thuật stream dữ liệu qua mạng/IO: chu
 
 ---
 
-## 1. Bối cảnh: bài toán "dữ liệu lớn hơn RAM" và "kết quả đến dần"
+## 1. Streaming — xử lý dữ liệu khi nó đến, không nạp hết
 
 Hai tình huống buộc phải stream thay vì nạp hết:
 
@@ -36,6 +36,8 @@ Streaming = **xử lý dữ liệu theo từng phần khi nó đến/được đ
 
 > [!IMPORTANT]
 > Tư tưởng streaming xuyên suốt mọi tầng: IO (đọc file/socket theo buffer), HTTP (chunked/SSE), database (cursor/fetch size), xử lý (lazy Stream), reactive (publisher/subscriber). Nguyên tắc chung: **đừng giữ thứ bạn không cần giữ** — tiêu thụ rồi bỏ.
+
+Phần còn lại của doc sẽ đi qua: streaming ở tầng IO (§2) → chunked transfer encoding qua HTTP/1.1 (§3) → server push: SSE vs WebSocket vs long-polling (§4) → backpressure (§5) → Reactive Streams & Flow API (§6) → HTTP/2 & gRPC streaming (§7) → Java Stream lazy vs stream dữ liệu (§8) → anti-patterns (§9).
 
 ---
 

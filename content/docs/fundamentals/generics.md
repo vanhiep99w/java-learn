@@ -5,7 +5,7 @@ description: "Mổ xẻ Java Generics: type erasure cơ chế biên dịch, brid
 
 ## Mục lục
 
-- [Bối cảnh: ClassCastException từ hư không — không có cast nào trong code](#1-bối-cảnh-classcastexception-từ-hư-không--không-có-cast-nào-trong-code)
+- [ClassCastException từ hư không — không có cast nào trong code](#1-classcastexception-từ-hư-không--không-có-cast-nào-trong-code)
 - [Type Erasure — generics biến mất sau compile](#2-type-erasure--generics-biến-mất-sau-compile)
 - [Bridge Methods — compiler tự sinh để giữ polymorphism](#3-bridge-methods--compiler-tự-sinh-để-giữ-polymorphism)
 - [Bounded Type Parameters — extends & super ở khai báo](#4-bounded-type-parameters--extends--super-ở-khai-báo)
@@ -21,7 +21,9 @@ description: "Mổ xẻ Java Generics: type erasure cơ chế biên dịch, brid
 
 ---
 
-## 1. Bối cảnh: ClassCastException từ hư không — không có cast nào trong code
+## 1. ClassCastException từ hư không — không có cast nào trong code
+
+**Generics** (`List<String>`, `Cache<T>`) cho phép viết code type-safe dùng lại cho nhiều kiểu. Nhưng generics trong Java tồn tại **chỉ lúc compile** — runtime, `Cache<User>` và `Cache<Order>` là *cùng một class* `Cache`. Cơ chế này gọi là **type erasure**: compiler kiểm tra type rồi xoá hết đi và chèn cast ở caller. Type safety phụ thuộc hoàn toàn vào compiler check — mà raw type / unchecked cast bypass check đó, để ClassCastException nổ ở nơi không có cast nào nhìn thấy.
 
 Bạn có service deserialize JSON thành object, lưu vào cache generic:
 
@@ -56,6 +58,8 @@ Order o = typedCache.get("order");
 
 > [!IMPORTANT]
 > Generics tồn tại **chỉ** lúc compile. Runtime, `Cache<User>` và `Cache<Order>` là cùng **một class** `Cache`. Type safety phụ thuộc hoàn toàn vào **compiler check** — mà raw type / unchecked cast bypass check đó.
+
+Phần còn lại của doc sẽ đi qua: type erasure cơ chế (§2) → bridge methods (§3) → bounded type parameters (§4) → wildcards & PECS (§5) → type inference & diamond (§6) → reification arrays vs generics (§7) → heap pollution (§8) → recursive type bounds (§9) → generic methods vs generic classes (§10) → type tokens & super type tokens (§11) → anti-patterns (§12) → cheat sheet (§13).
 
 ---
 

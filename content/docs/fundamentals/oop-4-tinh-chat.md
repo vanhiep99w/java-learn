@@ -7,7 +7,7 @@ description: "Mổ xẻ 4 tính chất OOP ở tầng JVM: Encapsulation và byt
 
 ## Mục lục
 
-- [Bối cảnh: "Tôi gọi method của lớp cha hay lớp con?"](#1-bối-cảnh-tôi-gọi-method-của-lớp-cha-hay-lớp-con)
+- [Tôi gọi method của lớp cha hay lớp con](#1-tôi-gọi-method-của-lớp-cha-hay-lớp-con)
 - [Encapsulation — đóng gói không chỉ là getter/setter](#2-encapsulation--đóng-gói-không-chỉ-là-gettersetter)
 - [Inheritance — object layout & super constructor chaining](#3-inheritance--object-layout--super-constructor-chaining)
 - [Polymorphism — invokevirtual, vtable và động cơ dispatch](#4-polymorphism--invokevirtual-vtable-và-động-cơ-dispatch)
@@ -19,7 +19,9 @@ description: "Mổ xẻ 4 tính chất OOP ở tầng JVM: Encapsulation và byt
 
 ---
 
-## 1. Bối cảnh: "Tôi gọi method của lớp cha hay lớp con?"
+## 1. Tôi gọi method của lớp cha hay lớp con
+
+4 tính chất OOP — **Encapsulation** (đóng gói), **Inheritance** (kế thừa), **Polymorphism** (đa hình), **Abstraction** (trừu tượng) — không phải khái niệm trừu tượng để học thuộc lòng. Mỗi tính chất ứng với một cơ chế cụ thể trong JVM: encapsulation → access flag trong bytecode; inheritance → object layout + `invokespecial`; polymorphism → `invokevirtual` + vtable; abstraction → `invokeinterface` + itable. Hiểu cơ chế = trả lời được mọi câu hỏi "tại sao".
 
 Một câu hỏi phỏng vấn kinh điển — và là nơi 4 tính chất OOP lộ ra bản chất thật của chúng:
 
@@ -42,6 +44,8 @@ Câu trả lời nằm ở **dynamic dispatch**: lời gọi `sound()` không đ
 
 > [!IMPORTANT]
 > 4 tính chất OOP không phải khái niệm trừu tượng để học thuộc lòng. Mỗi tính chất ứng với một cơ chế cụ thể trong JVM: encapsulation → access flag trong bytecode; inheritance → object layout + `invokespecial` gọi `<init>` cha; polymorphism → `invokevirtual` + vtable; abstraction → `invokeinterface` + itable. Hiểu cơ chế = trả lời được mọi câu hỏi "tại sao".
+
+Phần còn lại của doc sẽ đi qua: encapsulation — đóng gói không chỉ là getter/setter (§2) → inheritance — object layout & super constructor (§3) → polymorphism — invokevirtual & vtable (§4) → overriding vs overloading (§5) → abstraction — abstract class vs interface vs default method (§6) → so sánh & khi nào dùng (§7) → anti-patterns (§8) → cheat sheet (§9).
 
 ---
 
