@@ -47,7 +47,7 @@ Phần còn lại của doc giải thích **từng thủ phạm** và **cách ch
 
 Mô hình sai trong đầu nhiều người:
 
-```diagram
+```text
 ❌ Mô hình sai (tuyến tính vô hạn):
    1 thread  → 100s
    2 thread  → 50s
@@ -57,7 +57,7 @@ Mô hình sai trong đầu nhiều người:
 
 Thực tế đường cong speedup luôn **cong và bão hòa**, rồi **đi xuống**:
 
-```diagram
+```text
 ✅ Thực tế:
  speedup
    ▲
@@ -106,7 +106,7 @@ Phần `(1 − P)` là **phần tuần tự** — dù `N → ∞`, speedup cũng
 
 Đọc bảng này: nếu chỉ **5%** code là tuần tự (P = 95%), thì dù có **vô hạn** core, bạn cũng chỉ nhanh được **20 lần**. Với 8 core thực tế chỉ ~5.9 lần. Đây giải thích trực tiếp vì sao "8 core mà chỉ nhanh 4 lần".
 
-```diagram
+```text
 Tác vụ 100s, giả sử 20s là tuần tự (đọc file đầu vào, gộp kết quả cuối):
    1 thread:  [████████ tuần tự 20s ████████ song song 80s ]  = 100s
    8 thread:  [████████ tuần tự 20s ██] song song 80/8=10s    = 30s
@@ -123,7 +123,7 @@ Tác vụ 100s, giả sử 20s là tuần tự (đọc file đầu vào, gộp k
 
 Trước khi nói số thread, phải phân loại tác vụ — vì câu trả lời ngược nhau hoàn toàn:
 
-```diagram
+```text
 CPU-BOUND (tính toán nặng: nén, mã hóa, xử lý ảnh, tính toán số):
    • Thread bận 100% trên CPU, không nghỉ
    • Quá số core → các thread chỉ tranh CPU + context switch
@@ -151,7 +151,7 @@ Ví dụ trực quan với 8 core:
 
 CPU chỉ chạy được số thread bằng số core (logical core) tại một thời điểm. Khi có nhiều thread "sẵn sàng chạy" hơn số core, OS scheduler phải **luân phiên** chúng — gọi là **context switch**. Mỗi lần switch tốn:
 
-```diagram
+```text
 Một lần context switch phải:
    1. Lưu trạng thái thread đang chạy (thanh ghi, program counter, stack pointer)
    2. Nạp trạng thái thread kế tiếp
@@ -182,7 +182,7 @@ class Counter {
 // 100 thread cùng gọi increment() → 99 thread XẾP HÀNG chờ → tuần tự hóa
 ```
 
-```diagram
+```text
 Hiệu ứng lên Amdahl: vùng synchronized = phần TUẦN TỰ.
    Lock giữ càng lâu / tranh càng nhiều → (1−P) càng lớn → trần speedup càng thấp.
    Thêm thread vào vùng tranh lock = thêm người xếp hàng, KHÔNG thêm thông lượng.
@@ -209,7 +209,7 @@ Cách giảm contention:
 
 CPU không quản lý bộ nhớ theo từng byte mà theo **cache line** (thường 64 byte). Nếu hai biến độc lập **nằm cùng một cache line**, và hai thread (trên hai core) mỗi thread ghi một biến, thì mỗi lần ghi làm **invalidate toàn bộ cache line** ở core kia — dù chúng chẳng dùng chung dữ liệu gì.
 
-```diagram
+```text
 Cache line 64 byte:  [ counter[0] | counter[1] | ... ]
    Core 0 ghi counter[0] → invalidate cache line ở Core 1
    Core 1 ghi counter[1] → invalidate cache line ở Core 0
@@ -234,7 +234,7 @@ long[] counters = new long[numThreads];
 
 Thêm thread thường đồng nghĩa **tạo thêm object** đồng thời (mỗi request/task cấp phát buffer, DTO...). Điều này dồn áp lực lên Garbage Collector:
 
-```diagram
+```text
 Nhiều thread → tốc độ cấp phát (allocation rate) tăng
    → Young generation đầy nhanh hơn → GC chạy thường xuyên hơn
    → GC pause (stop-the-world) "ăn" vào thời gian của TẤT CẢ thread
@@ -260,7 +260,7 @@ Thread của bạn có thể scale, nhưng **tài nguyên phía sau** thì khôn
 | **Network/băng thông** | Tổng băng thông cố định; chia cho nhiều thread không tăng tổng |
 | **API bên thứ ba** | Rate limit; quá nhiều request song song → bị 429 / throttle |
 
-```diagram
+```text
 App server (100 thread)  ──►  DB connection pool (10 conn)  ──►  Database
                               ▲
                          CỔ CHAI THẬT nằm ở đây, không phải số thread
@@ -284,7 +284,7 @@ N_threads = N_core × U × (1 + W/C)
   W/C    = tỉ lệ (thời gian CHỜ) / (thời gian TÍNH) của một tác vụ
 ```
 
-```diagram
+```text
 CPU-BOUND (W/C ≈ 0):
    N_threads ≈ N_core × U × (1 + 0) ≈ N_core
    → ví dụ 8 core → ~8 thread (đôi khi N_core + 1 để lấp lúc thread bị page fault)
@@ -310,7 +310,7 @@ Nguyên tắc thực hành:
 
 ## 12. Checklist chẩn đoán — vì sao không scale
 
-```diagram
+```text
 ╭──────────────────────────────────────────────────────────────╮
 │ B1. Tác vụ CPU-bound hay I/O-bound?                          │
 │     • CPU-bound → số thread tối ưu ≈ số core. Quá đó = hại.   │

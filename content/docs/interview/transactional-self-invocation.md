@@ -87,7 +87,7 @@ Hành vi "ma quái" thường gặp:
 
 Mô hình sai trong đầu nhiều người:
 
-```diagram
+```text
 ❌ Mô hình sai:
    @Transactional  ──(bằng phép thuật)──►  method tự biết mở/commit transaction
         "Cứ gắn vào là nó tự lo, ở đâu cũng được."
@@ -95,7 +95,7 @@ Mô hình sai trong đầu nhiều người:
 
 Thực tế, annotation chỉ là **metadata** — một mẩu thông tin dán lên method. Bản thân nó **không chứa code**. Phải có ai đó **đọc** annotation và **sinh ra hành vi**. Trong Spring, "ai đó" là cơ chế AOP, và hành vi được nhét vào một **proxy**:
 
-```diagram
+```text
 ✅ Mô hình đúng:
    Lúc startup:
      Spring quét thấy @Transactional → tạo PROXY bọc quanh OrderService
@@ -118,7 +118,7 @@ Annotation là "tấm biển chỉ dẫn"; proxy là "người thực thi". Tấ
 
 Có hai trường phái làm AOP, và Spring chọn **proxy-based** (khác với AspectJ dùng **weaving**):
 
-```diagram
+```text
 AspectJ (compile-time / load-time WEAVING):
    Sửa thẳng bytecode của class → logic AOP nhúng VÀO chính method
    → this.method() cũng bị chặn (vì code đã ở trong method rồi)
@@ -132,7 +132,7 @@ Spring AOP (runtime PROXY):
 
 Lúc context khởi động, một `BeanPostProcessor` (vd `InfrastructureAdvisorAutoProxyCreator`) phát hiện bean có `@Transactional`, và thay vì đăng ký object gốc, nó đăng ký một **proxy**:
 
-```diagram
+```text
 Bean trong Spring container thực chất là:
 
    ┌──────────────────── OrderService$$Proxy ────────────────────┐
@@ -163,7 +163,7 @@ Mọi thứ inject vào nơi khác (`@Autowired OrderService`) thực chất là
 
 Đây là trái tim của câu trả lời. Bên trong object thật, từ khóa `this` trỏ tới **chính object thật đó** — **không phải** proxy. Proxy chỉ là một object *khác* bọc bên ngoài; object thật **không hề biết** proxy tồn tại.
 
-```diagram
+```text
 caller bên ngoài:
    proxy.processOrder()
       └─► target.processOrder()        ← đang chạy TRONG target
@@ -176,7 +176,7 @@ caller bên ngoài:
                   → không begin/commit/rollback → @Transactional vô hiệu
 ```
 
-```diagram
+```text
 So sánh hai đường đi:
 
   ✅ Đi qua proxy (có tx):
@@ -203,7 +203,7 @@ Spring tạo proxy bằng một trong hai cơ chế — chi tiết này hay đư
 | Khi nào Spring dùng | Bean có interface (mặc định cũ) | Không có interface; Spring Boot **mặc định CGLIB** |
 | Hệ quả | Chỉ proxy được method khai báo trong interface | Proxy được method `public`/`protected` |
 
-```diagram
+```text
 JDK proxy:   interface OrderService
                     ▲ implements
              OrderServiceImpl (target)
@@ -354,7 +354,7 @@ logging.level.org.springframework.transaction.interceptor=TRACE
 logging.level.org.springframework.orm.jpa.JpaTransactionManager=DEBUG
 ```
 
-```diagram
+```text
 B1. Gọi method trực tiếp từ ngoài (controller/test) → xem log có "Getting transaction" không.
     • CÓ log mở tx + rollback hoạt động → proxy ổn, annotation ổn.
 

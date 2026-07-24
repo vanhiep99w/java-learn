@@ -62,7 +62,7 @@ Nhiều người tin đoạn này sẽ ném exception hoặc bị chặn. Thực
 
 Khi Spring mở transaction với `readOnly=true`, nó tác động ở 2 tầng:
 
-```diagram
+```text
 @Transactional(readOnly=true)
         │
         ├──► Tầng Hibernate (JPA):
@@ -106,7 +106,7 @@ public void f() {
 
 **(2) DB không tôn trọng `setReadOnly`.** `Connection.setReadOnly(true)` chỉ là gợi ý. Nhiều DB (vd MySQL với một số cấu hình) **không thực sự cấm ghi** trên connection read-only — chúng chỉ coi đó là gợi ý tối ưu/định tuyến. PostgreSQL thì nghiêm hơn (có thể báo lỗi `cannot execute UPDATE in a read-only transaction` nếu transaction được set read-only ở tầng DB), nhưng hành vi **phụ thuộc DB + driver + cấu hình**.
 
-```diagram
+```text
 repo.save() ──► Hibernate flush tường minh ──► UPDATE gửi xuống DB
                                                    │
                                   DB có cấm không? ─┤
@@ -145,7 +145,7 @@ Dù không chặn ghi, `readOnly=true` mang lại giá trị thật:
 3. **Method không public / final** — CGLIB không proxy được → annotation bị bỏ qua.
 4. **Gọi từ cùng class / không qua bean proxy** — như self-invocation.
 
-```diagram
+```text
 Tx read-write A (mở từ ngoài)
    └── gọi method B @Transactional(readOnly=true) [REQUIRED]
           → B tham gia tx A (không tạo tx mới)
@@ -182,7 +182,7 @@ Nếu yêu cầu là **đảm bảo không thể ghi** (vd service báo cáo, re
 
 ## 9. Checklist chẩn đoán
 
-```diagram
+```text
 ╭──────────────────────────────────────────────────────────────╮
 │ "readOnly=true mà vẫn ghi được" — vì sao?                     │
 │                                                              │

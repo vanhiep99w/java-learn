@@ -89,7 +89,7 @@ Hành vi quan sát được rất "ma quái":
 
 Nhiều người hình dung bộ nhớ như một bảng trắng dùng chung mà ai cũng nhìn thấy tức thì:
 
-```diagram
+```text
 ❌ Mô hình sai (mô hình "bộ nhớ phẳng"):
 
    Thread A  ──ghi stop=true──►  ┌─────────────┐
@@ -100,7 +100,7 @@ Nhiều người hình dung bộ nhớ như một bảng trắng dùng chung mà
 
 Thực tế phần cứng và compiler hiện đại **không hề** hoạt động như vậy. Mô hình đúng có nhiều tầng đệm mà mỗi thread nhìn qua đó:
 
-```diagram
+```text
 ✅ Mô hình đúng (có cache + reorder):
 
    Thread A (core 0)              Thread B (core 1)
@@ -168,7 +168,7 @@ if (!tmp) {
 
 Sau biến đổi này, dù `stop` trong RAM có đổi thành `true`, vòng lặp cũng **không bao giờ đọc lại** — nó đã trở thành `while (true)`. Đây là lý do `-Xint` (tắt JIT) thường làm bug biến mất: không có JIT thì không có hoisting.
 
-```diagram
+```text
 Vì sao JIT được phép làm vậy?
    Trong CHỈ một thread, "stop không đổi" là đúng.
    JMM nói: "Tối ưu trong phạm vi thread cứ làm thoải mái,
@@ -199,7 +199,7 @@ Các nguồn tạo happens-before quan trọng:
 | `Thread.join()` | Mọi việc trong thread con happens-before `join()` trả về |
 | `final` field | Khởi tạo final field trong constructor happens-before khi object được publish đúng cách |
 
-```diagram
+```text
 Trong code bug của ta:
    main:    stop = true            (thao tác ghi)
    worker:  while (!stop) ...       (thao tác đọc)
@@ -223,7 +223,7 @@ Khai báo `volatile` cho biến `stop` tạo ra ba đảm bảo:
 private static volatile boolean stop = false;   // ✅ chỉ thêm 1 từ khóa
 ```
 
-```diagram
+```text
 volatile boolean stop:
   1. VISIBILITY:  mọi lần đọc lấy thẳng từ bộ nhớ chính (không dùng bản cache cũ),
                   mọi lần ghi flush ngay xuống bộ nhớ chính.
@@ -260,7 +260,7 @@ counter++;   // ❌ KHÔNG atomic! Đây là 3 bước: đọc → +1 → ghi
 
 Đây là điểm khiến loại bug này cực kỳ nguy hiểm trong thực tế:
 
-```diagram
+```text
 Trên laptop dev:                    Trên server production:
   • Client JVM hoặc ít core           • Server JVM, JIT C2 tối ưu mạnh
   • JIT chưa kịp "ấm" để hoisting      • Chạy lâu → JIT đã hoisting biến

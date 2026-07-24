@@ -88,7 +88,7 @@ public class ReportService {
 
 Giống `@Transactional`, lúc startup Spring tạo proxy bọc quanh bean và nhét logic vào đó:
 
-```diagram
+```text
 @Async:
    ┌──── ReportService$$Proxy ─────────────────────┐
    │  generateAsync() {                            │
@@ -121,7 +121,7 @@ Vì logic nằm trong proxy, **mọi nguyên nhân khiến lời gọi không đ
 
 Hệt như `@Transactional`: gọi `this.method()` từ bên trong cùng class đi thẳng tới object thật, bỏ qua proxy.
 
-```diagram
+```text
 caller ──► proxy.handleRequest()
               └─► target.handleRequest()
                      └─► this.generateAsync()
@@ -164,7 +164,7 @@ Hoặc self-injection (`@Autowired ReportService self;` rồi gọi `self.genera
 public class Application { ... }
 ```
 
-```diagram
+```text
 Không có @EnableAsync:
    Spring KHÔNG đăng ký AsyncAnnotationBeanPostProcessor
    → KHÔNG tạo proxy async cho bean có @Async
@@ -286,7 +286,7 @@ Một số provider yêu cầu khai báo trước tên cache. Thiếu cấu hìn
 
 ## 10. Checklist chẩn đoán
 
-```diagram
+```text
 ╭──────────────────────────────────────────────────────────────╮
 │ B1. Đã có @EnableAsync / @EnableCaching chưa?                │
 │     • Chưa → thêm vào @Configuration/@SpringBootApplication   │
