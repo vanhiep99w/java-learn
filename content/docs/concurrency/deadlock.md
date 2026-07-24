@@ -1,11 +1,13 @@
 ---
-title: "Deadlock — Deep Dive"
+title: "Deadlock"
 description: "Mổ xẻ Deadlock trong Java: 4 điều kiện Coffman, lock ordering, jstack & thread dump analysis, JMX ThreadMXBean detection, tryLock timeout, livelock & starvation, ReentrantLock vs synchronized deadlock, database deadlock & JPA, và production troubleshooting. Kèm ví dụ reproduce, detection script, và anti-patterns."
 ---
 
+Deadlock xảy ra khi một nhóm thread chờ tài nguyên do chính các thread trong nhóm giữ, khiến không thread nào có thể tiếp tục. Ứng dụng có thể vẫn chạy nhưng các luồng liên quan ngừng tạo tiến triển.
+
 ## Mục lục
 
-- [Service treo — không crash, không log, không response](#1-service-treo--không-crash-không-log-không-response)
+- [Tổng quan](#1-tổng-quan)
 - [Deadlock là gì — định nghĩa chính xác](#2-deadlock-là-gì--định-nghĩa-chính-xác)
 - [4 điều kiện Coffman — phá 1 là thoát](#3-4-điều-kiện-coffman--phá-1-là-thoát)
 - [Reproduce deadlock — ví dụ kinh điển](#4-reproduce-deadlock--ví-dụ-kinh-điển)
@@ -19,50 +21,11 @@ description: "Mổ xẻ Deadlock trong Java: 4 điều kiện Coffman, lock orde
 
 ---
 
-## 1. Service treo — không crash, không log, không response
+## 1. Tổng quan
 
-**Deadlock** là bug **im lặng nhất** của concurrent code: các thread giữ resource rồi chờ nhau thành một vòng tròn, không thread nào tiến lên — và JVM không throw, không log, không crash. Thread chỉ "biến mất" khỏi xử lý. Đến khi load balancer rút server khỏi pool thì mọi người mới ngả ngửa.
+Bốn điều kiện Coffman—mutual exclusion, hold and wait, no preemption và circular wait—phải đồng thời tồn tại để deadlock hình thành. Phá vỡ ít nhất một điều kiện là cơ sở của hầu hết chiến lược phòng tránh.
 
-Hãy xem nó xảy ra thế nào. Một hệ thống chuyển tiền, mỗi giao dịch khoá cả hai tài khoản nguồn và đích:
-
-```java
-public void transfer(Account from, Account to, BigDecimal amount) {
-    synchronized (from) {
-        synchronized (to) {
-            from.debit(amount);
-            to.credit(amount);
-        }
-    }
-}
-```
-
-Trên dev: chạy ngon lành. Lên production, chỉ cần hai request gõ cửa cùng lúc đúng một nhịp:
-- Thread 1: `transfer(A, B, 100)` — giữ A, chờ B
-- Thread 2: `transfer(B, A, 50)` — giữ B, chờ A
-
-Cả hai giữ chìa khoá của nhau, nên cùng chờ nhau … vĩnh viễn. Health check timeout, load balancer rút server khỏi pool, cảnh báo nổi lên.
-
-Đó là deadlock trong hình thái kinh điển nhất. Phần còn lại của doc sẽ đi qua: **định nghĩa chính xác** (§2) → **4 điều kiện Coffman** khiến nó xảy ra và cách phá (§3) → **phát hiện** qua thread dump & JMX (§5–6) → **phòng tránh** bằng lock ordering & tryLock (§7–8) → rồi mở rộng sang cả **deadlock ở tầng database** (§10).
-
-```
-thread dump:
-"transfer-1" BLOCKED on B, owned by "transfer-2"
-"transfer-2" BLOCKED on A, owned by "transfer-1"
-
-Found one Java-level deadlock:
-=============================
-"transfer-1":
-  waiting to lock monitor 0x00007f... (object 0x00000..., Account B),
-  which is held by "transfer-2"
-"transfer-2":
-  waiting to lock monitor 0x00007f... (object 0x00000..., Account A),
-  which is held by "transfer-1"
-```
-
-> [!IMPORTANT]
-> Deadlock là bug **im lặng nhất** — không exception, không stack trace, không error log. Thread chỉ "biến mất" khỏi xử lý. Phát hiện cần **thread dump** hoặc monitoring chủ động.
-
----
+Trong Java, deadlock thường xuất hiện qua nhiều lock được lấy theo thứ tự không nhất quán. Thread dump, lock ordering, timeout và giảm phạm vi critical section là các công cụ chính để phát hiện và xử lý.
 
 ## 2. Deadlock là gì — định nghĩa chính xác
 

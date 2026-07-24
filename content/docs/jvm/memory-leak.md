@@ -1,11 +1,13 @@
 ---
-title: "Memory Leak — Deep Dive"
+title: "Memory Leak"
 description: "Mổ xẻ Memory Leak trong Java: tại sao có GC vẫn leak, GC Roots & reachability chain, Reference types (Strong/Soft/Weak/Phantom), ReferenceQueue, 10 nguyên nhân leak phổ biến (static collection, inner class, ThreadLocal, ClassLoader, unclosed resources, listener, cache), heap dump analysis (MAT, jmap, jcmd), production troubleshooting, và anti-patterns."
 ---
 
+Memory leak trong Java xảy ra khi object không còn hữu ích với ứng dụng nhưng vẫn reachable, nên garbage collector không thể thu hồi. GC chỉ loại bỏ object không thể truy cập; nó không biết object nào đã hết giá trị nghiệp vụ.
+
 ## Mục lục
 
-- [OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được](#1-oom-sau-3-ngày--gc-chạy-liên-tục-nhưng-không-cứu-được)
+- [Tổng quan](#1-tổng-quan)
 - [Memory Leak trong Java — GC không phải thuốc chữa bách bệnh](#2-memory-leak-trong-java--gc-không-phải-thuốc-chữa-bách-bệnh)
 - [GC Roots & Reachability — ai quyết định object sống hay chết](#3-gc-roots--reachability--ai-quyết-định-object-sống-hay-chết)
 - [GC Mark Phase — cách JVM duyệt object graph](#4-gc-mark-phase--cách-jvm-duyệt-object-graph)
@@ -21,44 +23,11 @@ description: "Mổ xẻ Memory Leak trong Java: tại sao có GC vẫn leak, GC 
 
 ---
 
-## 1. OOM sau 3 ngày — GC chạy liên tục nhưng không cứu được
+## 1. Tổng quan
 
-Service xử lý event từ Kafka. Mỗi event được log vào cache "gần đây" để debug:
+Nguồn leak phổ biến gồm collection tăng không giới hạn, listener không được gỡ, `ThreadLocal` không cleanup, cache thiếu eviction và class loader bị giữ lại. Hệ quả thường là heap tăng dần, GC chạy thường xuyên hơn và cuối cùng có thể dẫn đến `OutOfMemoryError`.
 
-```java
-public class EventProcessor {
-    private static final Map<String, Event> recentEvents = new HashMap<>();
-
-    public void process(Event event) {
-        recentEvents.put(event.getId(), event);  // cache để tra cứu debug
-        doBusinessLogic(event);
-    }
-}
-```
-
-Trên dev (vài nghìn event): OK. Production (triệu event/ngày): heap tăng đều, GC chạy ngày càng nhiều:
-
-```
-Day 1:  Heap usage 40% → GC ~5%  time
-Day 2:  Heap usage 70% → GC ~20% time
-Day 3:  Heap usage 95% → GC ~80% time → Full GC liên tục
-        java.lang.OutOfMemoryError: Java heap space
-```
-
-GC Log:
-```
-[Full GC (Ergonomics) 3891M->3889M(4096M), 8.234 secs]   ← thu hồi 2 MB / 3.8 GB
-[Full GC (Ergonomics) 3891M->3890M(4096M), 8.456 secs]   ← GC gần như vô dụng
-```
-
-GC chạy liên tục nhưng **thu hồi gần như không gì** — vì `recentEvents` là `static` HashMap, giữ **strong reference** tới mọi event từ ngày 1. GC **không thể** thu hồi object mà vẫn reachable.
-
-> [!IMPORTANT]
-> Memory leak trong Java **không phải** "quên free memory" (như C/C++). Nó là **object vẫn reachable qua reference chain nhưng ứng dụng không bao giờ dùng nữa**. GC thấy object reachable → không thu hồi → heap đầy dần.
-
-Phần còn lại của doc sẽ đi qua: memory leak trong Java & vì sao GC không cứu (§2) → GC Roots & reachability (§3) → GC mark phase (§4) → reference types Strong/Soft/Weak/Phantom (§5) → reference processing pipeline (§6) → 10 nguyên nhân leak phổ biến (§7) → ThreadLocal leak (§8) → ClassLoader leak & Metaspace OOM (§9) → heap dump (§10) → MAT (§11) → production monitoring (§12).
-
----
+Chẩn đoán cần dựa trên xu hướng heap sau full GC, heap dump, dominator tree và đường reference từ GC Root, không chỉ nhìn tổng bộ nhớ của process.
 
 ## 2. Memory Leak trong Java — GC không phải thuốc chữa bách bệnh
 

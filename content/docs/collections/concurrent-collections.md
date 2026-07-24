@@ -1,11 +1,13 @@
 ---
-title: "ConcurrentHashMap — Deep Dive"
+title: "ConcurrentHashMap"
 description: "Mổ xẻ ConcurrentHashMap JDK 8+: từ Segment (Java 7) sang bin-level lock, CAS putVal, spread hash, size counting với CounterCell, weakly consistent iterator, bulk operations, và so sánh với Collections.synchronizedMap. Kèm source JDK, benchmark, và anti-patterns."
 ---
 
+Concurrent collections là các cấu trúc dữ liệu được thiết kế để nhiều thread cùng truy cập mà không cần khóa toàn bộ collection từ bên ngoài. Chúng cung cấp các thao tác nguyên tử và chiến lược đồng bộ phù hợp với từng kiểu workload.
+
 ## Mục lục
 
-- [800 thread, 1 cache: synchronizedMap sập còn ConcurrentHashMap sống](#1-800-thread-1-cache-synchronizedmap-sập-còn-concurrenthashmap-sống)
+- [Tổng quan](#1-tổng-quan)
 - [Từ Segment Lock (Java 7) sang Bin Lock (Java 8+)](#2-từ-segment-lock-java-7-sang-bin-lock-java-8)
 - [Cấu trúc nội bộ — Node[], ForwardingNode, TreeBin](#3-cấu-trúc-nội-bộ--node-forwardingnode-treebin)
 - [Spread hash — triệt bit-sign và khuấy đều](#4-spread-hash--triệt-bit-sign-và-khuấy-đều)
@@ -22,38 +24,11 @@ description: "Mổ xẻ ConcurrentHashMap JDK 8+: từ Segment (Java 7) sang bin
 
 ---
 
-## 1. 800 thread, 1 cache: synchronizedMap sập còn ConcurrentHashMap sống
+## 1. Tổng quan
 
-Concurrent collections (như `ConcurrentHashMap`, `CopyOnWriteArrayList`, `BlockingQueue`) là các cấu trúc dữ liệu được thiết kế **từ đầu** cho truy cập đa luồng — chúng cho phép nhiều thread đọc/ghi song song mà không khoá lẫn nhau. Chúng quan trọng vì `synchronizedMap` hay `Hashtable` truyền thống khoá **toàn bộ** cấu trúc cho mọi thao tác, nên càng nhiều thread thì càng chậm.
+`ConcurrentHashMap` là lựa chọn phổ biến cho bảng key–value dùng chung, nhưng Java còn có `CopyOnWriteArrayList`, `ConcurrentLinkedQueue`, các `BlockingQueue` và nhiều cấu trúc chuyên biệt khác. Mỗi loại đánh đổi khác nhau giữa read throughput, write cost, ordering và khả năng chờ.
 
-```java
-Map<String, UserInfo> cache = Collections.synchronizedMap(new HashMap<>());
-
-// 800 threads cùng gọi:
-UserInfo info = cache.computeIfAbsent(token, this::loadFromDB);
-```
-
-Một service xác thực token tra cứu token → user info trong map cache. Bình thường ~200 RPS, nhưng flash sale kéo lên 8.000 RPS — 800 thread cùng đọc/ghi. Kết quả: latency p99 từ **2ms** nhảy lên **450ms**, thread dump cho thấy hàng trăm thread **BLOCKED** chờ monitor lock. Chuyển sang `ConcurrentHashMap`:
-
-```java
-Map<String, UserInfo> cache = new ConcurrentHashMap<>();
-UserInfo info = cache.computeIfAbsent(token, this::loadFromDB);
-```
-
-Latency p99 giảm về **3ms**, throughput hồi phục — không đổi logic, chỉ đổi implementation. Đo được trên cùng hệ thống (JMH, 64 threads, 1M ops):
-
-```text
-Benchmark (JMH, 64 threads, 1M ops)         Ops/sec       Avg latency
-synchronizedMap.get                          312,000       ~204 μs
-ConcurrentHashMap.get                     48,700,000       ~1.3 μs
-```
-
-> [!IMPORTANT]
-> `ConcurrentHashMap` nhanh không phải vì "không lock" — mà vì lock ở **granularity nhỏ nhất có thể**: chỉ lock **một bin** (một slot trong mảng), cho phép 800 thread thao tác **song song** trên các bin khác nhau mà không tranh chấp.
-
-Phần còn lại của doc sẽ đi qua: cơ chế lock theo bin + CAS của `ConcurrentHashMap` (§2) → cấu trúc nội bộ `Node[]`/`ForwardingNode` (§3) → spread hash (§4) → `putVal` CAS-first (§5) → resize concurrent (§6) → đếm size kiểu LongAdder (§7) → `get` lock-free (§8) → iterator weakly consistent (§9) → bulk operations song song (§10) → so sánh với `synchronizedMap`/`Hashtable` (§11) → vì sao cấm null (§12) → anti-patterns (§13) → cheat sheet (§14).
-
----
+Phần này tập trung vào cách `ConcurrentHashMap` giảm contention, sau đó đặt nó trong bức tranh rộng hơn của concurrent collections để xác định cấu trúc phù hợp cho từng nhu cầu.
 
 ## 2. Từ Segment Lock (Java 7) sang Bin Lock (Java 8+)
 

@@ -1,5 +1,5 @@
 ---
-title: "Vì sao @Async chạy đồng bộ và @Cacheable không cache? — Deep Dive"
+title: "Vì sao @Async chạy đồng bộ và @Cacheable không cache?"
 description: "Câu hỏi phỏng vấn Spring: gắn @Async mà method vẫn chạy trên thread gọi (đồng bộ), gắn @Cacheable mà method vẫn chạy mỗi lần (không cache). Mổ xẻ gốc rễ proxy + self-invocation, quên @EnableAsync/@EnableCaching, dùng sai kiểu trả về, và cách sửa từng case."
 ---
 

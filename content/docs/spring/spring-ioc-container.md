@@ -1,11 +1,13 @@
 ---
-title: "Spring IoC Container — Deep Dive"
+title: "Spring IoC Container"
 description: "Mổ xẻ chi tiết IoC Container trong Spring: DefaultListableBeanFactory (~4000 dòng), dependency resolution algorithm (resolveDependency, type matching, qualifier, primary), circular dependency three-level cache, ConfigurationClassPostProcessor, BeanDefinition merging, FactoryBean vs @Bean, ApplicationEvent system, Environment & PropertySource precedence. Kèm đọc source Spring Framework, sơ đồ flow và các bug kinh điển."
 ---
 
+Spring IoC Container quản lý việc tạo object, liên kết dependency, cấu hình và lifecycle của bean. Thay vì mỗi class tự tìm hoặc tự tạo dependency, container xây dựng object graph từ metadata cấu hình.
+
 ## Mục lục
 
-- [@Autowired có 3 bean cùng type — ai được chọn](#1-autowired-có-3-bean-cùng-type--ai-được-chọn)
+- [Tổng quan](#1-tổng-quan)
 - [Container Architecture — BeanFactory vs ApplicationContext](#2-container-architecture--beanfactory-vs-applicationcontext)
 - [DefaultListableBeanFactory — class "thần thánh" 4000 dòng](#3-defaultlistablebeanfactory--class-thần-thánh-4000-dòng)
 - [BeanDefinition — blueprint trước khi bean tồn tại](#4-beandefinition--blueprint-trước-khi-bean-tồn-tại)
@@ -23,58 +25,11 @@ description: "Mổ xẻ chi tiết IoC Container trong Spring: DefaultListableBe
 
 ---
 
-## 1. @Autowired có 3 bean cùng type — ai được chọn
+## 1. Tổng quan
 
-IoC Container là **lớp sâu nhất** của Spring: nó nắm giữ **BeanDefinition** (metadata mỗi bean), **singleton cache** (instance thực), và **dependency resolution algorithm** — bộ máy quyết định khi `@Autowired` một type có nhiều hơn một bean thì chọn cái nào. Mọi thứ khác (AOP, Transaction, Security, Boot auto-config) đều chạy **bên trên** container. Nắm container nghĩa là nắm được: bean sinh ra từ đâu, khi inject type có nhiều candidate thì ưu tiên theo thứ tự nào, và circular dependency được khéo léo xử lý ra sao. Khi xảy ra `NoUniqueBeanDefinitionException` hay "inject nhầm bean", câu trả lời gần như luôn nằm ở `DefaultListableBeanFactory` — class "thần thánh" ~4000 dòng đứng sau mọi `@Autowired`.
+`BeanFactory` cung cấp nền tảng quản lý bean, còn `ApplicationContext` bổ sung event, resource, message resolution và tích hợp framework. Bean definition mô tả cách tạo bean; các post-processor có thể sửa definition hoặc can thiệp vào instance trong quá trình khởi tạo.
 
-Bạn có 3 `DataSource` bean trong application:
-
-```java
-@Configuration
-public class DataSourceConfig {
-
-    @Bean
-    @Primary
-    public DataSource primaryDs() {
-        return HikariDataSourceBuilder.create()
-            .url("jdbc:postgresql://primary:5432/app").build();
-    }
-
-    @Bean
-    @Qualifier("replica")
-    public DataSource replicaDs() {
-        return HikariDataSourceBuilder.create()
-            .url("jdbc:postgresql://replica:5432/app").build();
-    }
-
-    @Bean
-    public DataSource analyticsDs() {
-        return HikariDataSourceBuilder.create()
-            .url("jdbc:postgresql://analytics:5432/warehouse").build();
-    }
-}
-```
-
-Ở service, bạn inject:
-
-```java
-@Service
-public class ReportService {
-    @Autowired
-    private DataSource dataSource;   // ← 3 bean cùng type DataSource. Ai được chọn?
-}
-```
-
-Không exception, không warning — Spring chọn `primaryDs` vì có `@Primary`. Nhưng nếu **không** có `@Primary`? Spring ném `NoUniqueBeanDefinitionException`. Nếu field tên `replicaDs`? Spring match theo tên. Nếu vừa có `@Primary` vừa có `@Qualifier`?
-
-Đây không phải magic — đây là **dependency resolution algorithm** trong `DefaultListableBeanFactory`, với thứ tự ưu tiên rõ ràng. Hiểu algorithm này = hiểu vì sao bean nào được inject.
-
-> [!IMPORTANT]
-> IoC Container là **lớp sâu nhất** của Spring — mọi thứ khác (AOP, Transaction, Security, Boot) chạy **bên trên** container. `DefaultListableBeanFactory` là nơi mọi bean được tạo, inject, quản lý. Doc này mổ xẻ từng cơ chế bên trong.
-
-Phần còn lại của doc sẽ đi qua: kiến trúc container `BeanFactory` vs `ApplicationContext` (§2) → `DefaultListableBeanFactory` 4000 dòng (§3) → `BeanDefinition` blueprint (§4) → `ConfigurationClassPostProcessor` (§5) → dependency resolution algorithm (§6) → circular dependency three-level cache (§7) → `FactoryBean` vs `@Bean` (§8) → `@Conditional` & auto-configuration (§9) → `Environment` & `PropertySource` (§10) → `ApplicationEvent` system (§11) → bean scope (§12) → parent-child context (§13) → anti-patterns (§14) → cheat sheet (§15).
-
----
+Dependency injection chỉ là một phần của container. Scope, lifecycle, proxy và quy tắc chọn candidate đều ảnh hưởng đến object thực tế mà application nhận được.
 
 ## 2. Container Architecture — BeanFactory vs ApplicationContext
 

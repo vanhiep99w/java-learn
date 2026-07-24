@@ -3,9 +3,11 @@ title: "Autoboxing & Unboxing"
 description: "Mổ xẻ autoboxing/unboxing trong Java: bytecode Integer.valueOf/intValue, Integer cache [-128,127] và bẫy ==, NullPointerException khi unbox null, chi phí allocation ẩn trong vòng lặp, vì sao Stream nên dùng IntStream. Kèm đọc bytecode javap và benchmark."
 ---
 
+Autoboxing và unboxing cho phép Java chuyển đổi tự động giữa primitive và wrapper tương ứng. Cú pháp tiện lợi này che giấu việc tạo object, xử lý `null` và các quy tắc so sánh có thể ảnh hưởng đến hiệu năng lẫn tính đúng đắn.
+
 ## Mục lục
 
-- [Vòng lặp tính tổng ngốn 30 triệu object rác](#1-vòng-lặp-tính-tổng-ngốn-30-triệu-object-rác)
+- [Tổng quan](#1-tổng-quan)
 - [Autoboxing là gì — đường cong cú pháp của compiler](#2-autoboxing-là-gì--đường-cong-cú-pháp-của-compiler)
 - [Đọc bytecode: valueOf & intValue ở đâu ra](#3-đọc-bytecode-valueof--intvalue-ở-đâu-ra)
 - [Integer Cache & bẫy == kinh điển](#4-integer-cache--bẫy--kinh-điển)
@@ -19,39 +21,11 @@ description: "Mổ xẻ autoboxing/unboxing trong Java: bytecode Integer.valueOf
 
 ---
 
-## 1. Vòng lặp tính tổng ngốn 30 triệu object rác
+## 1. Tổng quan
 
-**Autoboxing/unboxing** là cú pháp (Java 5+) cho phép gán qua lại giữa kiểu nguyên thủy (`int`, `long`...) và lớp wrapper (`Integer`, `Long`...) mà không cần viết `valueOf`/`intValue` tường minh. JVM không biết autoboxing — compiler `javac` tự chèn lời gọi method thay bạn. Chính sự "vô hình" đó là nguy hiểm: một ký tự `L` lạc chỗ có thể tạo ra hàng triệu object rác trong một vòng lặp.
+Compiler chèn lời gọi như `Integer.valueOf()` khi boxing và `intValue()` khi unboxing. Vì wrapper có thể là `null`, unboxing có thể ném `NullPointerException`; vì một số giá trị được cache, so sánh wrapper bằng `==` có thể cho kết quả không nhất quán theo giá trị.
 
-Một job tổng hợp số liệu chạy chậm bất thường và GC log đầy `Allocation Failure`. Code thủ phạm trông vô hại:
-
-```java
-Long sum = 0L;                       // 😱 Long, không phải long
-for (long i = 0; i < 30_000_000; i++) {
-    sum += i;                        // mỗi vòng: unbox sum → cộng → box lại
-}
-```
-
-Một ký tự `L` viết hoa biến biến đếm thành **wrapper**. Mỗi lần `sum += i`:
-
-1. **unbox** `sum` (`Long` → `long`),
-2. cộng,
-3. **box** kết quả thành một `Long` **mới** (vì `Long` immutable).
-
-→ Vòng lặp tạo ra **30 triệu object `Long`** tạm, rồi vứt đi ngay. Sửa thành `long sum = 0L` → cùng kết quả, nhanh **gấp 5–10 lần** và **không** sinh rác:
-
-```text
-Benchmark              Mode  Cnt    Score    Error  Units
-SumBench.primitiveLong avgt    5    7.1 ±    0.3   ms/op   ← long
-SumBench.boxedLong     avgt    5   62.8 ±    4.1   ms/op   ← Long  (~9x chậm + 30M garbage)
-```
-
-> [!IMPORTANT]
-> Autoboxing tiện đến mức **vô hình** — và chính sự vô hình đó là nguy hiểm. Compiler chèn `valueOf`/`intValue` thay bạn mà không cảnh báo. Hiểu autoboxing nghĩa là biết **chính xác** compiler chèn gì, ở đâu, và khi nào nó tạo object.
-
-Phần còn lại của doc sẽ đi qua: bản chất autoboxing là syntactic sugar (§2) → đọc bytecode valueOf/intValue (§3) → Integer Cache & bẫy `==` (§4) → NPE khi unbox null (§5) → chi phí allocation/GC/cache miss (§6) → bẫy trong Collection/ternary (§7) → vì sao IntStream tồn tại (§8) → khi nào buộc dùng wrapper (§9) → anti-patterns (§10) → cheat sheet (§11).
-
----
+Trong collection và generic API, boxing là bắt buộc vì type argument không thể là primitive. Cần nhận biết chi phí này trong vòng lặp lớn và đường xử lý nhạy cảm với allocation.
 
 ## 2. Autoboxing là gì — đường cong cú pháp của compiler
 

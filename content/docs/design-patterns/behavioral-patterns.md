@@ -5,9 +5,11 @@ description: "Đào sâu nhóm pattern hành vi trong Java: Strategy (lambda ho�
 
 # Behavioral Patterns — Phân chia trách nhiệm & giao tiếp giữa object
 
+Behavioral patterns tập trung vào cách object phân chia trách nhiệm, trao đổi thông tin và thay đổi hành vi. Chúng giúp tách phần điều phối khỏi phần thực thi để code dễ mở rộng hơn khi quy tắc nghiệp vụ thay đổi.
+
 ## Mục lục
 
-- [Chuỗi if-else hành vi và sự cứng nhắc](#1-chuỗi-if-else-hành-vi-và-sự-cứng-nhắc)
+- [Tổng quan](#1-tổng-quan)
 - [Strategy — đóng gói thuật toán có thể hoán đổi](#2-strategy--đóng-gói-thuật-toán-có-thể-hoán-đổi)
 - [Observer — pub/sub và bẫy memory leak](#3-observer--pubsub-và-bẫy-memory-leak)
 - [Template Method — khung cố định, chi tiết mở](#4-template-method--khung-cố-định-chi-tiết-mở)
@@ -20,28 +22,11 @@ description: "Đào sâu nhóm pattern hành vi trong Java: Strategy (lambda ho�
 
 ---
 
-## 1. Chuỗi if-else hành vi và sự cứng nhắc
+## 1. Tổng quan
 
-Các behavioral pattern (Strategy, Observer, Template Method, Chain of Responsibility, Command, State...) trả lời câu hỏi: **làm sao để object phối hợp và để hành vi thay đổi linh hoạt** mà không biến code thành đống `if-else` cứng nhắc. Chúng quan trọng vì hành vi thay đổi theo điều kiện thường bắt đầu bằng một `if-else` bé xíu, rồi phình to — mỗi nhánh thêm vào là một chỗ phải sửa, vi phạm Open/Closed Principle.
+Các pattern trong nhóm này giải quyết nhiều dạng tương tác: Strategy hoán đổi thuật toán, Observer phát sự kiện, Command đóng gói yêu cầu, State biểu diễn chuyển trạng thái và Chain of Responsibility tạo chuỗi xử lý.
 
-```java
-// Mỗi cách tính phí ship là một nhánh — thêm cách mới phải sửa hàm này (vi phạm OCP)
-double shippingCost(Order o, String method) {
-    if (method.equals("standard")) return o.weight() * 1.0;
-    else if (method.equals("express")) return o.weight() * 2.5 + 10;
-    else if (method.equals("drone")) return ...;
-    // ... ngày càng dài, khó test từng nhánh, đụng 1 chỗ sửa cả hàm
-}
-```
-
-Behavioral patterns trả lời câu hỏi: **làm sao để object phối hợp và để hành vi thay đổi linh hoạt** mà không biến code thành đống `if-else` cứng nhắc. Chúng chủ yếu khai thác **đa hình** để "cắm" hành vi vào thay vì rẽ nhánh.
-
-> [!IMPORTANT]
-> Phần lớn behavioral pattern là cách *thay thế điều kiện rẽ nhánh bằng đa hình*. Khi bạn thấy `switch`/`if-else` lớn dựa trên "loại" hay "trạng thái", gần như luôn có một behavioral pattern (Strategy/State/Command) làm code mở rộng được mà không sửa code cũ.
-
-Phần còn lại của doc sẽ đi qua: Strategy hoán đổi thuật toán (§2) → Observer pub/sub và bẫy memory leak (§3) → Template Method khung cố định (§4) → Chain of Responsibility (§5) → Command đóng gói hành động (§6) → Iterator & State (§7) → phân biệt Strategy vs State vs Command (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Mục tiêu không phải thay mọi `if` bằng một pattern. Chỉ nên áp dụng khi pattern làm rõ điểm biến đổi, giảm coupling hoặc giúp kiểm thử từng hành vi độc lập.
 
 ## 2. Strategy — đóng gói thuật toán có thể hoán đổi
 

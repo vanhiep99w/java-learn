@@ -1,11 +1,13 @@
 ---
-title: "Functional Interface & Lambda — Deep Dive"
+title: "Functional Interface & Lambda"
 description: "Mổ xẻ Functional Interface và Lambda trong Java: @FunctionalInterface contract, 4 built-in families (Function/Consumer/Supplier/Predicate), Lambda bytecode (invokedynamic + LambdaMetafactory), method reference types, effectively final & closure, performance (lambda vs anonymous class vs method reference), type inference, Comparator composition, Optional pipeline, và advanced patterns (currying, memoization, decorator). Kèm bytecode analysis, benchmark, và anti-patterns."
 ---
 
+Functional interface là interface có đúng một abstract method và có thể làm target type cho lambda hoặc method reference. Nó cho phép truyền hành vi như dữ liệu mà vẫn giữ type checking tại compile time.
+
 ## Mục lục
 
-- [Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào](#1-anonymous-class-tạo-hàng-nghìn-class-file--lambda-giải-quyết-thế-nào)
+- [Tổng quan](#1-tổng-quan)
 - [Functional Interface — hợp đồng 1 abstract method](#2-functional-interface--hợp-đồng-1-abstract-method)
 - [4 gia đình built-in — Function, Consumer, Supplier, Predicate](#3-4-gia-đình-built-in--function-consumer-supplier-predicate)
 - [Lambda Bytecode — invokedynamic & LambdaMetafactory](#4-lambda-bytecode--invokedynamic--lambdametafactory)
@@ -18,37 +20,11 @@ description: "Mổ xẻ Functional Interface và Lambda trong Java: @FunctionalI
 
 ---
 
-## 1. Anonymous class tạo hàng nghìn .class file — lambda giải quyết thế nào
+## 1. Tổng quan
 
-**Functional interface** (interface có đúng 1 abstract method) là nền tảng của **lambda** và **method reference** trong Java 8+. Lambda không chỉ là anonymous class rút gọn — nó có cơ chế bytecode hoàn toàn khác (`invokedynamic` + `LambdaMetafactory`) sinh implementation tại runtime thay vì biên dịch thành `.class` riêng. Hiểu sự khác biệt đó giúp tối ưu hiệu năng và tránh pitfall.
+Các default method, static method và method kế thừa từ `Object` không làm mất tính functional của interface. Annotation `@FunctionalInterface` không bắt buộc, nhưng giúp compiler bảo vệ hợp đồng một abstract method khi interface thay đổi.
 
-Trước Java 8, mỗi callback là anonymous class:
-
-```java
-button.addActionListener(new ActionListener() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        System.out.println("Clicked");
-    }
-});
-```
-
-Mỗi anonymous class tạo **1 file .class** riêng (`ClassName$1.class`, `ClassName$2.class`...). Ứng dụng lớn có hàng nghìn listener/callback → hàng nghìn .class file → **slow startup** (class loading) + **bloat JAR**.
-
-Java 8 lambda:
-
-```java
-button.addActionListener(e -> System.out.println("Clicked"));
-```
-
-Ngắn gọn hơn, nhưng quan trọng hơn: **không tạo .class file**. Lambda dùng `invokedynamic` — JVM tạo implementation tại **runtime** bằng `LambdaMetafactory`, tránh class file bloat.
-
-> [!IMPORTANT]
-> Lambda không chỉ là "anonymous class rút gọn" — nó có **cơ chế bytecode hoàn toàn khác** (`invokedynamic` thay vì `new ClassName$1()`). Hiểu sự khác biệt giúp optimize performance và tránh pitfall.
-
-Phần còn lại của doc sẽ đi qua: hợp đồng functional interface (§2) → 4 gia đình built-in Function/Consumer/Supplier/Predicate (§3) → lambda bytecode & invokedynamic (§4) → method reference 4 loại (§5) → effectively final & closure (§6) → type inference (§7) → Comparator composition (§8) → advanced patterns currying/memoization/decorator (§9) → anti-patterns & tóm tắt (§10).
-
----
+Lambda không chỉ là cú pháp rút gọn của anonymous class: cách capture biến, identity và cơ chế sinh code có khác biệt. Các điểm này quan trọng khi thiết kế API và đánh giá allocation.
 
 ## 2. Functional Interface — hợp đồng 1 abstract method
 

@@ -1,11 +1,13 @@
 ---
-title: "JIT Compilation — Deep Dive"
+title: "JIT Compilation"
 description: "Mổ xẻ JIT compilation trong HotSpot JVM: interpreter → C1 → C2 tiered compilation, profiling & invocation counter, inlining, escape analysis, on-stack replacement (OSR), deoptimization, GraalVM JIT. Kèm flag tham chiếu, benchmark và assembly output."
 ---
 
+JIT compiler chuyển bytecode được thực thi thường xuyên thành machine code đã tối ưu trong lúc ứng dụng chạy. Cơ chế này cho phép JVM dùng dữ liệu runtime để tối ưu những đường code thực sự quan trọng.
+
 ## Mục lục
 
-- [Cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery](#1-cùng-code-chạy-chậm-lần-đầu-rồi-nhanh-100--warmup-mystery)
+- [Tổng quan](#1-tổng-quan)
 - [Interpreter → JIT: tại sao không compile trước hết?](#2-interpreter--jit-tại-sao-không-compile-trước-hết)
 - [Tiered Compilation — 5 level từ interpreter đến C2 optimized](#3-tiered-compilation--5-level-từ-interpreter-đến-c2-optimized)
 - [Profiling & Invocation Counter — khi nào method được compile?](#4-profiling--invocation-counter--khi-nào-method-được-compile)
@@ -22,34 +24,11 @@ description: "Mổ xẻ JIT compilation trong HotSpot JVM: interpreter → C1 �
 
 ---
 
-## 1. Cùng code, chạy chậm lần đầu rồi nhanh 100× — warmup mystery
+## 1. Tổng quan
 
-Benchmark naive: đo thời gian `fibonacci(40)`:
+Ban đầu, method có thể được interpreter thực thi hoặc compile ở mức tối ưu thấp. Khi profiling cho thấy code đủ “hot”, JVM áp dụng các kỹ thuật như inlining, escape analysis, loop optimization và devirtualization; giả định sai có thể dẫn đến deoptimization.
 
-```java
-long start = System.nanoTime();
-int result = fibonacci(40);
-long elapsed = System.nanoTime() - start;
-// Lần 1: 850ms
-// Lần 2: 820ms
-// ...
-// Lần 50: 8ms  ← 100× nhanh hơn!
-```
-
-Không phải caching, không phải input khác. Cùng computation, cùng result — nhưng JVM **compile lại code** giữa chừng thành native machine code tối ưu.
-
-```text
-Lần 1-10:   Interpreter (bytecode → execute từng instruction)     ~800ms
-Lần 11-20:  C1 compiled (basic native code)                       ~150ms
-Lần 30+:    C2 compiled (aggressive optimized native code)         ~8ms
-```
-
-> [!IMPORTANT]
-> Java không "interpreted language" cũng không "compiled language" — nó là **mixed-mode**: bắt đầu interpret, thu thập profile, rồi compile thành native code **tốt hơn** static compiler (C/C++) có thể làm — vì nó biết runtime behavior thực tế.
-
-Phần còn lại của doc sẽ đi qua: vì sao JIT chứ không compile trước hết (§2) → tiered compilation 5 level (§3) → profiling & invocation counter (§4) → C1 compiler (§5) → C2 compiler (§6) → inlining (§7) → escape analysis (§8) → on-stack replacement (§9) → deoptimization (§10) → code cache (§11) → GraalVM JIT (§12) → diagnostic flags & JIT output (§13).
-
----
+Vì quá trình tối ưu diễn ra theo thời gian, warmup ảnh hưởng rõ đến benchmark và latency đầu phiên. Đánh giá hiệu năng Java cần tách chi phí khởi động khỏi trạng thái ổn định.
 
 ## 2. Interpreter → JIT: tại sao không compile trước hết?
 

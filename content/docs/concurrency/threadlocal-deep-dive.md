@@ -1,11 +1,13 @@
 ---
-title: "ThreadLocal & InheritableThreadLocal — Deep Dive"
+title: "ThreadLocal & InheritableThreadLocal"
 description: "Mổ xẻ ThreadLocal từ bên trong: vì sao map nằm trong Thread chứ không trong ThreadLocal, ThreadLocalMap dùng open-addressing + linear probing, Entry extends WeakReference, magic number 0x61c88647, set/get/remove/expungeStaleEntry, memory leak trong thread pool, InheritableThreadLocal & createInheritedMap, bẫy với thread pool (TransmittableThreadLocal), ScopedValue cho Virtual Thread. Kèm đọc source JDK và sơ đồ chi tiết."
 ---
 
+`ThreadLocal` gắn một giá trị với thread hiện tại, cho phép các lời gọi trong cùng thread truy cập context mà không truyền tham số qua mọi tầng. Nó thường được dùng cho transaction context, security context, tracing và dữ liệu chỉ thuộc một request.
+
 ## Mục lục
 
-- [Truyền context xuyên 7 tầng method](#1-truyền-context-xuyên-7-tầng-method)
+- [Tổng quan](#1-tổng-quan)
 - [ThreadLocal là gì — mỗi thread một bản sao](#2-threadlocal-là-gì--mỗi-thread-một-bản-sao)
 - [Đảo ngược quyền sở hữu — map nằm trong Thread, không nằm trong ThreadLocal](#3-đảo-ngược-quyền-sở-hữu--map-nằm-trong-thread-không-nằm-trong-threadlocal)
 - [ThreadLocalMap — open addressing chứ không phải HashMap](#4-threadlocalmap--open-addressing-chứ-không-phải-hashmap)
@@ -24,55 +26,11 @@ description: "Mổ xẻ ThreadLocal từ bên trong: vì sao map nằm trong Thr
 
 ---
 
-## 1. Truyền context xuyên 7 tầng method
+## 1. Tổng quan
 
-`ThreadLocal` là **per-thread storage** của Java — một biến nhìn như `static` (truy cập mọi nơi không cần truyền) nhưng mỗi thread thấy một giá trị riêng. Đây là cách Spring lưu transaction, security context, request locale xuyên suốt call stack. Nhưng bên trong nó là một map đảo ngược quyền sở hữu kỳ lạ, và dùng sai trong thread pool sẽ gây memory leak — và cả rò rỉ dữ liệu giữa các request.
+Mỗi `Thread` giữ một `ThreadLocalMap` riêng; object `ThreadLocal` đóng vai trò key để tìm value. Cơ chế này tạo sự cô lập theo thread chứ không biến value thành thread-safe.
 
-Bạn có một web app. Tại `Controller` bạn biết `userId`, `tenantId`, `traceId`. Nhưng tầng `Repository` ở tận đáy stack cũng cần `tenantId` để chọn schema. Giải pháp ngây thơ: truyền tham số xuyên suốt.
-
-```java
-controller.handle(req, userId, tenantId, traceId)
-  → service.process(order, tenantId, traceId)
-    → validator.validate(order, tenantId)
-      → repository.save(order, tenantId)        // tenantId bị "kéo lê" qua 4 tầng
-```
-
-Vấn đề:
-1. **Ô nhiễm chữ ký method**: mọi method phải thêm tham số dù không dùng — chỉ để "chuyền tay".
-2. **Không thể chen vào thư viện**: code của framework/library ở giữa không nhận được context của bạn.
-3. **Dễ quên / truyền nhầm**: 4 tầng × N method = vô số chỗ có thể sai.
-
-Giải pháp thay thế: dùng **biến static** `static String tenantId`? Sai ngay — đa luồng sẽ ghi đè lẫn nhau (request A set `tenant=acme`, request B set `tenant=globex`, A đọc ra `globex`).
-
-Cái ta cần: **một biến nhìn thì như static (truy cập ở mọi nơi không cần truyền), nhưng mỗi thread thấy một giá trị riêng**. Đó chính xác là `ThreadLocal`.
-
-```java
-public class TenantContext {
-    private static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
-
-    public static void set(String tenantId) { CURRENT.set(tenantId); }
-    public static String get() { return CURRENT.get(); }
-    public static void clear() { CURRENT.remove(); }   // QUAN TRỌNG — xem mục 9, 10
-}
-
-// Controller (đầu request):
-TenantContext.set(req.getHeader("X-Tenant"));
-try {
-    service.process(order);     // không cần truyền tenantId nữa
-} finally {
-    TenantContext.clear();      // bắt buộc trong môi trường thread pool
-}
-
-// Repository (đáy stack):
-String schema = TenantContext.get();   // lấy đúng tenant của request hiện tại
-```
-
-Phần còn lại của doc sẽ đi qua: ThreadLocal là gì (§2) → tại sao map nằm trong Thread (§3) → ThreadLocalMap open-addressing (§4) → vì sao key yếu (§5) → magic number 0x61c88647 (§6) → set/get/remove chi tiết (§7–§9) → memory leak trong pool (§10) → InheritableThreadLocal (§11–§12) → Spring & SimpleDateFormat (§13) → ScopedValue cho Virtual Thread (§14).
-
-> [!IMPORTANT]
-> `ThreadLocal` không phải để "tăng tốc đa luồng" hay "tránh lock" theo nghĩa thông thường. Bản chất nó là **per-thread storage** — kho lưu trữ gắn liền với từng thread. Hai use case kinh điển: (1) **truyền context ngầm** (tenant, user, trace, transaction); (2) **tái sử dụng object không thread-safe** (như `SimpleDateFormat`) mà không cần đồng bộ hoá.
-
----
+Trong thread pool, thread sống lâu hơn request nên value có thể bị giữ lại hoặc rò sang tác vụ kế tiếp nếu không `remove()`. Việc truyền context sang thread con hay task bất đồng bộ cũng cần cơ chế rõ ràng thay vì giả định tự động kế thừa.
 
 ## 2. ThreadLocal là gì — mỗi thread một bản sao
 

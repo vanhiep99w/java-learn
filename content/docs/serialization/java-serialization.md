@@ -3,9 +3,11 @@ title: "Java Serialization & Deserialization"
 description: "Mổ xẻ Java Serialization: wire format & stream magic 0xACED, serialVersionUID & InvalidClassException, transient/static, readObject/writeObject & readResolve cho singleton, vì sao deserialization là lỗ hổng RCE (gadget chain) và cách phòng (ObjectInputFilter). Vì sao nên tránh và dùng JSON/Protobuf."
 ---
 
+Serialization chuyển trạng thái object thành dạng có thể lưu trữ hoặc truyền đi; deserialization khôi phục dữ liệu đó thành object. Cơ chế serialization tích hợp của Java thuận tiện nhưng đi kèm ràng buộc về tương thích, bảo mật và coupling với class.
+
 ## Mục lục
 
-- [Thêm một field, cả hệ thống không đọc được dữ liệu cũ](#1-thêm-một-field-cả-hệ-thống-không-đọc-được-dữ-liệu-cũ)
+- [Tổng quan](#1-tổng-quan)
 - [Cơ chế: Serializable, ObjectOutputStream & wire format](#2-cơ-chế-serializable-objectoutputstream--wire-format)
 - [serialVersionUID — hợp đồng phiên bản](#3-serialversionuid--hợp-đồng-phiên-bản)
 - [transient & static — cái gì KHÔNG được ghi](#4-transient--static--cái-gì-không-được-ghi)
@@ -19,24 +21,11 @@ description: "Mổ xẻ Java Serialization: wire format & stream magic 0xACED, s
 
 ---
 
-## 1. Thêm một field, cả hệ thống không đọc được dữ liệu cũ
+## 1. Tổng quan
 
-Một hệ thống cache session bằng Java Serialization vào Redis. Một hôm dev thêm một field vào class `Session`, deploy, và mọi session cũ bùng nổ:
+`Serializable` dùng metadata class, object graph và `serialVersionUID` để xây dựng wire format riêng của Java. Thay đổi cấu trúc class có thể ảnh hưởng khả năng đọc dữ liệu cũ, còn deserialization dữ liệu không tin cậy có thể mở ra chuỗi gadget nguy hiểm.
 
-```text
-java.io.InvalidClassException: com.app.Session;
-    local class incompatible:
-    stream classdesc serialVersionUID = 8917239471203, local class serialVersionUID = 3321094872013
-```
-
-Class không khai báo `serialVersionUID`, nên JVM **tự tính** một giá trị từ cấu trúc class (tên, field, method). Thêm một field → giá trị tính ra **đổi** → mọi byte cũ trong Redis có UID không khớp → `InvalidClassException`. Toàn bộ session người dùng mất.
-
-> [!IMPORTANT]
-> Java Serialization gắn chặt với **chính xác cấu trúc class** ở thời điểm ghi. Đây vừa là nguồn lỗi tương thích phiên bản, vừa là gốc rễ của lỗ hổng bảo mật nghiêm trọng nhất Java từng có. Hiểu nó là hiểu vì sao cộng đồng (và chính kiến trúc sư Java) khuyên **tránh dùng nó** cho dữ liệu mới.
-
-Phần còn lại của doc sẽ đi qua: cơ chế Serializable & wire format (§2) → serialVersionUID (§3) → transient & static (§4) → tùy biến writeObject/readObject/readResolve (§5) → object graph & reference dùng chung (§6) → deserialization lỗ hổng bảo mật gadget chain (§7) → phòng thủ ObjectInputFilter (§8) → vì sao nên dùng JSON/Protobuf (§9) → anti-patterns (§10).
-
----
+Vì vậy Java native serialization thường không phải lựa chọn tốt cho API hoặc lưu trữ dài hạn. Cần hiểu cơ chế để duy trì hệ thống cũ và chọn định dạng thay thế phù hợp.
 
 ## 2. Cơ chế: Serializable, ObjectOutputStream & wire format
 

@@ -3,9 +3,11 @@ title: "Comparable vs Comparator"
 description: "Mổ xẻ Comparable vs Comparator: natural ordering vs external ordering, hợp đồng tổng thứ tự, vì sao TimSort ném 'Comparison method violates its general contract!', bẫy int subtraction overflow, consistency với equals, và Comparator chaining (thenComparing, reversed, nullsFirst). Kèm phân tích TimSort."
 ---
 
+`Comparable` và `Comparator` đều định nghĩa thứ tự cho object, nhưng chúng đặt trách nhiệm ở hai nơi khác nhau. Một loại biểu diễn thứ tự tự nhiên của class; loại còn lại mô tả các chiến lược sắp xếp bên ngoài.
+
 ## Mục lục
 
-- [Sort crash với "violates its general contract"](#1-sort-crash-với-violates-its-general-contract)
+- [Tổng quan](#1-tổng-quan)
 - [Hai cách định nghĩa thứ tự](#2-hai-cách-định-nghĩa-thứ-tự)
 - [Hợp đồng tổng thứ tự (total order)](#3-hợp-đồng-tổng-thứ-tự-total-order)
 - [Vì sao TimSort phát hiện được vi phạm](#4-vì-sao-timsort-phát-hiện-được-vi-phạm)
@@ -19,38 +21,11 @@ description: "Mổ xẻ Comparable vs Comparator: natural ordering vs external o
 
 ---
 
-## 1. Sort crash với "violates its general contract"
+## 1. Tổng quan
 
-**Comparable** (`compareTo`) và **Comparator** (`compare`) là hai cách Java định nghĩa thứ tự cho object — natural ordering ở trong class, external ordering ở ngoài. Nhưng con số `-1/0/1` mà chúng trả về không phải tùy tiện: nó phải là một **total order** (thứ tự toàn phần) đúng về mặt toán học. Vi phạm hợp đồng này không cho ra kết quả "hơi sai" mà có thể crash giữa production.
+Class triển khai `Comparable` khi có một thứ tự mặc định ổn định và có ý nghĩa rộng rãi. `Comparator` phù hợp khi cần nhiều tiêu chí, không thể sửa class hoặc muốn tách quy tắc sắp xếp khỏi domain object.
 
-Một báo cáo sắp xếp danh sách nhân viên theo "độ ưu tiên" chạy ổn nhiều tháng, rồi một ngày crash giữa production với exception khó hiểu:
-
-```text
-java.lang.IllegalArgumentException: Comparison method violates its general contract!
-    at java.base/java.util.TimSort.mergeHi(TimSort.java:899)
-    at java.base/java.util.TimSort.mergeAt(TimSort.java:516)
-    at java.base/java.util.Arrays.sort(Arrays.java:1305)
-    at java.util.List.sort(...)
-```
-
-Comparator thủ phạm trông "hợp lý":
-
-```java
-list.sort((a, b) -> {
-    if (a.priority() > b.priority()) return 1;
-    if (a.priority() < b.priority()) return -1;
-    return a.isVip() ? -1 : 1;     // 😱 khi priority bằng nhau, hai non-VIP so nhau ra... 1 cả hai chiều
-});
-```
-
-Khi hai phần tử **cùng priority** và **cùng không VIP**, `compare(a,b)` trả `1` **và** `compare(b,a)` cũng trả `1` — vi phạm **đối xứng**. Với dữ liệu nhỏ (dev) không lộ; với dữ liệu lớn, **TimSort** phát hiện sự mâu thuẫn và **ném exception thay vì trả kết quả sai**.
-
-> [!IMPORTANT]
-> Lỗi không phải ở `sort` — nó ở `compare`. So sánh trong Java phải là một **total order** (quan hệ thứ tự toàn phần) đúng về mặt toán học. Vi phạm hợp đồng này không phải "kết quả hơi sai" mà có thể là `IllegalArgumentException`, vòng lặp sai, hoặc TreeMap mất phần tử. Hiểu Comparable/Comparator là hiểu **hợp đồng** đứng sau con số `-1/0/1`.
-
-Phần còn lại của doc sẽ đi qua: hai cách định nghĩa thứ tự (§2) → hợp đồng total order (§3) → vì sao TimSort phát hiện vi phạm (§4) → bẫy int subtraction overflow (§5) → consistency với equals & TreeSet (§6) → Comparator chaining (§7) → null handling & reversed (§8) → chọn Comparable hay Comparator (§9) → anti-patterns (§10) → cheat sheet (§11).
-
----
+Cả hai phải tuân thủ các tính chất như phản đối xứng và bắc cầu. Comparator vi phạm hợp đồng có thể làm sort thất bại hoặc khiến sorted collection hoạt động sai.
 
 ## 2. Hai cách định nghĩa thứ tự
 

@@ -1,5 +1,5 @@
 ---
-title: "Vì sao @Transactional không rollback khi gọi method trong cùng class? — Deep Dive"
+title: "Vì sao @Transactional không rollback khi gọi method trong cùng class?"
 description: "Câu hỏi phỏng vấn Spring kinh điển: đặt @Transactional lên method nhưng nó không rollback, không mở transaction. Thủ phạm là self-invocation và cơ chế proxy của Spring AOP. Mổ xẻ proxy JDK vs CGLIB, vì sao gọi this.method() bỏ qua proxy, và 6 cách sửa đúng."
 ---
 

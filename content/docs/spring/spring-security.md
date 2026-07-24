@@ -1,11 +1,13 @@
 ---
-title: "Spring Security — Deep Dive"
+title: "Spring Security"
 description: "Mổ xẻ chi tiết Spring Security từ source code: DelegatingFilterProxy → FilterChainProxy → VirtualFilterChain, HttpSecurity builder pattern & SecurityConfigurer, AuthenticationManager → ProviderManager parent chain → DaoAuthenticationProvider (UserCache, pre/post checks, eraseCredentials), SecurityContextHolder ThreadLocal lifecycle & async propagation, OAuth2 Resource Server (BearerTokenAuthenticationFilter, JwtDecoder, opaque token introspection), OAuth2 Login authorization code flow, Method Security internals (AuthorizationManagerBeforeMethodInterceptor, SpEL evaluation), ExceptionTranslationFilter, CORS/CSRF internals, Remember-me token, multi-chain @Order, Password encoding (BCrypt/Argon2/DelegatingPasswordEncoder), session management. Kèm source code, sơ đồ flow, và các lỗ hổng kinh điển."
 ---
 
+Spring Security cung cấp authentication, authorization và các cơ chế bảo vệ ứng dụng Spring. Với web application, phần lớn xử lý bắt đầu trong security filter chain trước khi request đi tới controller.
+
 ## Mục lục
 
-- [Bypass authentication — filter sai thứ tự, ẩn danh thành thật](#1-bypass-authentication--filter-sai-thứ-tự-ẩn-danh-thành-thật)
+- [Tổng quan](#1-tổng-quan)
 - [Kiến trúc tổng quan — Filter Chain Architecture](#2-kiến-trúc-tổng-quan--filter-chain-architecture)
 - [DelegatingFilterProxy & FilterChainProxy internals](#3-delegatingfilterproxy--filterchainproxy-internals)
 - [HttpSecurity — builder pattern tạo SecurityFilterChain](#4-httpsecurity--builder-pattern-tạo-securityfilterchain)
@@ -28,38 +30,11 @@ description: "Mổ xẻ chi tiết Spring Security từ source code: DelegatingF
 
 ---
 
-## 1. Bypass authentication — filter sai thứ tự, ẩn danh thành thật
+## 1. Tổng quan
 
-Spring Security bảo vệ ứng dụng bằng một **chain of filters** chặn mọi HTTP request trước khi tới controller: filter nào authenticate (set `SecurityContext`), filter nào authorize (kiểm tra quyền), filter nào xử lý exception — tất cả chạy theo **thứ tự cố định**. Khiến Spring Security khó không phải ở việc viết annotation (`@PreAuthorize`, DSL `authorizeHttpRequests`) — mà ở việc nắm chính xác **filter nào chạy trước/khi nào**, vì thứ tự đó quyết định request được chấp nhận hay bị lỗ hổng. Hầu hết lỗ hổng bypass authentication trong thực tế không phải do framework sai, mà do dev thêm filter custom mà không hiểu ai set `SecurityContext` trước/lúc nào, dẫn tới anonymous token "lén" được chấp nhận như user thật.
+Mỗi filter đảm nhiệm một bước như đọc credential, khôi phục security context, xử lý exception hoặc kiểm tra quyền. Authentication tạo ra danh tính đã xác thực; authorization quyết định danh tính đó có được phép truy cập resource hay không.
 
-Team thêm JWT filter custom vào Spring Security:
-
-```java
-@Bean
-SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/**").authenticated()
-        )
-        .addFilterBefore(new JwtFilter(), UsernamePasswordAuthenticationFilter.class);
-    return http.build();
-}
-```
-
-Test trên dev: hoạt động. Pentester phát hiện: request tới `/api/admin` với **header `Authorization` rỗng** → bypass JWT filter → trả về 200 với data admin.
-
-Nguyên nhân: `JwtFilter` bỏ qua request khi header rỗng (không set `SecurityContext`) → filter tiếp theo là `AnonymousAuthenticationFilter` **tự động set** `AnonymousAuthenticationToken` → `authorizeHttpRequests` thấy "authenticated" (anonymous cũng có `Authentication` object) → cho qua.
-
-Fix: cấu hình rõ ràng `.anonymous(AbstractHttpConfigurer::disable)` hoặc check `isAuthenticated() && !isAnonymous()`.
-
-Bug này không phải do Spring Security sai — mà do dev **không hiểu filter chain flow**. Doc này mổ xẻ từng lớp, từ servlet container đến SpEL authorization.
-
-> [!IMPORTANT]
-> Spring Security hoạt động bằng **chain of filters**. Hiểu thứ tự filter, flow authentication, và cách `SecurityContext` được populate là nền tảng để tránh lỗ hổng bảo mật. Mọi annotation (`@PreAuthorize`, `@Secured`) và config DSL (`authorizeHttpRequests`) cuối cùng đều chạy qua filter chain.
-
-Phần còn lại của doc sẽ đi qua: kiến trúc filter chain (§2) → `DelegatingFilterProxy` & `FilterChainProxy` (§3) → `HttpSecurity` builder (§4) → 15+ filter mặc định (§5) → authentication flow `ProviderManager` (§6) → `DaoAuthenticationProvider` (§7) → `SecurityContext` ThreadLocal (§8) → password encoding (§9) → authorization request & method level (§10) → `ExceptionTranslationFilter` (§11) → OAuth2 resource server (§12) → OAuth2 login (§13) → CSRF (§14) → CORS (§15) → session management (§16) → remember-me (§17) → multi-chain `@Order` (§18) → anti-patterns (§19) → cheat sheet (§20).
-
----
+Cấu hình an toàn cần xem xét toàn bộ chuỗi xử lý, session hoặc token, CSRF, CORS, password storage và method security thay vì chỉ viết một rule URL.
 
 ## 2. Kiến trúc tổng quan — Filter Chain Architecture
 

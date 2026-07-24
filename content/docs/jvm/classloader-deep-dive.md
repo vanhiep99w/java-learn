@@ -1,11 +1,13 @@
 ---
-title: "ClassLoader — Deep Dive"
+title: "ClassLoader"
 description: "Mổ xẻ ClassLoader trong JVM: parent delegation model, Bootstrap/Platform/App classloader, loading-linking-initializing flow, Class.forName vs loadClass, custom classloader, hot-reload và memory leak PermGen/Metaspace. Kèm đọc source JDK và sơ đồ chi tiết."
 ---
 
+ClassLoader chịu trách nhiệm tìm bytecode và định nghĩa class trong JVM. Một class không chỉ được nhận diện bởi tên đầy đủ mà còn bởi chính class loader đã nạp nó.
+
 ## Mục lục
 
-- [Redeploy mà class cũ vẫn sống — memory leak 2GB](#1-redeploy-mà-class-cũ-vẫn-sống--memory-leak-2gb)
+- [Tổng quan](#1-tổng-quan)
 - [ClassLoader là gì — mỗi class có một "danh tính kép"](#2-classloader-là-gì--mỗi-class-có-một-danh-tính-kép)
 - [Parent Delegation Model — tìm class từ trên xuống](#3-parent-delegation-model--tìm-class-từ-trên-xuống)
 - [Ba ClassLoader mặc định — Bootstrap, Platform, Application](#4-ba-classloader-mặc-định--bootstrap-platform-application)
@@ -21,24 +23,11 @@ description: "Mổ xẻ ClassLoader trong JVM: parent delegation model, Bootstra
 
 ---
 
-## 1. Redeploy mà class cũ vẫn sống — memory leak 2GB
+## 1. Tổng quan
 
-Team vận hành Tomcat với 50+ webapp. Mỗi lần **hot redeploy** (undeploy → deploy lại WAR mới), heap monitor cho thấy Metaspace **chỉ tăng, không giảm**. Sau 10 lần redeploy: Metaspace từ 128MB → 2.1GB → `OutOfMemoryError: Metaspace`.
+JVM dùng nhiều loader theo quan hệ phân cấp và thường áp dụng parent delegation để tránh nạp lại các class nền tảng. Cơ chế này tạo ranh giới cô lập cho application server, plugin và module system, nhưng cũng có thể dẫn đến `ClassNotFoundException`, `NoClassDefFoundError` hoặc class cast khó hiểu.
 
-Heap dump cho thấy: **class cũ vẫn reachable** — có thread, static field, hoặc JDBC driver giữ reference tới ClassLoader cũ → GC không thể thu hồi ClassLoader → mọi class nó load vẫn sống.
-
-```
-WebappClassLoader (old deploy #1) → giữ 3000 class definitions ← LEAKED
-WebappClassLoader (old deploy #2) → giữ 3000 class definitions ← LEAKED
-WebappClassLoader (current)       → 3000 class definitions     ← ACTIVE
-```
-
-> [!IMPORTANT]
-> Để GC thu hồi **class metadata**, cần thu hồi **ClassLoader**. Để thu hồi ClassLoader, **không còn reference nào** trỏ tới nó hoặc bất kỳ class nào nó load. Một `static` field, một thread chưa stop, một JDBC driver chưa deregister — đủ để giữ toàn bộ ClassLoader sống mãi.
-
-Phần còn lại của doc sẽ đi qua: ClassLoader là gì & class identity (§2) → parent delegation model (§3) → ba ClassLoader mặc định (§4) → loading → linking → initializing (§5) → Class.forName vs loadClass (§6) → custom ClassLoader (§7) → context ClassLoader (§8) → hot-reload (§9) → ClassLoader leak & Metaspace OOM (§10) → module system JDK 9+ (§11) → SPI & ServiceLoader (§12).
-
----
+Hiểu lifecycle của class loader còn quan trọng với memory leak: chỉ cần một reference giữ loader, toàn bộ class và static state do loader đó quản lý có thể tiếp tục tồn tại.
 
 ## 2. ClassLoader là gì — mỗi class có một "danh tính kép"
 

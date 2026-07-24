@@ -1,11 +1,13 @@
 ---
-title: "ThreadPoolExecutor — Deep Dive"
+title: "ThreadPoolExecutor"
 description: "Mổ xẻ ThreadPoolExecutor: corePoolSize vs maxPoolSize, work queue strategy, worker thread lifecycle, ctl bit-packing, rejection policy, hook methods. Kèm đọc source JDK, sơ đồ flow và anti-patterns production."
 ---
 
+`ThreadPoolExecutor` là bộ máy thực thi task có giới hạn và chính sách điều phối rõ ràng. Năm quyết định—số core thread, số thread tối đa, hàng đợi, thời gian sống và cách từ chối—xác định cách hệ thống phản ứng dưới tải.
+
 ## Mục lục
 
-- [10.000 request/s nhưng chỉ 8 thread xử lý](#1-10000-requests-nhưng-chỉ-8-thread-xử-lý)
+- [Tổng quan](#1-tổng-quan)
 - [Kiến trúc tổng quan — 5 tham số quyết định mọi thứ](#2-kiến-trúc-tổng-quan--5-tham-số-quyết-định-mọi-thứ)
 - [ctl — đóng gói state và worker count vào 1 biến AtomicInteger](#3-ctl--đóng-gói-state-và-worker-count-vào-1-biến-atomicinteger)
 - [Flow execute() — quyết định task đi đâu](#4-flow-execute--quyết-định-task-đi-đâu)
@@ -24,34 +26,11 @@ description: "Mổ xẻ ThreadPoolExecutor: corePoolSize vs maxPoolSize, work qu
 
 ---
 
-## 1. 10.000 request/s nhưng chỉ 8 thread xử lý
+## 1. Tổng quan
 
-`ThreadPoolExecutor` là backbone xử lý task bất đồng bộ của Java — nó quyết định khi nào tạo thread, khi nào xếp hàng, khi nào từ chối. Hiểu chính xác quy tắc dispatch **core → queue → max → reject** là chìa khoá tránh những vụ OOM âm thầm và latency bùng nổ. Bắt đầu từ một service thanh toán bị kẹt I/O.
+Khi task được submit, executor không đơn giản tạo thread cho đến `maximumPoolSize`. Nó ưu tiên core worker, sau đó đưa task vào queue, rồi mới mở rộng vượt core nếu queue không nhận thêm được. Thứ tự này khiến loại queue ảnh hưởng trực tiếp đến ý nghĩa của maximum size.
 
-Service thanh toán nhận 10.000 request/s. Mỗi request cần gọi 3 downstream service (bank, fraud-check, notification) — mỗi lần gọi mất 200ms. Đội dev dùng `Executors.newFixedThreadPool(8)` vì server 8 core:
-
-```java
-ExecutorService pool = Executors.newFixedThreadPool(8);
-
-for (Request req : incoming) {
-    pool.submit(() -> {
-        callBank(req);           // 200ms
-        callFraudCheck(req);     // 200ms
-        callNotification(req);   // 200ms
-    });
-}
-```
-
-Kết quả: response time **tăng từ 600ms lên 45 giây** khi traffic cao. Không OOM, không CPU spike, nhưng thread dump cho thấy 8 thread đều đang **WAITING** trên I/O, còn **hàng nghìn task** xếp hàng trong queue vô hạn `LinkedBlockingQueue`.
-
-Vấn đề: pool chỉ có 8 thread, mỗi thread kẹt 600ms I/O → throughput tối đa = 8 / 0.6 ≈ **13 request/s**. Còn lại 9987 request/s **xếp hàng** trong queue **không giới hạn** — latency tăng tuyến tính.
-
-Phần còn lại của doc sẽ đi qua: 5 tham số kiến trúc (§2) → biến `ctl` bit-packing (§3) → flow `execute()` (§4) → Worker lifecycle (§5) → work queue strategy (§6) → rejection policy (§7) → keep-alive (§8) → lifecycle shutdown (§9) → hook methods (§10) → bug nuốt exception (§11) → Executors factory pitfalls (§12) → tuning (§13) → monitoring (§14).
-
-> [!IMPORTANT]
-> `Executors.newFixedThreadPool(N)` dùng `LinkedBlockingQueue()` **không giới hạn**. Với IO-bound task, queue sẽ phình vô hạn mà pool **không bao giờ** tạo thêm thread. Hiểu ThreadPoolExecutor nghĩa là hiểu chính xác khi nào nó tạo thread, khi nào nó xếp hàng, và khi nào nó từ chối.
-
----
+Thiết kế pool cần đi cùng capacity planning và backpressure. Một queue vô hạn có thể che giấu quá tải bằng latency và bộ nhớ tăng dần; một queue hữu hạn buộc hệ thống bộc lộ giới hạn qua rejection policy.
 
 ## 2. Kiến trúc tổng quan — 5 tham số quyết định mọi thứ
 

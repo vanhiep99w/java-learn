@@ -5,9 +5,11 @@ description: "Đào sâu các kỹ thuật stream dữ liệu qua mạng/IO: chu
 
 # Streaming Data — Xử lý dữ liệu không nạp hết vào bộ nhớ
 
+Streaming xử lý dữ liệu dần khi dữ liệu được tạo ra hoặc nhận được, thay vì chờ toàn bộ payload hoàn tất. Cách tiếp cận này giúp giới hạn bộ nhớ, giảm thời gian tới kết quả đầu tiên và hỗ trợ luồng dữ liệu liên tục.
+
 ## Mục lục
 
-- [Streaming — xử lý dữ liệu khi nó đến, không nạp hết](#1-streaming--xử-lý-dữ-liệu-khi-nó-đến-không-nạp-hết)
+- [Tổng quan](#1-tổng-quan)
 - [Streaming ở tầng IO — đọc/ghi theo luồng](#2-streaming-ở-tầng-io--đọcghi-theo-luồng)
 - [Chunked transfer encoding — stream qua HTTP/1.1](#3-chunked-transfer-encoding--stream-qua-http11)
 - [Server push: SSE vs WebSocket vs Long-polling](#4-server-push-sse-vs-websocket-vs-long-polling)
@@ -20,26 +22,11 @@ description: "Đào sâu các kỹ thuật stream dữ liệu qua mạng/IO: chu
 
 ---
 
-## 1. Streaming — xử lý dữ liệu khi nó đến, không nạp hết
+## 1. Tổng quan
 
-Hai tình huống buộc phải stream thay vì nạp hết:
+Khái niệm streaming xuất hiện ở nhiều tầng: đọc/ghi IO theo chunk, HTTP response streaming, event stream và reactive pipeline. Chúng có chung nguyên tắc xử lý tăng dần nhưng khác nhau về protocol, backpressure và vòng đời kết nối.
 
-```java
-// SAI: nạp file 10GB vào RAM → OutOfMemoryError
-byte[] all = Files.readAllBytes(Path.of("huge.csv"));   // 💥
-
-// SAI: chờ toàn bộ kết quả query 1 triệu dòng rồi mới trả → chậm + tốn RAM
-List<Row> all = jdbc.query("SELECT * FROM events");      // 💥
-```
-
-Streaming = **xử lý dữ liệu theo từng phần khi nó đến/được đọc**, không giữ toàn bộ trong bộ nhớ. Hai lợi ích: (1) bộ nhớ hằng số bất kể dữ liệu lớn cỡ nào, (2) độ trễ thấp — bắt đầu xử lý/hiển thị ngay phần đầu thay vì chờ hết.
-
-> [!IMPORTANT]
-> Tư tưởng streaming xuyên suốt mọi tầng: IO (đọc file/socket theo buffer), HTTP (chunked/SSE), database (cursor/fetch size), xử lý (lazy Stream), reactive (publisher/subscriber). Nguyên tắc chung: **đừng giữ thứ bạn không cần giữ** — tiêu thụ rồi bỏ.
-
-Phần còn lại của doc sẽ đi qua: streaming ở tầng IO (§2) → chunked transfer encoding qua HTTP/1.1 (§3) → server push: SSE vs WebSocket vs long-polling (§4) → backpressure (§5) → Reactive Streams & Flow API (§6) → HTTP/2 & gRPC streaming (§7) → Java Stream lazy vs stream dữ liệu (§8) → anti-patterns (§9).
-
----
+Thiết kế cần xác định rõ tốc độ producer/consumer, cách giới hạn buffer, xử lý lỗi giữa luồng và cơ chế đóng tài nguyên.
 
 ## 2. Streaming ở tầng IO — đọc/ghi theo luồng
 

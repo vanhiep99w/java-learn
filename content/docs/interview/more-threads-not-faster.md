@@ -1,5 +1,5 @@
 ---
-title: "Vì sao thêm nhiều thread mà app không nhanh hơn (thậm chí chậm đi)? — Deep Dive"
+title: "Vì sao thêm nhiều thread mà app không nhanh hơn (thậm chí chậm đi)?"
 description: "Câu hỏi phỏng vấn concurrency tách người học thuộc khỏi người hiểu hệ thống: tăng số thread từ 4 lên 100 mà throughput không tăng, có khi giảm. Mổ xẻ Amdahl's Law, CPU-bound vs I/O-bound, context switch, lock contention, false sharing, GC pressure, và cách chọn đúng kích thước thread pool."
 ---
 

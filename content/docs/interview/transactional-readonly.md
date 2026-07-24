@@ -1,5 +1,5 @@
 ---
-title: "Vì sao @Transactional(readOnly=true) vẫn ghi được DB? — Deep Dive"
+title: "Vì sao @Transactional(readOnly=true) vẫn ghi được DB?"
 description: "Câu hỏi phỏng vấn Spring/JPA: gắn readOnly=true để 'chỉ đọc' nhưng vẫn UPDATE thành công, hoặc vẫn bị dirty checking flush xuống DB. Mổ xẻ readOnly thực sự làm gì (hint, không phải hàng rào), Hibernate FlushMode.MANUAL, tối ưu hiệu năng, và khi nào nó âm thầm không có tác dụng."
 ---
 

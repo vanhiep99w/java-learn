@@ -3,9 +3,11 @@ title: "HashSet, LinkedHashSet & TreeSet"
 description: "Mổ xẻ ba Set: HashSet/LinkedHashSet được backing bởi HashMap (giá trị PRESENT giả), LinkedHashSet thêm doubly-linked để giữ thứ tự chèn, TreeSet backing bởi Red-Black Tree TreeMap. Đào sâu vì sao TreeSet dùng compareTo (không equals), insertion-order vs sorted-order, và chi phí mỗi loại. Kèm source JDK."
 ---
 
+`HashSet`, `LinkedHashSet` và `TreeSet` đều loại bỏ phần tử trùng, nhưng chúng khác nhau về thứ tự, cách xác định trùng lặp và chi phí thao tác. Lựa chọn implementation phải xuất phát từ hợp đồng dữ liệu cần duy trì.
+
 ## Mục lục
 
-- [TreeSet nuốt phần tử: vì sao lọc trùng lại làm mất dữ liệu](#1-treeset-nuốt-phần-tử-vì-sao-lọc-trùng-lại-làm-mất-dữ-liệu)
+- [Tổng quan](#1-tổng-quan)
 - [Sự thật: Set chỉ là Map đội lốt](#2-sự-thật-set-chỉ-là-map-đội-lốt)
 - [HashSet — HashMap với value giả PRESENT](#3-hashset--hashmap-với-value-giả-present)
 - [LinkedHashSet — thêm doubly-linked giữ thứ tự chèn](#4-linkedhashset--thêm-doubly-linked-giữ-thứ-tự-chèn)
@@ -19,29 +21,11 @@ description: "Mổ xẻ ba Set: HashSet/LinkedHashSet được backing bởi Has
 
 ---
 
-## 1. TreeSet nuốt phần tử: vì sao lọc trùng lại làm mất dữ liệu
+## 1. Tổng quan
 
-`HashSet`, `LinkedHashSet` và `TreeSet` là ba implementation `Set` chính của Java, tất cả đều loại trùng — nhưng cách chúng định nghĩa "trùng" khác nhau, được backing bởi ba cấu trúc dữ liệu khác nhau. Chúng quan trọng vì chọn sai loại không chỉ ảnh hưởng hiệu năng (O(1) vs O(log n)) mà còn cho **kết quả sai**: phần tử hợp lệ có thể bị "nuốt" mất mà không ném exception.
+`HashSet` ưu tiên tra cứu nhanh và không bảo đảm thứ tự; `LinkedHashSet` giữ thứ tự chèn với chi phí bộ nhớ cao hơn; `TreeSet` duy trì thứ tự sắp xếp và xác định phần tử tương đương qua comparator hoặc `compareTo()`.
 
-Ví dụ bất ngờ: gom user vào `TreeSet` để vừa lọc trùng vừa sort theo điểm —
-
-```java
-record User(String id, int score) {}
-
-Set<User> top = new TreeSet<>(Comparator.comparingInt(User::score));
-top.add(new User("u1", 100));
-top.add(new User("u2", 100));    // 😱 cùng score → TreeSet coi là TRÙNG → KHÔNG thêm
-System.out.println(top.size());   // 1, không phải 2!
-```
-
-`u1` và `u2` rõ ràng **khác nhau** (`equals` `false`), nhưng `TreeSet` chỉ thấy `compare(u1, u2) == 0` (cùng score) nên coi `u2` là bản trùng và **bỏ qua**. Trong khi `HashSet` cùng dữ liệu giữ cả hai.
-
-> [!IMPORTANT]
-> Ba `Set` này hành xử khác nhau **không phải ngẫu nhiên** — chúng được xây trên ba cấu trúc backing khác nhau. `HashSet`/`LinkedHashSet` dùng `equals`+`hashCode`; `TreeSet` dùng `compareTo`/`Comparator`. Hiểu Set là hiểu **Map nào đang đứng sau nó**.
-
-Phần còn lại của doc sẽ đi qua: sự thật Set chỉ là Map đội lốt (§2) → HashSet = HashMap với value giả PRESENT (§3) → LinkedHashSet thêm doubly-linked giữ thứ tự chèn (§4) → TreeSet = Red-Black Tree qua TreeMap (§5) → vì sao TreeSet dùng compareTo không dùng equals (§6) → so sánh ba loại về thứ tự/độ phức tạp/null (§7) → API điều hướng NavigableSet của TreeSet (§8) → chọn Set nào & tuning (§9) → anti-patterns (§10) → cheat sheet (§11).
-
----
+Sự khác biệt giữa `equals()` và phép so sánh thứ tự đặc biệt quan trọng. Một comparator không nhất quán với `equals()` có thể khiến `TreeSet` xem hai object khác nhau là cùng một phần tử.
 
 ## 2. Sự thật: Set chỉ là Map đội lốt
 

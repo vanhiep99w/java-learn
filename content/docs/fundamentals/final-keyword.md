@@ -3,9 +3,11 @@ title: "final: class, method & variable"
 description: "Mổ xẻ final ở 3 cấp: variable/field/param, method, class. Đào sâu final field semantics trong Java Memory Model (safe publication không cần synchronized), JIT constant folding & devirtualization, effectively final cho lambda, và vì sao final ≠ immutable. Kèm bytecode và ví dụ đa luồng."
 ---
 
+Từ khóa `final` biểu đạt các ràng buộc khác nhau tùy vị trí sử dụng: biến chỉ được gán một lần, method không thể override và class không thể được kế thừa. Nó không đồng nghĩa với object bất biến.
+
 ## Mục lục
 
-- [Object khởi tạo xong mà thread khác thấy field rỗng](#1-object-khởi-tạo-xong-mà-thread-khác-thấy-field-rỗng)
+- [Tổng quan](#1-tổng-quan)
 - [Ba cấp độ của final](#2-ba-cấp-độ-của-final)
 - [final variable & effectively final](#3-final-variable--effectively-final)
 - [final ≠ immutable — sai lầm phổ biến nhất](#4-final--immutable--sai-lầm-phổ-biến-nhất)
@@ -19,42 +21,11 @@ description: "Mổ xẻ final ở 3 cấp: variable/field/param, method, class. 
 
 ---
 
-## 1. Object khởi tạo xong mà thread khác thấy field rỗng
+## 1. Tổng quan
 
-**`final`** áp lên ba thứ khác nhau: biến/field (gán đúng một lần), method (cấm override) và class (cấm kế thừa). Ở tầng nông nó chỉ là cú pháp, nhưng với **field** nó còn là một bảo đảm của **Java Memory Model**: khi constructor kết thúc bình thường, mọi thread đọc object qua reference đã publish đều thấy final field *đã khởi tạo đúng* — không cần `synchronized` hay `volatile`. Hiểu `final` đầy đủ nghĩa là hiểu nó tác động tới compiler, JIT và CPU memory model.
+Một reference `final` không thể trỏ sang object khác, nhưng trạng thái bên trong object vẫn có thể thay đổi. Với class và method, `final` kiểm soát khả năng mở rộng; với field, nó còn có semantics đặc biệt về publication sau constructor.
 
-Bạn có một config bất biến, dựng một lần rồi chia sẻ qua nhiều thread **không** dùng lock:
-
-```java
-class Config {
-    int timeout;                 // ⚠️ KHÔNG final
-    Config() { this.timeout = 30; }
-}
-
-// Thread A
-sharedConfig = new Config();     // publish không đồng bộ
-
-// Thread B
-int t = sharedConfig.timeout;    // có thể đọc ra 0 (!!) thay vì 30
-```
-
-Trong môi trường đa luồng không đồng bộ, thread B **có thể nhìn thấy** `sharedConfig` đã trỏ tới object **trước khi** constructor ghi xong `timeout = 30` — và đọc ra `0` (giá trị mặc định). Đây là hệ quả của **reordering**: việc gán reference và việc ghi field có thể bị JIT/CPU sắp xếp lại.
-
-Đổi một từ — `final int timeout;` — và bug **biến mất** mà không cần `synchronized` hay `volatile`:
-
-```java
-class Config {
-    final int timeout;           // ✅ final field
-    Config() { this.timeout = 30; }
-}
-```
-
-> [!IMPORTANT]
-> `final` không chỉ là "không cho gán lại". Với **field**, nó là một **bảo đảm của Java Memory Model**: mọi thread thấy object qua reference đã publish đều thấy final field **đã khởi tạo đúng**. Hiểu `final` đầy đủ nghĩa là hiểu nó tác động tới **compiler, JIT và CPU memory model**, không chỉ cú pháp.
-
-Phần còn lại của doc sẽ đi qua: ba cấp độ của final (§2) → final variable & effectively final (§3) → final ≠ immutable (§4) → final field & JMM safe publication (§5) → final method & devirtualization (§6) → final class (§7) → final + JIT constant folding (§8) → final với lambda & inner class (§9) → anti-patterns (§10) → cheat sheet (§11).
-
----
+Hiểu từng phạm vi giúp dùng `final` để thể hiện ý định thiết kế mà không gán cho nó những bảo đảm mà ngôn ngữ không cung cấp.
 
 ## 2. Ba cấp độ của final
 

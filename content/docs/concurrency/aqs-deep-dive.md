@@ -1,11 +1,13 @@
 ---
-title: "AbstractQueuedSynchronizer (AQS) — Deep Dive"
+title: "AbstractQueuedSynchronizer (AQS)"
 description: "Mổ xẻ AQS — nền tảng của ReentrantLock, Semaphore, CountDownLatch, ReadWriteLock: CLH queue biến thể, state management, exclusive vs shared mode, acquire/release flow, ConditionObject. Kèm đọc source JDK và sơ đồ chi tiết."
 ---
 
+`AbstractQueuedSynchronizer` (AQS) là nền tảng dùng để xây dựng nhiều synchronizer trong `java.util.concurrent`, bao gồm `ReentrantLock`, `Semaphore`, `CountDownLatch` và `ReentrantReadWriteLock`. Nó tách việc quản lý hàng đợi thread khỏi quy tắc cấp quyền truy cập của từng synchronizer.
+
 ## Mục lục
 
-- [Tự viết Lock bằng CAS — và thất bại](#1-tự-viết-lock-bằng-cas--và-thất-bại)
+- [Tổng quan](#1-tổng-quan)
 - [AQS là gì — framework xây synchronizer](#2-aqs-là-gì--framework-xây-synchronizer)
 - [State — một int quyết định mọi thứ](#3-state--một-int-quyết-định-mọi-thứ)
 - [CLH Queue biến thể — hàng đợi thread chờ lock](#4-clh-queue-biến-thể--hàng-đợi-thread-chờ-lock)
@@ -21,41 +23,11 @@ description: "Mổ xẻ AQS — nền tảng của ReentrantLock, Semaphore, Cou
 
 ---
 
-## 1. Tự viết Lock bằng CAS — và thất bại
+## 1. Tổng quan
 
-`AbstractQueuedSynchronizer` (AQS) là khung sườn nằm dưới hầu hết `ReentrantLock`, `Semaphore`, `CountDownLatch`, `ReentrantReadWriteLock` và `Condition`. Hiểu nó là hiểu cách mọi synchronizer của Java xếp hàng thread, park/unpark và xoay quanh một biến `state` duy nhất. Cách nhanh nhất thấy vì sao cần AQS là thử **tự viết lock** chỉ bằng CAS — và xem nó gãy ở đâu.
+AQS quản lý một giá trị trạng thái bằng CAS và một hàng đợi chờ kiểu CLH. Subclass chỉ cần định nghĩa cách acquire/release state ở chế độ exclusive hoặc shared; phần xếp hàng, park, unpark và xử lý hủy chờ được framework đảm nhiệm.
 
-Bạn thử viết spin lock đơn giản:
-
-```java
-public class NaiveSpinLock {
-    private final AtomicInteger locked = new AtomicInteger(0);
-
-    public void lock() {
-        while (!locked.compareAndSet(0, 1)) {
-            // spin — đốt CPU chờ
-        }
-    }
-
-    public void unlock() {
-        locked.set(0);
-    }
-}
-```
-
-Vấn đề:
-1. **CPU burn**: thread spin liên tục, đốt 100% core khi contention cao.
-2. **Không fair**: thread vừa unlock có thể lock lại ngay (starvation cho thread chờ lâu).
-3. **Không hỗ trợ timeout**: không thể "chờ tối đa 5s rồi bỏ".
-4. **Không hỗ trợ interrupt**: thread bị interrupt vẫn spin.
-5. **Không reentrant**: cùng thread lock lần 2 → deadlock chính nó.
-
-Cả 5 vấn đề trên đều là thứ AQS giải quyết sẵn — queue, park/unpark, interrupt, timeout, fairness đều nằm trong một abstract class. Phần còn lại của doc sẽ đi qua: AQS là gì và gồm gì (§2) → biến `state` (§3) → CLH queue (§4) → acquire/release exclusive (§5) → shared mode (§6) → cách ReentrantLock/Semaphore/CountDownLatch/ReadWriteLock đắp lên AQS (§7–§10) → ConditionObject (§11) → cancellation/timeout (§12).
-
-> [!IMPORTANT]
-> Doug Lea thiết kế AQS để giải quyết **tất cả** vấn đề trên trong **một framework** duy nhất. Thay vì mỗi synchronizer tự viết queue + park/unpark + cancel, chúng chia sẻ AQS làm nền tảng — chỉ cần override `tryAcquire`/`tryRelease`.
-
----
+Hiểu cấu trúc này giúp đọc được hành vi của các lock cấp cao, phân tích fairness và contention, đồng thời tránh tự triển khai cơ chế đồng bộ thiếu an toàn.
 
 ## 2. AQS là gì — framework xây synchronizer
 

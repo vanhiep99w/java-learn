@@ -5,9 +5,11 @@ description: "Bản đồ hệ sinh thái Spring: IoC container & Dependency Inj
 
 # Spring — Hiểu cơ chế bên dưới, không chỉ annotation
 
+Spring là hệ sinh thái xây dựng ứng dụng Java dựa trên container quản lý object và các abstraction cho những mối quan tâm hạ tầng. Hai cơ chế nền tảng là IoC/Dependency Injection và AOP.
+
 ## Mục lục
 
-- [IoC và AOP — hai cơ chế nền của mọi thứ Spring làm](#1-ioc-và-aop--hai-cơ-chế-nền-của-mọi-thứ-spring-làm)
+- [Tổng quan](#1-tổng-quan)
 - [IoC & Dependency Injection — trái tim của Spring](#2-ioc--dependency-injection--trái-tim-của-spring)
 - [Container: BeanFactory vs ApplicationContext](#3-container-beanfactory-vs-applicationcontext)
 - [Bean lifecycle & scope](#4-bean-lifecycle--scope)
@@ -20,34 +22,11 @@ description: "Bản đồ hệ sinh thái Spring: IoC container & Dependency Inj
 
 ---
 
-## 1. IoC và AOP — hai cơ chế nền của mọi thứ Spring làm
+## 1. Tổng quan
 
-Spring **không phải một framework web** — cốt lõi của nó chỉ là hai cơ chế: **IoC** (Inversion of Control), một container *tạo và lắp ráp* object (bean) thay để bạn tự `new` và nối dây, và **AOP**, lớp *proxy* bọc bean để rải code cắt ngang như transaction, cache, security. Mọi module khác (MVC, Data, Security, Boot) đều xây trên hai nền này; các annotation bạn viết (`@Service`, `@Transactional`, `@RestController`) chỉ là mặt tiền tiện lợi gói quanh IoC và AOP. Hiểu đúng hai cơ chế này là chìa khoá giải mã mọi "ma thuật" của Spring — và cũng là cách tránh những bug thầm lặng như self-invocation làm `@Transactional` vô hiệu.
+IoC Container tạo và liên kết bean, giúp code nghiệp vụ không phải tự quản lý dependency. AOP chèn các hành vi xuyên suốt như transaction, security, cache và logging quanh lời gọi method. Spring Boot bổ sung auto-configuration và conventions để giảm cấu hình lặp lại.
 
-Không có Spring, code Java doanh nghiệp đầy "dây nối" thủ công: mỗi class tự `new` dependency của nó, tự quản vòng đời, tự mở/đóng transaction, tự lo cấu hình:
-
-```java
-class OrderService {
-    private final OrderRepository repo = new JdbcOrderRepository(
-        new HikariDataSource(loadConfig()));   // tự tạo cả cây phụ thuộc
-    private final EmailSender email = new SmtpEmailSender(...);
-
-    void place(Order o) {
-        Connection c = dataSource.getConnection();
-        try { c.setAutoCommit(false); /* logic */ c.commit(); }   // tự quản transaction
-        catch (Exception e) { c.rollback(); } finally { c.close(); }
-    }
-}
-```
-
-Vấn đề: coupling chặt (khoá cứng lớp cụ thể), khó test (không mock được), lặp boilerplate (transaction/connection ở mọi method). Spring giải quyết bằng **đảo ngược quyền điều khiển** (IoC): bạn *khai báo* cần gì, container *tạo và lắp ráp* cho bạn.
-
-> [!IMPORTANT]
-> Spring không phải "một framework web" — nó là một **container quản lý object** (bean) + **AOP**. Mọi thứ khác (MVC, Data, Security) xây trên hai nền này. Hiểu IoC + AOP = hiểu 80% Spring; phần còn lại chỉ là annotation tiện lợi gói quanh hai cơ chế đó.
-
-Phần còn lại của doc sẽ đi qua: IoC & Dependency Injection (§2) → Container `BeanFactory` vs `ApplicationContext` (§3) → bean lifecycle & scope (§4) → AOP & `@Transactional` (§5) → Spring Boot auto-configuration & starter (§6) → các module chính (§7) → kiểu inject & best practice (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Nắm ba lớp này—container, infrastructure abstraction và Boot—giúp hiểu Spring như một hệ thống nhất quán thay vì tập hợp annotation rời rạc.
 
 ## 2. IoC & Dependency Injection — trái tim của Spring
 

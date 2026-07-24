@@ -1,11 +1,13 @@
 ---
-title: "CompletableFuture — Deep Dive"
+title: "CompletableFuture"
 description: "Mổ xẻ CompletableFuture: ForkJoinPool execution, async composition pipeline, thenApply vs thenCompose, exception handling chain, allOf/anyOf orchestration, timeout & cancellation, và production patterns. Kèm execution thread analysis, benchmark, và anti-patterns."
 ---
 
+`CompletableFuture` mô hình hóa một kết quả có thể xuất hiện trong tương lai và cho phép ghép các bước xử lý bất đồng bộ thành pipeline. Điểm mạnh của nó nằm ở khả năng composition, xử lý lỗi và phối hợp nhiều tác vụ, không chỉ ở việc chạy code trên thread khác.
+
 ## Mục lục
 
-- [5 API call tuần tự — 2.5s latency, parallel chỉ 600ms](#1-5-api-call-tuần-tự--25s-latency-parallel-chỉ-600ms)
+- [Tổng quan](#1-tổng-quan)
 - [CompletableFuture vs Future — tại sao cần nó](#2-completablefuture-vs-future--tại-sao-cần-nó)
 - [Execution Thread — ai chạy cái gì, ở đâu?](#3-execution-thread--ai-chạy-cái-gì-ở-đâu)
 - [Composition: thenApply vs thenCompose vs thenCombine](#4-composition-thenapply-vs-thencompose-vs-thencombine)
@@ -20,43 +22,11 @@ description: "Mổ xẻ CompletableFuture: ForkJoinPool execution, async composi
 
 ---
 
-## 1. 5 API call tuần tự — 2.5s latency, parallel chỉ 600ms
+## 1. Tổng quan
 
-`CompletableFuture` là công cụ của Java để **orchestrate nhiều tác vụ async** — chạy song song I/O, compose kết quả, xử lý exception và timeout mà không cần callback hell hay block thread. Bài toán điển hình cho thấy vì sao nó đáng dùng: một trang cần dữ liệu từ 5 microservices.
+So với `Future`, `CompletableFuture` không buộc caller phải chặn bằng `get()` để tiếp tục xử lý. Các stage có thể biến đổi kết quả, nối tác vụ phụ thuộc, kết hợp tác vụ độc lập hoặc phục hồi khi xảy ra exception.
 
-Bạn xây trang product detail cần dữ liệu từ 5 microservices:
-
-```java
-// Tuần tự — tổng latency = sum(5 calls)
-Product product = productService.get(id);       // 500ms
-List<Review> reviews = reviewService.get(id);    // 400ms
-Pricing pricing = pricingService.get(id);        // 300ms
-Inventory inv = inventoryService.get(id);        // 200ms
-Recommendation rec = recService.get(id);         // 600ms
-// Tổng: 2000ms (tuần tự vì dùng blocking call)
-```
-
-Dùng `CompletableFuture` — chạy **song song**:
-
-```java
-var productF  = CompletableFuture.supplyAsync(() -> productService.get(id));
-var reviewsF  = CompletableFuture.supplyAsync(() -> reviewService.get(id));
-var pricingF  = CompletableFuture.supplyAsync(() -> pricingService.get(id));
-var invF      = CompletableFuture.supplyAsync(() -> inventoryService.get(id));
-var recF      = CompletableFuture.supplyAsync(() -> recService.get(id));
-
-CompletableFuture.allOf(productF, reviewsF, pricingF, invF, recF).join();
-
-// Tổng: max(500, 400, 300, 200, 600) = 600ms — giảm 70%!
-return new ProductDetail(productF.join(), reviewsF.join(), ...);
-```
-
-Latency giảm từ tổng (2s) xuống max (600ms) chỉ bằng cách song song hoá. Phần còn lại của doc sẽ đi qua: vì sao `CompletableFuture` hơn `Future` (§2) → thread nào chạy callback nào (§3) → composition `thenApply`/`thenCompose`/`thenCombine` (§4) → exception handling (§5) → allOf/anyOf (§6) → timeout & cancellation (§7) → pattern thực chiến (§8) → bên trong Completion Stack (§9).
-
-> [!IMPORTANT]
-> `CompletableFuture` không phải "async for fun" — nó giải quyết bài toán: **orchestrate I/O-bound tasks song song** + **compose kết quả** mà không cần callback hell hay blocking thread.
-
----
+Hiệu quả thực tế phụ thuộc vào executor, bản chất CPU-bound hay I/O-bound và vị trí blocking. Tài liệu sẽ làm rõ semantics của từng nhóm API trước khi bàn đến chạy song song và tuning.
 
 ## 2. CompletableFuture vs Future — tại sao cần nó
 

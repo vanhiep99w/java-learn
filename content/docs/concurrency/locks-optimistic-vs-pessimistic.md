@@ -3,9 +3,11 @@ title: "Optimistic vs Pessimistic Lock"
 description: "Mổ xẻ khóa lạc quan vs bi quan: CAS (compare-and-swap) & lệnh CPU cmpxchg, vòng lặp retry của AtomicInteger, ABA problem & AtomicStampedReference, StampedLock optimistic read, versioning trong DB (@Version JPA), so với synchronized/ReentrantLock. Kèm sơ đồ và benchmark contention."
 ---
 
+Optimistic locking và pessimistic locking là hai chiến lược kiểm soát truy cập đồng thời. Một bên giả định xung đột hiếm và kiểm tra khi cập nhật; bên còn lại ngăn xung đột trước bằng cách giữ quyền truy cập độc quyền.
+
 ## Mục lục
 
-- [Counter đếm sai dưới tải cao — synchronized vs AtomicInteger vs LongAdder](#1-counter-đếm-sai-dưới-tải-cao--synchronized-vs-atomicinteger-vs-longadder)
+- [Tổng quan](#1-tổng-quan)
 - [Hai triết lý: bi quan vs lạc quan](#2-hai-triết-lý-bi-quan-vs-lạc-quan)
 - [Pessimistic lock — synchronized & ReentrantLock](#3-pessimistic-lock--synchronized--reentrantlock)
 - [CAS — trái tim của optimistic lock](#4-cas--trái-tim-của-optimistic-lock)
@@ -19,43 +21,11 @@ description: "Mổ xẻ khóa lạc quan vs bi quan: CAS (compare-and-swap) & l�
 
 ---
 
-## 1. Counter đếm sai dưới tải cao — synchronized vs AtomicInteger vs LongAdder
+## 1. Tổng quan
 
-Lock không chỉ có `synchronized`. Có cả một quang phổ từ **bi quan** (chặn thread khác, park) tới **lạc quan** (cho làm, kiểm tra lúc commit). Chọn đúng triết lý quyết định hiệu năng — `AtomicInteger` có thể nhanh hơn `synchronized` 4×, nhưng sai hoàn cảnh thì `LongAdder` lại thắng cả hai. Bắt đầu từ một counter đếm sai.
+Pessimistic locking phù hợp khi xung đột thường xuyên hoặc chi phí retry cao, nhưng có thể làm tăng thời gian chờ và nguy cơ deadlock. Optimistic locking giảm blocking, đổi lại caller phải xử lý thất bại CAS, version conflict hoặc retry.
 
-Một bộ đếm lượt xem dùng biến `int` thường, nhiều thread cùng `++`:
-
-```java
-int views = 0;
-void onView() { views++; }   // 😱 không atomic: read → +1 → write (3 bước)
-```
-
-Dưới 16 thread, sau 1 triệu lượt mỗi thread, `views` ra **ít hơn** 16 triệu rất nhiều. Lý do: `views++` là **ba thao tác** (đọc, cộng, ghi) — hai thread đọc cùng giá trị `v`, cùng ghi `v+1` → mất một lượt (lost update).
-
-Hai cách sửa, hai triết lý:
-
-```java
-// Pessimistic: khóa độc quyền
-synchronized void onView() { views++; }
-
-// Optimistic: CAS không khóa
-AtomicInteger views = new AtomicInteger();
-void onView() { views.incrementAndGet(); }   // vòng lặp CAS bên trong
-```
-
-```text
-Benchmark (16 thread, contention vừa)   Throughput
-synchronized counter                    ~  45 M ops/s
-AtomicInteger (CAS)                      ~ 180 M ops/s   ← không khóa, không park thread
-LongAdder (striped)                      ~ 850 M ops/s   ← chia ô, contention thấp nhất
-```
-
-Phần còn lại của doc sẽ đi qua: hai triết lý bi quan vs lạc quan (§2) → pessimistic lock (§3) → CAS — gốc rễ optimistic (§4) → AtomicInteger/CAS loop (§5) → ABA problem (§6) → StampedLock optimistic read (§7) → optimistic ở tầng DB với `@Version` (§8) → cách chọn theo mức contention (§9).
-
-> [!IMPORTANT]
-> "Lock" không chỉ có `synchronized`. Có cả một quang phổ từ **bi quan** (chặn thread khác) tới **lạc quan** (cho làm, kiểm tra lúc commit). Chọn đúng phụ thuộc vào **mức tranh chấp (contention)**. Hiểu hai triết lý này là hiểu vì sao `AtomicInteger` nhanh hơn `synchronized`, và khi nào điều ngược lại đúng.
-
----
+Không có chiến lược luôn tốt hơn. Quyết định phụ thuộc vào tỷ lệ tranh chấp, độ dài critical section, yêu cầu latency và khả năng thực hiện lại thao tác một cách an toàn.
 
 ## 2. Hai triết lý: bi quan vs lạc quan
 

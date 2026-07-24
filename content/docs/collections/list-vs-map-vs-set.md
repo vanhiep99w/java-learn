@@ -5,9 +5,11 @@ description: "So sánh ba trụ cột Collection ở tầng cấu trúc dữ li�
 
 # List vs Map vs Set — Chọn đúng từ bản chất
 
+`List`, `Set` và `Map` biểu diễn ba nhu cầu dữ liệu khác nhau: dãy có thứ tự, tập phần tử duy nhất và ánh xạ key–value. Chọn đúng abstraction giúp thể hiện ràng buộc của bài toán ngay trong kiểu dữ liệu.
+
 ## Mục lục
 
-- [Cùng một bài toán, ba cấu trúc, ba câu trả lời khác nhau](#1-cùng-một-bài-toán-ba-cấu-trúc-ba-câu-trả-lời-khác-nhau)
+- [Tổng quan](#1-tổng-quan)
 - [List — dãy có thứ tự, cho phép trùng](#2-list--dãy-có-thứ-tự-cho-phép-trùng)
 - [Set — tập hợp, loại trùng bằng cách nào?](#3-set--tập-hợp-loại-trùng-bằng-cách-nào)
 - [Map — ánh xạ key→value](#4-map--ánh-xạ-keyvalue)
@@ -20,35 +22,11 @@ description: "So sánh ba trụ cột Collection ở tầng cấu trúc dữ li�
 
 ---
 
-## 1. Cùng một bài toán, ba cấu trúc, ba câu trả lời khác nhau
+## 1. Tổng quan
 
-`List`, `Set` và `Map` là ba trụ cột của Collection: **List** là dãy có thứ tự cho phép trùng, **Set** là tập loại trùng, **Map** là ánh xạ key→value. Chúng quan trọng vì chọn đúng cấu trúc cho câu hỏi bạn hỏi nhiều nhất quyết định trực tiếp độ phức tạp — sai cấu trúc biến O(1) thành O(n), và đôi khi còn cho **kết quả sai** chứ không chỉ chậm.
+`List` phù hợp khi vị trí và thứ tự phần tử có ý nghĩa; `Set` phù hợp khi uniqueness là ràng buộc chính; `Map` phù hợp khi cần truy cập một value qua key. Các interface này không thay thế lẫn nhau dù đôi khi có thể mô phỏng cùng một kết quả.
 
-Ví dụ: nhận danh sách user ID và cần "đếm số ID khác nhau" — chọn sai cấu trúc thì ra sai luôn:
-
-```java
-List<Long> ids = List.of(1L, 2L, 2L, 3L, 1L);
-
-new ArrayList<>(ids).size();   // 5 — List GIỮ trùng
-new HashSet<>(ids).size();     // 3 — Set LOẠI trùng  ← đáp án đúng
-```
-
-Còn "tra số lần xuất hiện của mỗi ID" — chỉ `Map` làm được tự nhiên:
-
-```java
-Map<Long, Long> count = ids.stream()
-    .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
-// {1=2, 2=2, 3=1}
-```
-
-Ba cấu trúc trả lời ba câu hỏi khác nhau: **"thứ tự & lặp lại"** (List), **"có hay không / tập khác nhau"** (Set), **"ứng với key này là gì"** (Map).
-
-> [!IMPORTANT]
-> Chọn cấu trúc dữ liệu = chọn **câu hỏi bạn sẽ hỏi nhiều nhất**. Hỏi "phần tử thứ i?" → List. Hỏi "đã thấy chưa?" → Set. Hỏi "key này map tới gì?" → Map. Sai cấu trúc biến O(1) thành O(n).
-
-Phần còn lại của doc sẽ đi qua: List — dãy có thứ tự cho trùng (§2) → Set — loại trùng bằng cách nào (§3) → Map — ánh xạ key→value (§4) → vì sao Set là Map "đội lốt" (§5) → null handling ba thái độ khác nhau (§6) → thứ tự insertion/sorted/không xác định (§7) → độ phức tạp & bảng so sánh (§8) → chuyển đổi qua lại & bẫy (§9) → cheat sheet (§10).
-
----
+Phần này so sánh semantics, độ phức tạp thao tác và các implementation thường dùng để đưa ra lựa chọn dựa trên yêu cầu thực tế.
 
 ## 2. List — dãy có thứ tự, cho phép trùng
 

@@ -1,11 +1,13 @@
 ---
-title: "ThreadPoolExecutor — Deep Dive"
+title: "ThreadPoolExecutor"
 description: "Mổ xẻ ThreadPoolExecutor: ctl bit-field (runState + workerCount), Worker lifecycle, core/max pool sizing, BlockingQueue strategies, 4 RejectionHandler, thread keep-alive, prestartAllCoreThreads, ForkJoinPool vs ThreadPoolExecutor, ScheduledThreadPoolExecutor, và Executors factory pitfalls. Kèm source JDK analysis, thread dump đọc hiểu, và anti-patterns."
 ---
 
+`ThreadPoolExecutor` quản lý một tập worker để tái sử dụng thread và giới hạn lượng công việc chạy đồng thời. Nó tách việc gửi task khỏi chính sách tạo thread, xếp hàng và từ chối task khi hệ thống quá tải.
+
 ## Mục lục
 
-- [OutOfMemoryError — newCachedThreadPool nuốt hết RAM](#1-outofmemoryerror--newcachedthreadpool-nuốt-hết-ram)
+- [Tổng quan](#1-tổng-quan)
 - [Tại sao cần Thread Pool](#2-tại-sao-cần-thread-pool)
 - [Kiến trúc ThreadPoolExecutor — ctl, Worker, BlockingQueue](#3-kiến-trúc-threadpoolexecutor--ctl-worker-blockingqueue)
 - [ctl — 32 bit chứa 2 thông tin](#4-ctl--32-bit-chứa-2-thông-tin)
@@ -22,40 +24,11 @@ description: "Mổ xẻ ThreadPoolExecutor: ctl bit-field (runState + workerCoun
 
 ---
 
-## 1. OutOfMemoryError — newCachedThreadPool nuốt hết RAM
+## 1. Tổng quan
 
-`ThreadPoolExecutor` của Java có một quy tắc dispatch dễ bị bẻ gãy: **core → queue → max → reject**. Các factory `Executors.*` trông tiện lợi nhưng giấu queue vô hạn hoặc thread vô hạn bên trong, biến thành bom OOM chờ nổ trên production. Cách rõ nhất để thấy là một service dùng `newCachedThreadPool` đón traffic.
+Một thread mới có chi phí bộ nhớ và lập lịch đáng kể, nên tạo thread không giới hạn có thể làm ứng dụng cạn tài nguyên trước khi tăng được throughput. Thread pool đưa các giới hạn này thành cấu hình rõ ràng qua core size, maximum size, work queue, keep-alive và rejection policy.
 
-Service xử lý HTTP request, mỗi request spawn một task:
-
-```java
-ExecutorService pool = Executors.newCachedThreadPool();  // "tiện lợi"
-
-// Handler cho mỗi request
-void handleRequest(Request req) {
-    pool.execute(() -> {
-        callExternalApi(req);    // blocking I/O, 2-5 giây
-    });
-}
-```
-
-Trên dev (10 req/s): chạy mượt. Spike 10.000 req/s trên production → **10.000 thread** được tạo cùng lúc → mỗi thread chiếm ~1 MB stack → **10 GB stack memory** → `OutOfMemoryError: unable to create native thread`.
-
-```
-Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread
-    at java.base/java.lang.Thread.start0(Native Method)
-    at java.base/java.lang.Thread.start(Thread.java:802)
-    at java.base/java.util.concurrent.ThreadPoolExecutor.addWorker(ThreadPoolExecutor.java:937)
-```
-
-Nguyên nhân: `newCachedThreadPool()` tạo pool với `maximumPoolSize = Integer.MAX_VALUE` và `SynchronousQueue` (queue không chứa gì). Mỗi task tới mà không có thread rảnh → tạo thread mới → **không giới hạn**.
-
-Phần còn lại của doc sẽ đi qua: vì sao cần thread pool (§2) → kiến trúc ThreadPoolExecutor (§3) → biến `ctl` 32-bit (§4) → flow `execute()` (§5) → Worker main loop (§6) → BlockingQueue strategies (§7) → RejectionHandler (§8) → keep-alive (§9) → shutdown (§10) → Executors factory pitfalls (§11) → ForkJoinPool vs ThreadPoolExecutor (§12) → sizing formula (§13).
-
-> [!IMPORTANT]
-> `Executors.newCachedThreadPool()` và `Executors.newFixedThreadPool()` (dùng `LinkedBlockingQueue` unbounded) là hai "bẫy" phổ biến nhất. Production nên **tự tạo** `ThreadPoolExecutor` với bound rõ ràng cho cả pool size và queue.
-
----
+Cấu hình đúng phải phản ánh loại workload và năng lực của tài nguyên phía sau. Pool không làm biến mất bottleneck; nó chỉ giúp kiểm soát concurrency và backpressure.
 
 ## 2. Tại sao cần Thread Pool
 

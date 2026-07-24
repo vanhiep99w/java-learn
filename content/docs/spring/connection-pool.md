@@ -1,11 +1,13 @@
 ---
-title: "Connection Pool (HikariCP) — Deep Dive"
+title: "Connection Pool (HikariCP)"
 description: "Mổ xẻ HikariCP: ConcurrentBag lock-free connection borrowing, FastList, housekeeping thread, connection lifecycle, leak detection, pool sizing formula, suspend/resume, metrics, và migration từ legacy pools. Kèm benchmark, tuning guide, và anti-patterns."
 ---
 
+Connection pool duy trì một tập database connection có thể tái sử dụng để tránh chi phí mở kết nối cho từng request. HikariCP là implementation mặc định phổ biến trong Spring Boot nhờ thiết kế gọn và overhead thấp.
+
 ## Mục lục
 
-- [Query 500ms bỗng thành 5s — connection pool cạn kiệt](#1-query-500ms-bỗng-thành-5s--connection-pool-cạn-kiệt)
+- [Tổng quan](#1-tổng-quan)
 - [Tại sao cần Connection Pool?](#2-tại-sao-cần-connection-pool)
 - [HikariCP Architecture — tổng quan kiến trúc](#3-hikaricp-architecture--tổng-quan-kiến-trúc)
 - [ConcurrentBag — lock-free connection borrowing](#4-concurrentbag--lock-free-connection-borrowing)
@@ -23,55 +25,11 @@ description: "Mổ xẻ HikariCP: ConcurrentBag lock-free connection borrowing, 
 
 ---
 
-## 1. Query 500ms bỗng thành 5s — connection pool cạn kiệt
+## 1. Tổng quan
 
-Connection pool (HikariCP, mặc định của Spring Boot 2.0+) là lớp **giữ một tập connection tái sử dụng** giữa app và database, thay vì mở/đóng connection mới mỗi query. Nó là tuyến phòng thủ trực tiếp cho database: giới hạn số connection, hàng đợi các request thừa, reuse connection đã tốn tiền TCP+auth để mở. Khi pool **cạn kiệt** (exhausted) — thường do leak hoặc sizing sai — triệu chứng không phải một query chậm, mà **toàn bộ** API bị nghẽn: mọi thread đều chờ mượn connection cho đến timeout. Đây là lý do pool sizing và leak detection thuộc nhóm cấu hình sống còn nhất của service thật.
+Mỗi request mượn connection, thực hiện công việc rồi trả lại pool. Khi tất cả connection đều bận, request mới phải chờ đến timeout; tăng pool size quá mức lại có thể đẩy contention xuống database.
 
-Production alert: p99 latency API `/orders` nhảy từ 500ms lên **5,000ms**. Database load bình thường. Network OK.
-
-```
-Thread dump (100 threads chờ):
-"http-nio-8080-exec-47" TIMED_WAITING
-   at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:181)
-   - waiting on: connectionBag.borrow(timeout)
-```
-
-Root cause: pool `maximumPoolSize=10`, nhưng 1 endpoint quên close connection (leak):
-
-```java
-@GetMapping("/report")
-public Report generate() {
-    Connection conn = dataSource.getConnection();  // borrow
-    ResultSet rs = conn.createStatement().executeQuery(sql);
-    return buildReport(rs);
-    // ❌ KHÔNG close connection! Pool cạn dần...
-}
-```
-
-10 request `/report` → 10 connections leaked → pool **exhausted** → tất cả request khác **chờ 5s timeout** → cascade failure.
-
-Fix: **try-with-resources** + HikariCP **leak detection**:
-
-```java
-@GetMapping("/report")
-public Report generate() {
-    try (Connection conn = dataSource.getConnection()) {  // auto-close
-        ResultSet rs = conn.createStatement().executeQuery(sql);
-        return buildReport(rs);
-    }  // connection trả về pool ở đây
-}
-```
-
-```properties
-spring.datasource.hikari.leak-detection-threshold=2000  # warn nếu >2s không trả
-```
-
-> [!IMPORTANT]
-> Connection pool không phải "set and forget". Pool exhaustion = **tất cả** queries chậm (không chỉ query có vấn đề). Leak detection + proper sizing + monitoring = tam giác sống còn.
-
-Phần còn lại của doc sẽ đi qua: vì sao cần pool (§2) → kiến trúc HikariCP (§3) → `ConcurrentBag` lock-free borrowing (§4) → `FastList` tối ưu (§5) → connection lifecycle (§6) → pool sizing (§7) → housekeeping (§8) → leak detection (§9) → health check (§10) → config thực chiến (§11) → metrics (§12) → so sánh các pool (§13) → anti-patterns (§14) → cheat sheet (§15).
-
----
+Kích thước pool cần phù hợp với khả năng xử lý của DB, thời gian giữ connection và concurrency của ứng dụng. Metric về active, idle, pending và acquisition time quan trọng hơn một con số cấu hình cố định.
 
 ## 2. Tại sao cần Connection Pool?
 

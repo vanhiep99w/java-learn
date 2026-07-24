@@ -1,11 +1,13 @@
 ---
-title: "ConcurrentHashMap — Deep Dive"
+title: "ConcurrentHashMap"
 description: "Mổ xẻ ConcurrentHashMap JDK 8+: bucket-level synchronized + CAS, Node/TreeBin/ForwardingNode, transfer() song song, size counting với CounterCell, so sánh với Hashtable/synchronizedMap. Kèm đọc source JDK và flow chi tiết."
 ---
 
+`ConcurrentHashMap` cung cấp bảng key–value cho phép nhiều thread đọc và cập nhật đồng thời. Khác với việc bọc `HashMap` bằng một lock chung, nó giới hạn phạm vi đồng bộ để duy trì throughput khi mức cạnh tranh tăng.
+
 ## Mục lục
 
-- [64 thread trên 1 lock: throughput chậm đi 40 lần (và cách hồi phục)](#1-64-thread-trên-1-lock-throughput-chậm-đi-40-lần-và-cách-hồi-phục)
+- [Tổng quan](#1-tổng-quan)
 - [Kiến trúc JDK 8+ — từ Segment sang per-bin lock](#2-kiến-trúc-jdk-8--từ-segment-sang-per-bin-lock)
 - [Node types — Node, TreeBin, ForwardingNode, ReservationNode](#3-node-types--node-treebin-forwardingnode-reservationnode)
 - [put() internals — CAS + synchronized + treeify](#4-put-internals--cas--synchronized--treeify)
@@ -22,35 +24,11 @@ description: "Mổ xẻ ConcurrentHashMap JDK 8+: bucket-level synchronized + CA
 
 ---
 
-## 1. 64 thread trên 1 lock: throughput chậm đi 40 lần (và cách hồi phục)
+## 1. Tổng quan
 
-`ConcurrentHashMap` là một `Map` thread-safe **được thiết kế lại từ đầu** cho truy cập đồng thời: thay vì một lock cho toàn map, nó khoá ở cấp **từng bin** (bucket) kết hợp CAS cho bin rỗng, cho phép hàng trăm thread đọc/ghi song song. Đây là cấu trúc dữ liệu then chốt cho mọi cache, counter phân tán và registry trong code đa luồng hiệu năng cao.
+Từ Java 8, `ConcurrentHashMap` không còn kiến trúc `Segment` cố định. Việc đọc phần lớn không khóa, trong khi cập nhật phối hợp bằng CAS và khóa theo bin; resize được nhiều thread hỗ trợ thay vì dồn cho một thread duy nhất.
 
-Bài toán kinh điển mà nó giải quyết: một rate-limiter đếm request per IP, dùng `synchronizedMap`:
-
-```java
-Map<String, AtomicLong> counters = Collections.synchronizedMap(new HashMap<>());
-
-// 64 thread đồng thời:
-counters.computeIfAbsent(ip, k -> new AtomicLong()).incrementAndGet();
-```
-
-Trên dev (4 thread) chạy nhanh. Production 64 thread: throughput tụt từ **2 triệu ops/s** xuống **50.000 ops/s** — chậm **40 lần**. Thread dump: 63 thread `BLOCKED` chờ 1 thread giữ lock toàn cục:
-
-```text
-Benchmark                         Threads    Ops/s
-synchronizedMap.computeIfAbsent        4    1,800,000
-synchronizedMap.computeIfAbsent       64       48,000   ← lock contention
-ConcurrentHashMap.computeIfAbsent      4    2,100,000
-ConcurrentHashMap.computeIfAbsent     64    1,950,000   ← gần linear scale
-```
-
-> [!IMPORTANT]
-> `synchronizedMap` khoá **toàn bộ map** cho mỗi thao tác — dù 2 thread thao tác trên 2 key hoàn toàn khác nhau. ConcurrentHashMap chỉ khoá **bin chứa key đó** → thread trên bin khác chạy song song hoàn toàn.
-
-Phần còn lại của doc sẽ đi qua: kiến trúc từ Segment (Java 7) sang per-bin lock (§2) → các node types `Node`/`TreeBin`/`ForwardingNode` (§3) → internals `put` CAS + synchronized + treeify (§4) → `get` hoàn toàn lock-free (§5) → resize `transfer()` song song (§6) → đếm size kiểu LongAdder với `CounterCell` (§7) → TreeBin wrapper khi treeify (§8) → vì sao cấm null (§9) → bulk operations với `parallelismThreshold` (§10) → so sánh Hashtable/synchronizedMap/ConcurrentHashMap (§11) → pitfalls compound operations (§12) → dùng làm cache & thundering herd (§13) → cheat sheet (§14).
-
----
+Các chi tiết này giải thích vì sao những API như `computeIfAbsent()`, `putIfAbsent()` và `merge()` quan trọng: chúng giữ toàn bộ read–modify–write trong một thao tác nguyên tử, tránh race condition do ghép nhiều lời gọi riêng lẻ.
 
 ## 2. Kiến trúc JDK 8+ — từ Segment sang per-bin lock
 

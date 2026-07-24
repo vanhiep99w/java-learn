@@ -5,9 +5,11 @@ description: "Đào sâu pattern matching Java: switch expression (arrow/yield, 
 
 # Pattern Matching & Switch Expressions — Khai tử instanceof-cast-dài-dòng
 
+Pattern matching trong Java kết hợp kiểm tra kiểu, trích xuất dữ liệu và rẽ nhánh trong cú pháp ngắn gọn hơn. Cùng với switch expression, nó giúp biểu diễn các nhánh xử lý theo shape của dữ liệu một cách rõ ràng và an toàn.
+
 ## Mục lục
 
-- [Tháp instanceof-then-cast và chuỗi if-else](#1-tháp-instanceof-then-cast-và-chuỗi-if-else)
+- [Tổng quan](#1-tổng-quan)
 - [Switch expression — arrow, yield, và là biểu thức](#2-switch-expression--arrow-yield-và-là-biểu-thức)
 - [Pattern matching for instanceof & flow scoping](#3-pattern-matching-for-instanceof--flow-scoping)
 - [Pattern matching for switch (Java 21)](#4-pattern-matching-for-switch-java-21)
@@ -20,43 +22,11 @@ description: "Đào sâu pattern matching Java: switch expression (arrow/yield, 
 
 ---
 
-## 1. Tháp instanceof-then-cast và chuỗi if-else
+## 1. Tổng quan
 
-Pattern matching (Java 16–21) gộp **kiểm tra kiểu + ép kiểu + gán biến** thành một bước và biến `switch` thành một biểu thức an toàn-toàn-vẹn (exhaustive). Nó quan trọng vì cách cũ — kiểm `instanceof` rồi **cast lại** chính object vừa kiểm, xếp thành chuỗi `if-else` dài — vừa thừa thãi vừa dễ quên một nhánh.
+Các phiên bản Java hiện đại bổ sung type pattern cho `instanceof`, switch expression, pattern trong `switch` và record pattern. Compiler kiểm tra phạm vi biến, tính đầy đủ của nhánh và quan hệ giữa các case.
 
-```java
-// Trước pattern matching — lặp tên, cast tay, dễ sai
-String describe(Object o) {
-    if (o instanceof Integer) {
-        Integer i = (Integer) o;            // cast lại cái vừa kiểm
-        return "int " + (i * 2);
-    } else if (o instanceof String) {
-        String s = (String) o;
-        return "str " + s.length();
-    }
-    return "unknown";
-}
-```
-
-Ba cái phiền: (1) kiểm rồi **cast lại** thừa thãi, (2) chuỗi `if-else` dài không kiểm tra **đủ trường hợp**, (3) dễ quên xử lý null. Pattern matching (Java 16–21) gộp **kiểm tra kiểu + ép kiểu + gán biến** thành một bước, và `switch` trở thành biểu thức an toàn-toàn-vẹn.
-
-```java
-String describe(Object o) {
-    return switch (o) {
-        case Integer i -> "int " + (i * 2);     // i đã là Integer, dùng ngay
-        case String s  -> "str " + s.length();
-        case null      -> "null";
-        default        -> "unknown";
-    };
-}
-```
-
-> [!IMPORTANT]
-> Pattern matching không chỉ là "đường cú pháp" (syntactic sugar). Nó cho compiler **suy luận đủ trường hợp** (exhaustiveness) với `sealed` type — biến lỗi "quên một nhánh" từ bug runtime thành lỗi compile. Đây là bước Java tiến về lập trình kiểu *algebraic data types* như trong các ngôn ngữ hàm.
-
-Phần còn lại của doc sẽ đi qua: switch expression với arrow/yield (§2) → pattern matching cho `instanceof` và flow scoping (§3) → pattern matching cho switch (§4) → record pattern destructuring lồng nhau (§5) → guarded pattern với `when` (§6) → exhaustiveness, sealed & xử lý null (§7) → compiler sinh invokedynamic bên dưới (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Tính năng này đặc biệt hiệu quả khi làm việc với sealed hierarchy, nhưng vẫn cần tránh biến `switch` thành nơi chứa quá nhiều logic nghiệp vụ.
 
 ## 2. Switch expression — arrow, yield, và là biểu thức
 

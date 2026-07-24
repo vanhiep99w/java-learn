@@ -3,9 +3,11 @@ title: "equals() & hashCode()"
 description: "Mổ xẻ hợp đồng giữa equals() và hashCode(): vì sao phải override cùng nhau, cơ chế HashMap dùng cặp method này để định vị entry, 5 điều khoản của equals, bẫy mutable key, kế thừa phá vỡ đối xứng, và cách dùng record/Objects.hash() cho đúng. Kèm bytecode, benchmark và đọc source JDK."
 ---
 
+`equals()` xác định hai object có tương đương về mặt logic hay không, còn `hashCode()` hỗ trợ phân phối object trong cấu trúc dựa trên hash. Hai method có vai trò khác nhau nhưng phải tuân thủ một hợp đồng chung.
+
 ## Mục lục
 
-- [Entry vừa put xong đã biến mất](#1-entry-vừa-put-xong-đã-biến-mất)
+- [Tổng quan](#1-tổng-quan)
 - [Hai method, hai vai trò khác nhau](#2-hai-method-hai-vai-trò-khác-nhau)
 - [Mặc định trong Object — định danh, không phải giá trị](#3-mặc-định-trong-object--định-danh-không-phải-giá-trị)
 - [Hợp đồng equals — 5 điều khoản](#4-hợp-đồng-equals--5-điều-khoản)
@@ -21,46 +23,11 @@ description: "Mổ xẻ hợp đồng giữa equals() và hashCode(): vì sao ph
 
 ---
 
-## 1. Entry vừa put xong đã biến mất
+## 1. Tổng quan
 
-**`equals()`** và **`hashCode()`** là cặp method `Object` định nghĩa để trả lời hai câu hỏi khác nhau: "hai object có bằng nhau về giá trị không?" và "object này nằm ở bucket nào?". Chúng phối hợp để làm nên `HashMap`/`HashSet`. Hợp đồng bắt buộc: nếu `a.equals(b)` thì hai object **phải** cùng hashCode. Override một mà quên cái kia là lỗi #1 khi làm việc với collection dạng hash — và hậu quả là entry vẫn nằm trong map nhưng không bao giờ tìm lại được.
+Nếu hai object bằng nhau theo `equals()`, chúng bắt buộc có cùng hash code. Chiều ngược lại không bắt buộc vì collision là hợp lệ. Các collection như `HashMap` và `HashSet` dùng hash để chọn bucket rồi dùng `equals()` để xác định phần tử.
 
-Bạn xây cache giỏ hàng. Key là một POJO `CartKey(userId, region)`. Bạn override `equals` để hai key cùng `userId` + `region` được coi là một, nhưng **quên** `hashCode`:
-
-```java
-public final class CartKey {
-    final long userId;
-    final String region;
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof CartKey k)) return false;
-        return userId == k.userId && region.equals(k.region);
-    }
-    // ⚠️ KHÔNG override hashCode()
-}
-```
-
-Test cứ thất bại một cách "ma quái":
-
-```java
-Map<CartKey, Cart> cache = new HashMap<>();
-cache.put(new CartKey(7, "VN"), cart);
-
-Cart found = cache.get(new CartKey(7, "VN"));   // → null ??!
-System.out.println(new CartKey(7,"VN").equals(new CartKey(7,"VN"))); // true
-```
-
-Hai key `equals` nhau, nhưng `get` trả `null`. Entry vẫn nằm trong map (`size() == 1`), chỉ là bạn **không bao giờ tìm lại được nó**.
-
-> [!IMPORTANT]
-> Bug không nằm ở `equals` — nó hoàn toàn đúng. Bug nằm ở chỗ **thiếu `hashCode`**. Hai `CartKey` "bằng nhau" lại sinh ra **hai hashCode khác nhau** (mặc định của `Object` dựa trên địa chỉ object), nên HashMap tính ra **hai bucket khác nhau** và không bao giờ gặp lại entry cũ.
-
-Đây là lỗi #1 khi làm việc với `HashMap`/`HashSet`. Để hiểu vì sao, ta phải mổ xẻ chính xác hai method này làm gì và HashMap gọi chúng lúc nào.
-
-Phần còn lại của doc sẽ đi qua: hai method hai vai trò (§2) → mặc định trong Object (§3) → hợp đồng equals 5 điều khoản (§4) → hợp đồng hashCode 3 điều khoản (§5) → HashMap dùng cặp method này thế nào (§6) → khung viết equals (§7) → khung viết hashCode (§8) → kế thừa phá đối xứng (§9) → mutable key trap (§10) → record (§11) → anti-patterns (§12) → cheat sheet (§13).
-
----
+Vi phạm hợp đồng hoặc thay đổi field tham gia equality sau khi insert có thể khiến object không còn được tìm thấy. Vì vậy equality nên phản ánh identity ổn định của domain object.
 
 ## 2. Hai method, hai vai trò khác nhau
 

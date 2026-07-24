@@ -1,11 +1,13 @@
 ---
-title: "Fork/Join Framework — Deep Dive"
+title: "Fork/Join Framework"
 description: "Mổ xẻ Fork/Join framework: work-stealing algorithm, ForkJoinPool internals (WorkQueue deque per worker), ForkJoinTask lifecycle, RecursiveTask vs RecursiveAction, parallel Stream dùng commonPool. Kèm đọc source JDK, sơ đồ work-stealing và tuning."
 ---
 
+Fork/Join Framework hỗ trợ bài toán chia để trị bằng cách tách một tác vụ lớn thành các tác vụ nhỏ rồi kết hợp kết quả. Nó phù hợp nhất với công việc CPU-bound có thể phân rã đệ quy và đủ lớn để bù chi phí lập lịch.
+
 ## Mục lục
 
-- [Parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy](#1-parallel-sort-100m-phần-tử--8-core-nhưng-chỉ-2-core-busy)
+- [Tổng quan](#1-tổng-quan)
 - [Fork/Join là gì — divide-and-conquer + work-stealing](#2-forkjoin-là-gì--divide-and-conquer--work-stealing)
 - [ForkJoinPool architecture — WorkQueue deque per worker](#3-forkjoinpool-architecture--workqueue-deque-per-worker)
 - [Work-Stealing algorithm — idle worker lấy task từ busy worker](#4-work-stealing-algorithm--idle-worker-lấy-task-từ-busy-worker)
@@ -21,40 +23,11 @@ description: "Mổ xẻ Fork/Join framework: work-stealing algorithm, ForkJoinPo
 
 ---
 
-## 1. Parallel sort 100M phần tử — 8 core nhưng chỉ 2 core busy
+## 1. Tổng quan
 
-Fork/Join là framework của Java cho **recursive divide-and-conquer** song song, nổi bật nhờ **work-stealing**: worker hết việc tự lấy task từ worker bận mà không cần central scheduler. Nó cũng là engine chạy `parallelStream()` và `CompletableFuture` mặc định. Cách rõ nhất để thấy vì sao cần nó là viết divide-and-conquer rồi phát hiện CPU gần như không dùng tới.
+Mỗi worker trong `ForkJoinPool` có deque riêng. Khi hết việc, worker có thể lấy tác vụ từ deque của worker khác qua cơ chế work-stealing, nhờ đó phân phối tải động mà không cần một hàng đợi trung tâm duy nhất.
 
-Bạn viết parallel merge sort: chia array đôi, fork 2 task, join kết quả:
-
-```java
-class MergeSort extends RecursiveAction {
-    int[] arr; int lo, hi;
-
-    protected void compute() {
-        if (hi - lo < 10000) {
-            Arrays.sort(arr, lo, hi);  // base case
-            return;
-        }
-        int mid = (lo + hi) / 2;
-        MergeSort left = new MergeSort(arr, lo, mid);
-        MergeSort right = new MergeSort(arr, mid, hi);
-        left.fork();     // fork left task
-        right.compute(); // compute right in current thread
-        left.join();     // chờ left hoàn thành
-        merge(arr, lo, mid, hi);
-    }
-}
-```
-
-Kết quả: 8 core nhưng CPU utilization chỉ 25% — 6 core idle hầu hết thời gian. Vấn đề: **threshold quá lớn** → chỉ tạo ít task → ít việc để steal. Hoặc: **join() block** sớm trước khi worker kịp steal.
-
-Phần còn lại của doc sẽ đi qua: Fork/Join & work-stealing là gì (§2) → kiến trúc ForkJoinPool/WorkQueue (§3) → thuật toán work-stealing (§4) → vòng đời `fork()`/`join()`/`compute()` (§5–§8) → common pool & parallel Stream (§9–§10) → pitfalls với blocking (§11) → tuning (§12).
-
-> [!IMPORTANT]
-> Fork/Join nhanh không phải vì "tạo nhiều thread" — mà vì **work-stealing**: worker idle tự lấy việc từ worker busy. Nhưng work-stealing chỉ hiệu quả khi có **đủ task nhỏ** để distribute. Quá ít task = load imbalance. Quá nhiều = overhead.
-
----
+Hiệu năng phụ thuộc mạnh vào ngưỡng chia, độ cân bằng của task và việc tránh blocking. Chia quá nhỏ làm overhead tăng; chia quá lớn khiến một số core nhàn rỗi.
 
 ## 2. Fork/Join là gì — divide-and-conquer + work-stealing
 

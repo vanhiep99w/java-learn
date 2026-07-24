@@ -3,9 +3,11 @@ title: "Heap vs Stack Memory"
 description: "Mổ xẻ bộ nhớ JVM: stack frame & local variable array, heap & object layout (header/oop), tham chiếu vs giá trị, escape analysis + scalar replacement + TLAB, StackOverflowError vs OutOfMemoryError, và vì sao 'Java truyền tham chiếu' là hiểu sai. Kèm sơ đồ và đọc bytecode."
 ---
 
+Heap và stack phục vụ các vai trò khác nhau trong bộ nhớ runtime của JVM. Stack tổ chức trạng thái của từng lời gọi method theo thread, còn heap chứa object được chia sẻ và quản lý bởi garbage collector.
+
 ## Mục lục
 
-- [StackOverflowError lúc 2 giờ sáng](#1-stackoverflowerror-lúc-2-giờ-sáng)
+- [Tổng quan](#1-tổng-quan)
 - [Bản đồ bộ nhớ runtime của JVM](#2-bản-đồ-bộ-nhớ-runtime-của-jvm)
 - [Stack — frame, local array và operand stack](#3-stack--frame-local-array-và-operand-stack)
 - [Heap — object layout, header và reference](#4-heap--object-layout-header-và-reference)
@@ -20,37 +22,11 @@ description: "Mổ xẻ bộ nhớ JVM: stack frame & local variable array, heap
 
 ---
 
-## 1. StackOverflowError lúc 2 giờ sáng
+## 1. Tổng quan
 
-JVM chia bộ nhớ runtime thành các vùng khác nhau: **stack** (per-thread, lưu stack frame của từng method call, tự pop khi return) và **heap** (chia sẻ toàn JVM, chứa mọi object và mảng, do GC dọn). Hiểu heap vs stack là hiểu *cái gì sống ở đâu, sống bao lâu, và ai dọn nó* — nền tảng để đọc mọi lỗi bộ nhớ của JVM, từ `StackOverflowError` đến `OutOfMemoryError`.
+Mỗi thread có stack riêng gồm các frame; mỗi frame giữ local variable, operand stack và thông tin trả về. Object thường nằm trên heap, trong khi biến reference có thể nằm trong frame hoặc trong object khác.
 
-Một service xử lý cây danh mục lồng nhau crash với `StackOverflowError`. Hàm đệ quy duyệt cây trông hoàn toàn bình thường:
-
-```java
-long countNodes(Category c) {
-    long total = 1;
-    for (Category child : c.children())
-        total += countNodes(child);     // đệ quy
-    return total;
-}
-```
-
-Lỗi không phải vì cây quá lớn — mà vì một danh mục bị nhập sai khiến nó **chứa chính nó** làm con → đệ quy **vô hạn**. Mỗi lời gọi `countNodes` đẩy một **stack frame** mới; sau ~10.000–20.000 frame, stack của thread cạn kiệt:
-
-```
-Exception in thread "main" java.lang.StackOverflowError
-    at Catalog.countNodes(Catalog.java:3)
-    at Catalog.countNodes(Catalog.java:5)
-    at Catalog.countNodes(Catalog.java:5)
-    ... (lặp lại hàng vạn lần)
-```
-
-> [!IMPORTANT]
-> `StackOverflowError` và `OutOfMemoryError` là **hai vùng nhớ khác nhau** cạn kiệt theo **hai cơ chế khác nhau**. Hiểu heap vs stack là hiểu *cái gì sống ở đâu, sống bao lâu, và ai dọn nó* — nền tảng để đọc mọi lỗi bộ nhớ của JVM.
-
-Phần còn lại của doc sẽ đi qua: bản đồ bộ nhớ runtime JVM (§2) → stack frame & local array (§3) → heap object layout & reference (§4) → giá trị nằm ở đâu (§5) → hiểu lầm "Java truyền tham chiếu" (§6) → escape analysis (§7) → TLAB (§8) → StackOverflowError vs OutOfMemoryError (§9) → tinh chỉnh -Xss/-Xmx (§10) → anti-patterns (§11) → cheat sheet (§12).
-
----
+Cách phân chia này giúp giải thích `StackOverflowError`, `OutOfMemoryError`, vòng đời biến cục bộ và chi phí cấp phát. Tuy nhiên JVM có thể tối ưu vị trí vật lý của object, nên không nên đồng nhất mô hình ngôn ngữ với một bố trí bộ nhớ tuyệt đối.
 
 ## 2. Bản đồ bộ nhớ runtime của JVM
 

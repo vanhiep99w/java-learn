@@ -5,9 +5,11 @@ description: "Đào sâu 5 nguyên tắc SOLID với ví dụ vi phạm và các
 
 # SOLID — 5 nguyên tắc giữ code không mục ruỗng
 
+SOLID là năm nguyên tắc định hướng thiết kế object-oriented nhằm kiểm soát coupling và giữ cho thay đổi mang tính cục bộ. Chúng không phải bộ luật tuyệt đối, mà là công cụ đánh giá trách nhiệm và quan hệ giữa các abstraction.
+
 ## Mục lục
 
-- [Vì sao codebase "thối rữa" theo thời gian](#1-vì-sao-codebase-thối-rữa-theo-thời-gian)
+- [Tổng quan](#1-tổng-quan)
 - [S — Single Responsibility Principle](#2-s--single-responsibility-principle)
 - [O — Open/Closed Principle](#3-o--openclosed-principle)
 - [L — Liskov Substitution Principle](#4-l--liskov-substitution-principle)
@@ -20,28 +22,11 @@ description: "Đào sâu 5 nguyên tắc SOLID với ví dụ vi phạm và các
 
 ---
 
-## 1. Vì sao codebase "thối rữa" theo thời gian
+## 1. Tổng quan
 
-SOLID (Robert C. Martin) là 5 nguyên tắc giữ code **dễ thay đổi**: thêm tính năng mà không phải sửa code cũ, sửa một chỗ không làm vỡ chỗ khác (low coupling, high cohesion). Chúng quan trọng vì codebase dù viết sạch ban đầu cũng "thối rữa" (code rot) theo thời gian — một service phình lên 2000 dòng gánh đủ thứ trách nhiệm, mỗi lần sửa nhỏ đều rủi ro phá logic lân cận. Gốc rễ của sự thối rữa là **coupling** chặt (sửa chỗ này kéo theo chỗ kia) và **cohesion** thấp (một class gánh nhiều trách nhiệm không liên quan).
+Mỗi nguyên tắc nhìn thiết kế từ một góc khác: lý do thay đổi, khả năng mở rộng, tính thay thế, độ hẹp của interface và hướng phụ thuộc. Chúng liên quan chặt chẽ nhưng không nên được áp dụng tách rời khỏi bối cảnh.
 
-```mermaid
-flowchart LR
-    subgraph Bad["Coupling chặt"]
-        OS["OrderService<br/>(làm tất cả)"]
-    end
-    subgraph Good["Tách trách nhiệm"]
-        O2["OrderService"] --> P["PaymentGateway"]
-        O2 --> N["Notifier"]
-        O2 --> I["InvoiceGenerator"]
-    end
-```
-
-> [!IMPORTANT]
-> SOLID không phải mục tiêu — nó là **phương tiện** để đạt mục tiêu thật: code chịu được thay đổi mà không lan ra (low coupling, high cohesion). Đừng áp dụng SOLID máy móc; áp dụng khi nó *giảm chi phí thay đổi trong tương lai*.
-
-Phần còn lại của doc sẽ đi qua: Single Responsibility (§2) → Open/Closed (§3) → Liskov Substitution (§4) → Interface Segregation (§5) → Dependency Inversion (§6) → liên hệ SOLID với design patterns (§7) → khi nào ĐỪNG cứng nhắc (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Một thiết kế tốt cân bằng khả năng thay đổi với độ đơn giản hiện tại. Trừu tượng hóa quá sớm nhân danh SOLID có thể tạo nhiều lớp trung gian mà không giải quyết nhu cầu thực tế.
 
 ## 2. S — Single Responsibility Principle
 

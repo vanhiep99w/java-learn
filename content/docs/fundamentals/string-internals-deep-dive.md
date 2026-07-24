@@ -1,11 +1,13 @@
 ---
-title: "String Internals — Deep Dive"
+title: "String Internals"
 description: "Mổ xẻ String trong JVM: String Pool (intern()), Compact Strings (JDK 9+), immutability guarantee, String concatenation optimization (StringBuilder → invokedynamic), String deduplication G1 GC, == vs equals pitfalls. Kèm đọc source JDK, bytecode và benchmark."
 ---
 
+Cách JVM lưu trữ `String` đã thay đổi qua các phiên bản JDK để giảm bộ nhớ và tăng hiệu quả xử lý. Hiểu cấu trúc bên trong giúp giải thích chi phí của chuỗi, string pool, deduplication và các thao tác chuyển đổi encoding.
+
 ## Mục lục
 
-- [500MB heap toàn String trùng lặp](#1-500mb-heap-toàn-string-trùng-lặp)
+- [Tổng quan](#1-tổng-quan)
 - [Cấu trúc nội bộ — byte[] + coder (JDK 9+)](#2-cấu-trúc-nội-bộ--byte--coder-jdk-9)
 - [Immutability — vì sao String là final + không đổi được](#3-immutability--vì-sao-string-là-final--không-đổi-được)
 - [String Pool — intern() và constant pool](#4-string-pool--intern-và-constant-pool)
@@ -20,26 +22,11 @@ description: "Mổ xẻ String trong JVM: String Pool (intern()), Compact String
 
 ---
 
-## 1. 500MB heap toàn String trùng lặp
+## 1. Tổng quan
 
-**String** trong JVM phức tạp hơn vẻ ngoài: `final` + **immutable** + backing `byte[]` với `coder` LATIN1/UTF16 (JDK 9+), cộng thêm **String Pool**, concatenation tối ưu bằng `invokedynamic`, và **G1 String Deduplication**. Mỗi cơ chế đó là một đòn bẩy tiết kiệm RAM — vì string thường chiếm 25–40% heap, hiểu internals là cách giảm hàng trăm MB mà không đổi logic code.
+Từ JDK 9, Compact Strings cho phép `String` dùng `byte[]` cùng một trường `coder` thay vì luôn dùng `char[]`. Chuỗi Latin-1 có thể tiêu thụ gần một nửa dung lượng phần dữ liệu so với UTF-16.
 
-Service xử lý log có heap 2GB. Memory profiler: 40% heap = **`char[]`** (pre-JDK 9) / **`byte[]`** (JDK 9+). Top dominator: `String` objects — hàng triệu instance có cùng nội dung (`"INFO"`, `"ERROR"`, `"GET"`, `"/api/v1/users"`...).
-
-```text
-Heap dump analysis:
-  String instances:           8,200,000
-  Unique string values:         45,000    ← chỉ 0.5% là unique!
-  Total char[]/byte[] memory:   512 MB
-  After deduplication:           28 MB    ← tiết kiệm 94%
-```
-
-> [!IMPORTANT]
-> String thường chiếm **25-40% heap** của Java application. Hiểu internals (pool, compact strings, dedup) là hiểu cách tiết kiệm hàng trăm MB RAM mà không đổi logic code.
-
-Phần còn lại của doc sẽ đi qua: cấu trúc nội bộ byte[] + coder (§2) → immutability (§3) → String Pool & intern() (§4) → Compact Strings LATIN1 vs UTF16 (§5) → concatenation từ StringBuilder đến invokedynamic (§6) → == vs equals (§7) → G1 String Deduplication (§8) → substring copy hay share (§9) → hashCode caching (§10) → performance patterns & anti-patterns (§11) → cheat sheet (§12).
-
----
+Dù implementation thay đổi, hợp đồng bất biến của `String` vẫn giữ nguyên. Các tối ưu như interning hoặc deduplication chỉ nên dùng khi dữ liệu và profiling chứng minh lợi ích.
 
 ## 2. Cấu trúc nội bộ — byte[] + coder (JDK 9+)
 

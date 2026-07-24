@@ -5,9 +5,11 @@ description: "Đào sâu Optional: bản chất value-based class & cảnh báo 
 
 # Optional — Xử lý "có thể vắng mặt" một cách tường minh
 
+`Optional` biểu diễn rõ ràng rằng một kết quả có thể có hoặc không có giá trị. Nó phù hợp nhất ở return type của API, nơi absence là một kết quả hợp lệ cần caller xử lý có chủ đích.
+
 ## Mục lục
 
-- [NPE — "lỗi tỉ đô" và lời hứa của Optional](#1-npe--lỗi-tỉ-đô-và-lời-hứa-của-optional)
+- [Tổng quan](#1-tổng-quan)
 - [Optional là gì — value-based class](#2-optional-là-gì--value-based-class)
 - [Tạo Optional: of / ofNullable / empty](#3-tạo-optional-of--ofnullable--empty)
 - [Biến đổi: map / flatMap / filter](#4-biến-đổi-map--flatmap--filter)
@@ -20,32 +22,11 @@ description: "Đào sâu Optional: bản chất value-based class & cảnh báo 
 
 ---
 
-## 1. NPE — "lỗi tỉ đô" và lời hứa của Optional
+## 1. Tổng quan
 
-`Optional<T>` là một container chứa 0 hoặc 1 giá trị, đưa sự "có thể vắng mặt" vào **chữ ký method** để compiler ép caller xử lý thay vì âm thầm ném `NullPointerException`. Nó quan trọng vì NPE — do Tony Hoare gọi là "lỗi tỉ đô" — xuất phát từ việc kiểu `String` *nói dối*: hứa trả chuỗi nhưng có thể trả `null`, mà compiler không cảnh báo.
+`Optional` cung cấp các phép biến đổi như `map`, `flatMap`, `filter` và các nhánh fallback thay cho việc kiểm tra `null` lặp lại. Tuy nhiên nó không loại bỏ mọi `NullPointerException` và không nên được dùng tùy tiện cho field, parameter hoặc collection element.
 
-```java
-// Trước Optional — null ẩn trong kiểu trả về, dễ quên kiểm
-User u = repo.findByEmail(email);
-String city = u.getAddress().getCity().toUpperCase();   // NPE ở bất kỳ . nào
-```
-
-`Optional<T>` làm sự "có thể vắng mặt" trở nên **tường minh trong kiểu**:
-
-```java
-Optional<User> u = repo.findByEmail(email);   // kiểu NÓI RÕ: có thể không có
-String city = u.flatMap(User::getAddress)
-               .flatMap(Address::getCity)
-               .map(String::toUpperCase)
-               .orElse("UNKNOWN");            // buộc xử lý trường hợp vắng
-```
-
-> [!IMPORTANT]
-> Giá trị thật của `Optional` không phải "tránh NPE" mà là **đẩy quyết định xử lý-vắng-mặt vào thời điểm compile**, vào chữ ký method. Một method trả `Optional<User>` *bắt buộc* caller nghĩ tới trường hợp rỗng — điều mà `null` âm thầm bỏ qua.
-
-Phần còn lại của doc sẽ đi qua: bản chất value-based class (§2) → các factory tạo Optional (§3) → biến đổi `map`/`flatMap`/`filter` (§4) → lấy giá trị `orElse`/`orElseGet`/`orElseThrow` và bẫy eager (§5) → kết hợp với Stream (§6) → khi nào KHÔNG dùng (§7) → chi phí hiệu năng (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Giá trị của `Optional` nằm ở hợp đồng API rõ ràng, không phải ở việc bọc mọi reference có thể `null`.
 
 ## 2. Optional là gì — value-based class
 

@@ -1,11 +1,13 @@
 ---
-title: "Spring Boot Auto-Configuration — Deep Dive"
+title: "Spring Boot Auto-Configuration"
 description: "Mổ xẻ chi tiết cơ chế auto-configuration trong Spring Boot: @EnableAutoConfiguration, AutoConfigurationImportSelector, DeferredImportSelector, @Conditional evaluation, condition ordering, AutoConfiguration.imports registry, custom starter creation, spring-boot-autoconfigure module internals, Condition debugging, AOT & GraalVM native image, failure analysis. Kèm đọc source Spring Boot, sơ đồ flow và các cạm bẫy thực tế."
 ---
 
+Spring Boot Auto-Configuration tự động đăng ký bean dựa trên classpath, property và các bean đã tồn tại trong application context. Cơ chế này cung cấp cấu hình mặc định có điều kiện và cho phép ứng dụng ghi đè khi cần.
+
 ## Mục lục
 
-- [Thêm dependency, bean tự xuất hiện — auto-configuration là gì](#1-thêm-dependency-bean-tự-xuất-hiện--auto-configuration-là-gì)
+- [Tổng quan](#1-tổng-quan)
 - [@EnableAutoConfiguration — annotation kích hoạt cỗ máy](#2-enableautoconfiguration--annotation-kích-hoạt-cỗ-máy)
 - [AutoConfigurationImportSelector — load danh sách từ đâu?](#3-autoconfigurationimportselector--load-danh-sách-từ-đâu)
 - [DeferredImportSelector — tại sao auto-config chạy SAU user config?](#4-deferredimportselector--tại-sao-auto-config-chạy-sau-user-config)
@@ -23,46 +25,11 @@ description: "Mổ xẻ chi tiết cơ chế auto-configuration trong Spring Boo
 
 ---
 
-## 1. Thêm dependency, bean tự xuất hiện — auto-configuration là gì
+## 1. Tổng quan
 
-Auto-configuration là cơ chế lõi khiến Spring Boot "chạy được ngay": thay vì bắt bạn khai báo từng `@Bean` cho `DataSource`, `EntityManagerFactory`, `TransactionManager`..., nó **quét classpath**, thấy class/property nào có mặt thì **có điều kiện** (`@Conditional`) kích hoạt cấu hình mặc định tương ứng. Nó quan trọng vì đây là thứ thu hẹp khoảng cách giữa "thêm một dependency" và "có một service chạy được" — và cũng là nguồn của mọi tình huống "bean tự xuất hiện/biến mất" mà dev không hiểu. Nguyên tắc sống còn của auto-config là **"user bean luôn thắng"**: nhờ cơ chế hoãn (deferred), cấu hình của bạn được parse trước, auto-config chỉ tạo bean mặc định khi bạn chưa define.
+`@EnableAutoConfiguration` kích hoạt việc import danh sách auto-configuration. Mỗi cấu hình sử dụng các điều kiện như `@ConditionalOnClass`, `@ConditionalOnMissingBean` và `@ConditionalOnProperty` để quyết định có áp dụng hay không.
 
-Bạn tạo project Spring Boot mới. Chỉ thêm `spring-boot-starter-data-jpa` vào `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-jpa</artifactId>
-</dependency>
-<dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <scope>runtime</scope>
-</dependency>
-```
-
-Không viết `@Bean DataSource`, không viết `@Bean EntityManagerFactory`, không viết `@Bean TransactionManager`. Nhưng:
-
-```java
-@Service
-public class UserService {
-    @Autowired
-    private DataSource dataSource;          // ✅ tồn tại — HikariDataSource
-    @Autowired
-    private EntityManagerFactory emf;       // ✅ tồn tại — LocalContainerEntityManagerFactoryBean
-    @Autowired
-    private PlatformTransactionManager tm;  // ✅ tồn tại — JpaTransactionManager
-}
-```
-
-3 bean phức tạp **tự xuất hiện** chỉ vì bạn thêm JAR vào classpath. Không có magic — đây là **auto-configuration**: Spring Boot quét classpath, phát hiện class `DataSource`/`EntityManager` có mặt → kích hoạt `DataSourceAutoConfiguration`, `HibernateJpaAutoConfiguration` → tạo bean mặc định.
-
-> [!IMPORTANT]
-> Auto-configuration = **"opinionated defaults with easy override"**. Spring Boot tạo bean mặc định nếu bạn không define. Hễ bạn define `@Bean DataSource` riêng → auto-config bean bị **skip**. Hiểu cơ chế này = hiểu vì sao bean xuất hiện/biến mất khi thêm/bớt dependency hoặc config.
-
-Phần còn lại của doc sẽ đi qua: `@EnableAutoConfiguration` (§2) → `AutoConfigurationImportSelector` (§3) → `DeferredImportSelector` chạy sau user config (§4) → `@Conditional` engine (§5) → condition evaluation order (§6) → ordering giữa auto-config (§7) → mổ xẻ `DataSourceAutoConfiguration` (§8) → module 150+ auto-config (§9) → custom starter (§10) → failure analysis (§11) → condition report debug (§12) → AOT & GraalVM native (§13) → anti-patterns (§14) → cheat sheet (§15).
-
----
+Auto-configuration không quét ngẫu nhiên rồi tạo bean. Nó là tập cấu hình rõ ràng, có thứ tự và có thể quan sát qua condition evaluation report.
 
 ## 2. @EnableAutoConfiguration — annotation kích hoạt cỗ máy
 

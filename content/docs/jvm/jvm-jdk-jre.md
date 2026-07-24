@@ -5,9 +5,11 @@ description: "Phân biệt JVM/JRE/JDK ở mức cấu trúc thật: javac sinh 
 
 # JVM, JDK & JRE — Từ source tới mã máy
 
+JVM, JRE và JDK là ba khái niệm liên quan nhưng phục vụ các mục đích khác nhau trong nền tảng Java. Phân biệt chúng giúp hiểu thứ gì thực thi bytecode, thứ gì cung cấp thư viện runtime và thứ gì cần cho quá trình phát triển.
+
 ## Mục lục
 
-- [Write once, run anywhere — thực sự xảy ra thế nào](#1-write-once-run-anywhere--thực-sự-xảy-ra-thế-nào)
+- [Tổng quan](#1-tổng-quan)
 - [Ba lớp lồng nhau: JDK ⊃ JRE ⊃ JVM](#2-ba-lớp-lồng-nhau-jdk--jre--jvm)
 - [javac — từ .java tới bytecode .class](#3-javac--từ-java-tới-bytecode-class)
 - [Class file format & constant pool](#4-class-file-format--constant-pool)
@@ -20,24 +22,11 @@ description: "Phân biệt JVM/JRE/JDK ở mức cấu trúc thật: javac sinh 
 
 ---
 
-## 1. Write once, run anywhere — thực sự xảy ra thế nào
+## 1. Tổng quan
 
-Bạn viết `Hello.java` trên macOS, gửi file `Hello.class` cho đồng nghiệp chạy trên Linux ARM và Windows x64 — **không recompile**, vẫn chạy. Điều này nghe hiển nhiên nhưng nó là kết quả của một kiến trúc rất có chủ đích:
+JVM là máy ảo thực thi bytecode. JRE theo cách phân loại truyền thống gồm JVM cùng thư viện và thành phần cần để chạy ứng dụng. JDK bổ sung compiler, debugger, javadoc và các công cụ phát triển.
 
-```
-Hello.java  ──javac──►  Hello.class  ──────►  chạy trên BẤT KỲ JVM nào
-(source, người đọc)     (bytecode,            (mỗi OS/CPU có 1 bản JVM riêng
-                         máy ảo đọc)            dịch bytecode → mã máy thật)
-```
-
-Bí mật: `javac` **không** dịch ra mã máy của một CPU cụ thể. Nó dịch ra **bytecode** — tập lệnh của một "máy tính tưởng tượng" (JVM). Mỗi nền tảng có một bản JVM *native* riêng, và chính JVM mới là thứ biến bytecode thành mã máy thật của nền tảng đó.
-
-> [!IMPORTANT]
-> Tính khả chuyển của Java **không** nằm ở ngôn ngữ — nó nằm ở **bytecode + JVM**. Bất kỳ ngôn ngữ nào sinh ra `.class` hợp lệ (Kotlin, Scala, Groovy, Clojure) đều "run anywhere" như Java. JVM là nền tảng, Java chỉ là một trong nhiều khách hàng của nó.
-
-Phần còn lại của doc sẽ đi qua: ba lớp lồng nhau JDK ⊃ JRE ⊃ JVM (§2) → javac từ .java tới bytecode (§3) → class file format & constant pool (§4) → JVM thực thi interpreter + JIT (§5) → tiered compilation C1/C2 (§6) → AOT, GraalVM Native Image & jlink (§7) → JRE biến mất từ Java 11 (§8) → so sánh & khi nào quan tâm cái gì (§9).
-
----
+Từ Java 9 và hệ module, cách phân phối runtime đã thay đổi và JRE độc lập không còn được cung cấp như trước. Dù vậy, ba khái niệm vẫn hữu ích để phân tách vai trò kiến trúc.
 
 ## 2. Ba lớp lồng nhau: JDK ⊃ JRE ⊃ JVM
 

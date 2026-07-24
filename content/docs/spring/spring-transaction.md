@@ -1,11 +1,13 @@
 ---
-title: "Spring Transaction — Deep Dive"
+title: "Spring Transaction"
 description: "Mổ xẻ chi tiết cơ chế transaction trong Spring: AOP proxy, TransactionInterceptor, PlatformTransactionManager, propagation internals, isolation level, ThreadLocal binding, self-invocation trap, rollback rules, savepoint, read-only optimization. Kèm đọc source Spring Framework, sơ đồ flow và các bug kinh điển."
 ---
 
+Spring Transaction cung cấp abstraction thống nhất để xác định ranh giới transaction trên JDBC, JPA và các công nghệ dữ liệu khác. `@Transactional` là metadata; việc begin, commit và rollback do infrastructure của Spring thực hiện.
+
 ## Mục lục
 
-- [@Transactional mà dữ liệu vẫn mất — gọi nội bộ, proxy vô hình](#1-transactional-mà-dữ-liệu-vẫn-mất--gọi-nội-bộ-proxy-vô-hình)
+- [Tổng quan](#1-tổng-quan)
 - [Spring Transaction nhìn từ 10.000 feet — AOP Proxy](#2-spring-transaction-nhìn-từ-10000-feet--aop-proxy)
 - [Proxy được tạo như thế nào — JDK Dynamic Proxy vs CGLIB](#3-proxy-được-tạo-như-thế-nào--jdk-dynamic-proxy-vs-cglib)
 - [TransactionInterceptor — trái tim của @Transactional](#4-transactioninterceptor--trái-tim-của-transactional)
@@ -25,43 +27,11 @@ description: "Mổ xẻ chi tiết cơ chế transaction trong Spring: AOP proxy
 
 ---
 
-## 1. @Transactional mà dữ liệu vẫn mất — gọi nội bộ, proxy vô hình
+## 1. Tổng quan
 
-`@Transactional` trong Spring **không phải phép thuật**: nó chỉ là metadata báo cho một **proxy AOP** biết phải mở/commit/rollback transaction quanh method nào. Proxy là người thực sự điều khiển transaction — begin, bind connection vào ThreadLocal, gọi method thật, rồi commit hoặc rollback tuỳ kết quả. Vì vậy annotation **chỉ có hiệu lực khi lời gọi đi qua proxy**; nếu method tự gọi method khác trong cùng class (self-invocation), lời gọi `this` đi thẳng tới target và **bỏ qua proxy hoàn toàn** → transaction không bao giờ được mở → từng câu SQL auto-commit riêng lẻ → dữ liệu inconsistent. Đây là root cause của đại đa số bug "đã `@Transactional` mà dữ liệu vẫn hỏng".
+Trong cách dùng declarative phổ biến, AOP proxy chặn lời gọi method và chuyển quyền điều khiển cho `TransactionInterceptor`. Interceptor chọn `PlatformTransactionManager`, tạo hoặc tham gia transaction, bind resource theo thread rồi hoàn tất transaction theo kết quả thực thi.
 
-Bạn viết một service chuyển tiền. Logic rõ ràng: trừ tài khoản A, cộng tài khoản B, ghi log giao dịch — tất cả trong một method `@Transactional`:
-
-```java
-@Service
-public class TransferService {
-
-    @Transactional
-    public void transfer(Long fromId, Long toId, BigDecimal amount) {
-        accountRepo.debit(fromId, amount);   // trừ tiền A
-        accountRepo.credit(toId, amount);    // cộng tiền B
-        auditRepo.log(fromId, toId, amount); // ghi audit
-    }
-
-    public void batchTransfer(List<TransferRequest> requests) {
-        for (TransferRequest r : requests) {
-            transfer(r.from(), r.to(), r.amount());  // 😱 gọi nội bộ
-        }
-    }
-}
-```
-
-Trên môi trường dev: chạy tốt. Lên production, một giao dịch `credit` ném exception — bạn kỳ vọng toàn bộ transaction rollback, tài khoản A không bị trừ. Nhưng kiểm tra DB: **tiền A đã bị trừ**, tài khoản B chưa cộng, audit trống. Dữ liệu **inconsistent**.
-
-Bạn debug: `@Transactional` rõ ràng đã đặt, exception rõ ràng đã ném. Vậy tại sao transaction không rollback?
-
-Nguyên nhân: `batchTransfer()` gọi `transfer()` **từ bên trong cùng class** — đây là **self-invocation**. Lời gọi này **đi thẳng đến method thật**, bỏ qua proxy AOP → `@Transactional` **không bao giờ được kích hoạt** → mỗi câu SQL chạy trong auto-commit riêng lẻ.
-
-> [!IMPORTANT]
-> `@Transactional` **không** phải phép thuật. Nó chỉ hoạt động khi method được gọi **qua proxy**. Hiểu proxy đi qua đâu, bind connection ra sao, rollback khi nào — đó là hiểu Spring Transaction. Doc này mổ xẻ từng lớp từ annotation đến `COMMIT` SQL.
-
-Phần còn lại của doc sẽ đi qua: AOP proxy nhìn từ 10.000 feet (§2) → JDK vs CGLIB proxy (§3) → `TransactionInterceptor` (§4) → `PlatformTransactionManager` (§5) → `TransactionSynchronizationManager` ThreadLocal (§6) → flow đầy đủ đến COMMIT (§7) → propagation 7 chế độ (§8) → isolation level (§9) → rollback rules (§10) → self-invocation trap (§11) → read-only optimization (§12) → savepoint & NESTED (§13) → programmatic transaction (§14) → anti-patterns (§15) → so sánh các cách quản lý TX (§16) → cheat sheet (§17).
-
----
+Propagation, isolation, rollback rule và read-only đều được diễn giải trong luồng này. Vì vậy cần hiểu ranh giới proxy và transaction context trước khi dựa vào annotation trong thiết kế nghiệp vụ.
 
 ## 2. Spring Transaction nhìn từ 10.000 feet — AOP Proxy
 

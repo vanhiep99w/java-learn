@@ -5,9 +5,11 @@ description: "Đào sâu 4 mức truy cập Java: public/protected/default/priva
 
 # Access Modifiers — Phạm vi truy cập từ ngôn ngữ tới JVM
 
+Access modifier xác định nơi một class, field, constructor hoặc method có thể được truy cập. Đây là công cụ nền tảng để thiết lập ranh giới API và bảo vệ chi tiết triển khai trong Java.
+
 ## Mục lục
 
-- [protected gây bẫy khi truy cập khác package](#1-protected-gây-bẫy-khi-truy-cập-khác-package)
+- [Tổng quan](#1-tổng-quan)
 - [Bốn mức truy cập & bảng phạm vi](#2-bốn-mức-truy-cập--bảng-phạm-vi)
 - [private — và bí mật synthetic accessor](#3-private--và-bí-mật-synthetic-accessor)
 - [protected — quy tắc "khác package" gây bẫy](#4-protected--quy-tắc-khác-package-gây-bẫy)
@@ -20,36 +22,11 @@ description: "Đào sâu 4 mức truy cập Java: public/protected/default/priva
 
 ---
 
-## 1. protected gây bẫy khi truy cập khác package
+## 1. Tổng quan
 
-**Access modifier** (public/protected/default/private) quyết định *ai được nhìn thấy và gọi tới* một class, field hay method. Nó không phải cơ chế bảo mật mà là **công cụ thiết kế API**: mức truy cập hẹp nhất = bề mặt API nhỏ nhất = tự do refactor mà không phá vỡ client. Nhưng `protected` có một điều khoản ít người nhớ, khiến nó trở thành nguồn bug phổ biến nhất.
+Bốn mức `private`, package-private, `protected` và `public` tạo ra phạm vi khác nhau theo class, package và quan hệ kế thừa. Trong đó `protected` dễ bị hiểu sai vì quyền truy cập ngoài package còn phụ thuộc vào cách tham chiếu qua subclass.
 
-```java
-// package shapes
-package shapes;
-public class Shape {
-    protected int area() { return 0; }
-}
-
-// package app — class KHÁC package, có kế thừa
-package app;
-import shapes.Shape;
-public class Box extends Shape {
-    void test(Shape other) {
-        this.area();    // ✅ OK
-        other.area();   // ❌ compile error!  "area() has protected access in Shape"
-    }
-}
-```
-
-Cùng là `protected`, cùng là lớp con, nhưng `this.area()` được phép còn `other.area()` thì không. Lý do nằm ở một điều khoản ít người nhớ trong JLS §6.6.2: **`protected` từ ngoài package chỉ cho phép truy cập qua tham chiếu có kiểu là chính lớp con đó (hoặc lớp con sâu hơn), không phải mọi instance của lớp cha.**
-
-> [!IMPORTANT]
-> Access modifier không phải bảo mật — nó là **công cụ thiết kế API**. Mức truy cập quyết định *bạn được phép thay đổi gì mà không phá vỡ client*. `public` = hợp đồng vĩnh viễn; `private` = tự do tái cấu trúc. Chọn mức **hẹp nhất có thể**.
-
-Phần còn lại của doc sẽ đi qua: bảng 4 mức truy cập & phạm vi (§2) → private và synthetic accessor (§3) → quy tắc "khác package" của protected (§4) → default (§5) → access flag trong bytecode (§6) → JPMS (§7) → quy tắc thiết kế (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Chọn mức hẹp nhất đáp ứng nhu cầu giúp giảm coupling và giữ invariant. `public` nên thể hiện một hợp đồng có chủ đích, không phải lựa chọn mặc định để tiện gọi.
 
 ## 2. Bốn mức truy cập & bảng phạm vi
 

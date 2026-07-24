@@ -1,11 +1,13 @@
 ---
-title: "Garbage Collection — Deep Dive"
+title: "Garbage Collection"
 description: "Mổ xẻ GC trong JVM: GC Roots & reachability, generational hypothesis, Young/Old/Metaspace, thuật toán Mark-Sweep/Copying/Mark-Compact, 5 collector (Serial → ZGC), GC log đọc hiểu, tuning flags, và production troubleshooting. Kèm benchmark, timeline diagram, và anti-patterns."
 ---
 
+Garbage Collection tự động thu hồi vùng nhớ của object không còn reachable trong JVM. GC giúp lập trình viên không phải giải phóng từng object, nhưng vẫn tạo ra trade-off giữa throughput, pause time và memory footprint.
+
 ## Mục lục
 
-- [Full GC 12 giây — service mất 300 request](#1-full-gc-12-giây--service-mất-300-request)
+- [Tổng quan](#1-tổng-quan)
 - [GC Roots & Reachability — ai sống, ai chết?](#2-gc-roots--reachability--ai-sống-ai-chết)
 - [Generational Hypothesis — vì sao chia Young/Old](#3-generational-hypothesis--vì-sao-chia-youngold)
 - [Heap Layout: Eden, Survivor, Old, Metaspace](#4-heap-layout-eden-survivor-old-metaspace)
@@ -23,38 +25,11 @@ description: "Mổ xẻ GC trong JVM: GC Roots & reachability, generational hypo
 
 ---
 
-## 1. Full GC 12 giây — service mất 300 request
+## 1. Tổng quan
 
-Bạn vận hành một order service Spring Boot. SLA yêu cầu p99 < 200ms. Một ngày dashboard hiện: **p99 nhảy lên 12.000ms**, error rate tăng vọt, rồi tự hồi phục sau 12 giây. Pattern này lặp lại mỗi 4-5 phút.
+Collector xác định object còn sống từ GC Roots, sau đó áp dụng các thuật toán copy, mark, sweep hoặc compact theo cách tổ chức heap. Giả thuyết thế hệ giúp phần lớn collector xử lý object ngắn hạn và dài hạn bằng chiến lược khác nhau.
 
-GC log cho thấy:
-
-```text
-[2024-03-15T10:23:45.123+0700] GC(847) Pause Full (Ergonomics)
-[2024-03-15T10:23:45.123+0700] GC(847)   Phase 1: Mark live objects   6.234s
-[2024-03-15T10:23:51.357+0700] GC(847)   Phase 2: Compute new addresses 1.891s
-[2024-03-15T10:23:53.248+0700] GC(847)   Phase 3: Adjust pointers 2.456s
-[2024-03-15T10:23:55.704+0700] GC(847)   Phase 4: Move objects  1.234s
-[2024-03-15T10:23:56.938+0700] GC(847) Pause Full (Ergonomics) 7943M->2156M(8192M) 11.815s
-```
-
-**11.8 giây** stop-the-world. Mọi thread ứng dụng **đóng băng**. 300 request đang in-flight timeout. Nguyên nhân: heap 8GB, Old Gen gần đầy, JVM trigger **Full GC** — duyệt và compact **toàn bộ** 8GB heap.
-
-Sau khi chuyển sang **G1** với tuning hợp lý:
-
-```text
-[GC pause (G1 Evacuation Pause) (young), 0.0087234 secs]
-[GC pause (G1 Mixed), 0.0156789 secs]
-```
-
-Pause time: **8-15ms** — giảm **1000x**. Không đổi code, chỉ đổi **collector** và **flags**.
-
-> [!IMPORTANT]
-> GC không hỏng vì "Java chậm". Nó hỏng vì bạn **không hiểu** collector đang dùng, heap được chia như thế nào, và object của bạn sống bao lâu. Doc này mổ xẻ từng lớp.
-
-Phần còn lại của doc sẽ đi qua: GC Roots & reachability (§2) → generational hypothesis (§3) → heap layout Eden/Survivor/Old/Metaspace (§4) → ba thuật toán Mark-Sweep/Copying/Mark-Compact (§5) → stop-the-world (§6) → Serial & Parallel collector (§7) → CMS (§8) → G1 (§9) → ZGC (§10) → so sánh 5 collector (§11) → đọc GC log (§12) → tuning flags (§13) → anti-patterns (§14).
-
----
+Không có collector tốt nhất cho mọi hệ thống. Việc chọn và tuning phải dựa trên mục tiêu latency, kích thước heap, allocation rate và dữ liệu từ GC log thay vì chỉ thay đổi flag theo kinh nghiệm.
 
 ## 2. GC Roots & Reachability — ai sống, ai chết?
 

@@ -1,11 +1,13 @@
 ---
-title: "Spring Proxy — Deep Dive"
+title: "Spring Proxy"
 description: "Mổ xẻ chi tiết cơ chế proxy trong Spring: JDK Dynamic Proxy internals (Proxy.newProxyInstance, InvocationHandler, $Proxy0), CGLIB internals (Enhancer, MethodInterceptor, FastClass), ProxyFactory API, AbstractAutoProxyCreator trong bean lifecycle, Advisor/Advice/Pointcut stack, interceptor chain ordering, @EnableAspectJAutoProxy, Scoped Proxy, debugging proxy với AopUtils. Kèm bytecode, benchmark và các cạm bẫy thực tế."
 ---
 
+Spring proxy là object đại diện đứng trước bean thật để chặn lời gọi method và áp dụng advice. Nhiều tính năng như transaction, cache, retry, async và method security dựa trên cơ chế này.
+
 ## Mục lục
 
-- [@Cacheable chạy, @Retry câm — khi proxy bị self-call bỏ qua](#1-cacheable-chạy-retry-câm--khi-proxy-bị-self-call-bỏ-qua)
+- [Tổng quan](#1-tổng-quan)
 - [Proxy Pattern — ý tưởng nền tảng](#2-proxy-pattern--ý-tưởng-nền-tảng)
 - [JDK Dynamic Proxy — Proxy.newProxyInstance() bên trong](#3-jdk-dynamic-proxy--proxynewproxyinstance-bên-trong)
 - [CGLIB Proxy — bytecode generation và FastClass](#4-cglib-proxy--bytecode-generation-và-fastclass)
@@ -23,42 +25,11 @@ description: "Mổ xẻ chi tiết cơ chế proxy trong Spring: JDK Dynamic Pro
 
 ---
 
-## 1. @Cacheable chạy, @Retry câm — khi proxy bị self-call bỏ qua
+## 1. Tổng quan
 
-Proxy là object trung gian **cùng kiểu** với bean thật mà Spring tự tạo để bọc bean khi có AOP advice (`@Transactional`, `@Cacheable`, `@Async`, `@Retryable`...). Mọi annotation AOP trong Spring **không tự thực thi** — chúng chỉ là metadata; **proxy mới là người chạy** advice trước/sau khi gọi method thật. Nắm cơ chế này quan trọng vì nó giải thích hai hiện tượng gây mất ngủ: annotation **âm thầm vô hiệu** khi đặt trên method `final`/`private` (CGLIB không override được), và khi method tự gọi nhau trong cùng class (**self-invocation**) — lời gọi `this` đi thẳng tới target, **bỏ qua proxy**, nên mọi annotation trên method bị gọi đều câm lặng.
+Spring có thể tạo JDK dynamic proxy cho interface hoặc proxy dựa trên subclass qua CGLIB. Caller phải gọi qua proxy thì advice mới chạy; lời gọi nội bộ bằng `this`, method không thể override hoặc object tự tạo ngoài container có thể bỏ qua lớp chặn.
 
-Bạn xây một service gọi API bên ngoài. Để tối ưu, bạn dùng `@Cacheable` cache kết quả, và `@Retryable` retry khi API timeout:
-
-```java
-@Service
-public class PricingService {
-
-    @Cacheable("prices")
-    public BigDecimal getPrice(String sku) {
-        return externalApi.fetchPrice(sku);  // gọi HTTP, có thể timeout
-    }
-
-    @Retryable(maxAttempts = 3, backoff = @Backoff(delay = 500))
-    public BigDecimal getPriceWithRetry(String sku) {
-        return getPrice(sku);  // 😱 gọi nội bộ
-    }
-}
-```
-
-Bạn test: `@Cacheable` hoạt động — lần gọi thứ 2 trả về từ cache. Nhưng `@Retryable`? API timeout lần đầu → **không retry**, exception bay thẳng lên caller.
-
-Debug thêm: nếu gọi `getPriceWithRetry()` từ **bên ngoài** (controller gọi trực tiếp), `@Retryable` hoạt động tốt. Chỉ khi `getPrice()` gọi nội bộ từ cùng class thì mới hỏng.
-
-Và rồi bạn nhận ra: `@Cacheable` hoạt động vì controller gọi `getPrice()` qua **proxy**. Nhưng `getPriceWithRetry()` gọi `this.getPrice()` — **bỏ qua proxy** → `@Cacheable` cũng hỏng khi gọi từ `getPriceWithRetry()`.
-
-Bạn tưởng annotation là "phép thuật" — nhưng thực ra, **mọi thứ** đều đi qua proxy. Hiểu proxy hoạt động thế nào = hiểu vì sao annotation hoạt động hay thất bại.
-
-> [!IMPORTANT]
-> Trong Spring, `@Transactional`, `@Cacheable`, `@Async`, `@Retryable`, `@Secured`, `@Validated`... đều hoạt động qua **cùng cơ chế proxy**. Hiểu một = hiểu tất cả. Doc này mổ xẻ proxy từ bytecode đến interceptor chain.
-
-Phần còn lại của doc sẽ đi qua: Proxy pattern nền tảng (§2) → JDK Dynamic Proxy internals (§3) → CGLIB bytecode & FastClass (§4) → benchmark JDK vs CGLIB (§5) → `ProxyFactory` API (§6) → `AbstractAutoProxyCreator` (§7) → Advisor/Advice/Pointcut (§8) → interceptor chain (§9) → `@EnableAspectJAutoProxy` (§10) → scoped proxy (§11) → self-invocation & cách giải (§12) → debugging proxy (§13) → anti-patterns (§14) → cheat sheet (§15).
-
----
+Hiểu đường đi của lời gọi quan trọng hơn việc chỉ nhìn annotation. Nó cho phép xác định chính xác khi nào tính năng AOP được áp dụng và vì sao một annotation có vẻ “không hoạt động”.
 
 ## 2. Proxy Pattern — ý tưởng nền tảng
 

@@ -1,11 +1,13 @@
 ---
-title: "volatile, synchronized & Atomic — Deep Dive"
+title: "volatile, synchronized & Atomic"
 description: "Mổ xẻ ba cơ chế đồng bộ: volatile (visibility + memory barrier), synchronized (monitor lock + happens-before), Atomic/CAS (lock-free). Đi sâu vào CPU cache coherence, biased/thin/fat lock, CAS spin loop, ABA problem, VarHandle. Kèm JMH benchmark và anti-patterns."
 ---
 
+`volatile`, `synchronized` và các atomic class đều hỗ trợ lập trình đa luồng, nhưng chúng giải quyết những phạm vi khác nhau. Chọn sai công cụ có thể tạo ra code nhìn có vẻ an toàn nhưng vẫn mất cập nhật hoặc vi phạm invariant.
+
 ## Mục lục
 
-- [Counter tăng 1 triệu lần — kết quả sai 37%](#1-counter-tăng-1-triệu-lần--kết-quả-sai-37)
+- [Tổng quan](#1-tổng-quan)
 - [CPU Cache & Visibility Problem](#2-cpu-cache--visibility-problem)
 - [volatile — visibility guarantee & memory barrier](#3-volatile--visibility-guarantee--memory-barrier)
 - [volatile KHÔNG phải atomic — count++ vẫn race](#4-volatile-không-phải-atomic--count-vẫn-race)
@@ -22,56 +24,11 @@ description: "Mổ xẻ ba cơ chế đồng bộ: volatile (visibility + memory
 
 ---
 
-## 1. Counter tăng 1 triệu lần — kết quả sai 37%
+## 1. Tổng quan
 
-Java có ba cơ chế đồng bộ cốt lõi — `volatile`, `synchronized`, và `Atomic`/CAS — mỗi cái giải một bài toán khác nhau: visibility, mutual exclusion, và atomicity không khoá. Dùng sai tool cho sai problem là nguyên nhân của những bug đồng bộ âm thầm. Bắt đầu bằng một counter mà cả `plain int` lẫn `volatile int` đều tính sai.
+`volatile` bảo đảm visibility và ordering cho việc đọc/ghi một biến, không biến chuỗi read–modify–write thành nguyên tử. `synchronized` bảo vệ một critical section và các invariant gồm nhiều biến. Atomic class dùng CAS để thực hiện một số cập nhật nguyên tử mà không khóa theo cách truyền thống.
 
-Bạn xây metrics counter cho service. 10 thread cùng tăng counter, mỗi thread 100.000 lần. Kỳ vọng: 1.000.000.
-
-```java
-int counter = 0;  // shared
-
-// 10 threads chạy song song:
-for (int i = 0; i < 100_000; i++) {
-    counter++;
-}
-```
-
-Kết quả thực tế: **~630.000** — mất 37% increment. Không exception, không warning. Sai âm thầm.
-
-Thử thêm `volatile`:
-
-```java
-volatile int counter = 0;
-// ... vẫn counter++
-```
-
-Kết quả: **~780.000** — tốt hơn, nhưng vẫn sai! `volatile` chỉ fix **visibility**, không fix **atomicity** của `counter++`.
-
-Dùng `AtomicInteger`:
-
-```java
-AtomicInteger counter = new AtomicInteger(0);
-// 10 threads:
-counter.incrementAndGet();
-```
-
-Kết quả: **1.000.000** — chính xác 100%.
-
-```text
-Benchmark (JMH, 10 threads, 1M ops total)
-plain int (no sync)        : 630,247  ← WRONG
-volatile int + ++          : 781,923  ← STILL WRONG
-synchronized block         : 1,000,000 ✓  (throughput: 12M ops/s)
-AtomicInteger              : 1,000,000 ✓  (throughput: 45M ops/s)
-```
-
-Phần còn lại của doc sẽ đi qua: CPU cache & visibility (§2) → volatile & memory barrier (§3) → vì sao volatile không atomic cho `++` (§4) → synchronized & happens-before (§5) → biased/thin/fat lock (§6) → Atomic* & CAS (§7) → CAS spin loop từ assembly (§8) → ABA problem (§9) → LongAdder (§10) → VarHandle (§11).
-
-> [!IMPORTANT]
-> Ba cơ chế giải quyết **ba vấn đề khác nhau**: volatile = visibility, synchronized = mutual exclusion + visibility + atomicity (compound), Atomic = lock-free atomicity. Dùng sai tool cho sai problem = bug âm thầm.
-
----
+Phần này so sánh các bảo đảm cụ thể, chi phí dưới contention và tình huống nên dùng từng cơ chế.
 
 ## 2. CPU Cache & Visibility Problem
 

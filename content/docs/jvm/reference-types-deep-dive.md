@@ -1,11 +1,13 @@
 ---
-title: "Reference Types — Deep Dive"
+title: "Reference Types"
 description: "Mổ xẻ 4 loại reference trong Java: Strong, Weak, Soft, Phantom. ReferenceQueue, GC interaction, WeakHashMap internals, SoftReference cho cache, PhantomReference cho resource cleanup. Kèm GC flow chi tiết và ví dụ production."
 ---
 
+Java cung cấp strong, soft, weak và phantom reference để biểu đạt các mức độ giữ object khác nhau đối với garbage collector. Chúng hỗ trợ cache, metadata phụ trợ và cleanup theo lifecycle của object.
+
 ## Mục lục
 
-- [Cache 2GB không chịu GC — OOM chỉ vì Strong reference](#1-cache-2gb-không-chịu-gc--oom-chỉ-vì-strong-reference)
+- [Tổng quan](#1-tổng-quan)
 - [4 loại reference — từ mạnh đến yếu](#2-4-loại-reference--từ-mạnh-đến-yếu)
 - [GC Reachability Analysis — khi nào object "chết"?](#3-gc-reachability-analysis--khi-nào-object-chết)
 - [SoftReference — cache tự co khi sắp OOM](#4-softreference--cache-tự-co-khi-sắp-oom)
@@ -20,36 +22,11 @@ description: "Mổ xẻ 4 loại reference trong Java: Strong, Weak, Soft, Phant
 
 ---
 
-## 1. Cache 2GB không chịu GC — OOM chỉ vì Strong reference
+## 1. Tổng quan
 
-Service image-processing cache kết quả resize vào `HashMap<String, BufferedImage>`:
+Strong reference giữ object sống như thông thường. Soft và weak reference cho phép collector thu hồi object theo điều kiện khác nhau; phantom reference được enqueue sau khi object không còn khả năng truy cập và thường dùng để theo dõi cleanup an toàn.
 
-```java
-Map<String, BufferedImage> cache = new HashMap<>();
-
-BufferedImage getResized(String key, BufferedImage original) {
-    return cache.computeIfAbsent(key, k -> resize(original));  // cache forever
-}
-```
-
-Heap 4GB. Sau vài giờ: cache chứa 200.000 entry × 10KB mỗi image = **2GB**. GC **không thể** thu hồi vì `HashMap` → strong reference → mọi image "reachable". Full GC liên tục nhưng không giải phóng được gì → `OutOfMemoryError`.
-
-```text
-Full GC: 4096M → 4090M (recovered only 6MB!) — cache giữ sống mọi thứ
-```
-
-Fix bằng `SoftReference`:
-```java
-Map<String, SoftReference<BufferedImage>> cache = new ConcurrentHashMap<>();
-// Hoặc tốt hơn: Caffeine/Guava cache với softValues()
-```
-
-> [!IMPORTANT]
-> Strong reference = "tôi CẦN object này". GC **tuyệt đối không** thu hồi object có strong reference. Cache dùng strong reference = cache chỉ phình, không bao giờ co → OOM chắc chắn nếu data unbounded.
-
-Phần còn lại của doc sẽ đi qua: 4 loại reference từ mạnh đến yếu (§2) → GC reachability analysis (§3) → SoftReference cho cache (§4) → WeakReference (§5) → WeakHashMap internals (§6) → PhantomReference & cleanup (§7) → ReferenceQueue (§8) → Finalizer & Cleaner (§9) → ThreadLocal memory leak (§10) → so sánh & decision matrix (§11).
-
----
+Reference type không tự tạo thành một cache hoàn chỉnh. Chính sách eviction, giới hạn dung lượng và vòng đời `ReferenceQueue` vẫn phải được thiết kế rõ ràng.
 
 ## 2. 4 loại reference — từ mạnh đến yếu
 

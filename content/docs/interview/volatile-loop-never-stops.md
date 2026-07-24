@@ -1,5 +1,5 @@
 ---
-title: "Vì sao bỏ volatile khiến thread chạy vòng lặp mãi không dừng? — Deep Dive"
+title: "Vì sao bỏ volatile khiến thread chạy vòng lặp mãi không dừng?"
 description: "Một câu hỏi phỏng vấn concurrency kinh điển: một thread set cờ boolean stop = true, nhưng thread đang chạy vòng lặp while(!stop) không bao giờ thấy và chạy mãi mãi. Mổ xẻ visibility, Java Memory Model, CPU cache, happens-before, vì sao volatile sửa được, và vì sao 'chạy đúng trên máy tôi' là cái bẫy nguy hiểm nhất."
 ---
 

@@ -5,9 +5,11 @@ description: "Đào sâu hai định dạng serialization nhị phân: Protobuf 
 
 # Protobuf & Avro — Serialization nhị phân cho hệ thống lớn
 
+Protobuf và Avro là hai định dạng serialization nhị phân dựa trên schema, phù hợp cho giao tiếp service và data pipeline. Cả hai giảm payload và quản lý schema tốt hơn JSON, nhưng có cách biểu diễn schema và chiến lược tương thích khác nhau.
+
 ## Mục lục
 
-- [Vì sao JSON và Java Serializable không đủ](#1-vì-sao-json-và-java-serializable-không-đủ)
+- [Tổng quan](#1-tổng-quan)
 - [Protobuf — schema-first & wire format](#2-protobuf--schema-first--wire-format)
 - [Bên trong wire format: tag, varint, ZigZag](#3-bên-trong-wire-format-tag-varint-zigzag)
 - [Field number là hợp đồng — schema evolution của Protobuf](#4-field-number-là-hợp-đồng--schema-evolution-của-protobuf)
@@ -20,28 +22,11 @@ description: "Đào sâu hai định dạng serialization nhị phân: Protobuf 
 
 ---
 
-## 1. Vì sao JSON và Java Serializable không đủ
+## 1. Tổng quan
 
-JSON tuyệt vời cho API public: người đọc được, ngôn ngữ nào cũng parse. Nhưng ở quy mô lớn (hàng triệu message/giây giữa các microservice, lưu vào Kafka/data lake), JSON lộ điểm yếu:
+Protobuf thường sinh code từ file `.proto` và nhận diện field bằng số tag. Avro thường mang schema cùng dữ liệu hoặc tra schema qua registry, đặc biệt phù hợp với hệ sinh thái Kafka và xử lý dữ liệu.
 
-```json
-{"userId": 12345, "userName": "alice", "isActive": true}
-```
-
-- **To**: tên field lặp lại trong **mọi** message (`"userId"` gửi triệu lần).
-- **Chậm**: parse text → phân tích cú pháp tốn CPU.
-- **Không kiểu chặt**: `"12345"` hay `12345`? schema lỏng lẻo, dễ sai.
-
-Còn `java.io.Serializable` thì:
-
-> [!WARNING]
-> **Java Serializable bị xem là sai lầm thiết kế** (Effective Java Item 85): nó là lỗ hổng bảo mật khổng lồ (deserialization of untrusted data → RCE — hàng loạt CVE), gắn chặt với class Java (không cross-language), `serialVersionUID` mong manh, và hiệu năng kém. **Không bao giờ** dùng Java native serialization cho dữ liệu qua mạng/lưu trữ lâu dài. Protobuf/Avro sinh ra để thay thế.
-
-Protobuf (Google) và Avro (Apache, từ Hadoop) giải quyết bằng **schema + nhị phân nhỏ gọn + cross-language + schema evolution**.
-
-Phần còn lại của doc sẽ đi qua: Protobuf schema-first & wire format (§2) → bên trong wire format: tag, varint, ZigZag (§3) → field number là hợp đồng & schema evolution (§4) → Avro schema đi kèm dữ liệu (§5) → reader vs writer schema resolution (§6) → Schema Registry (§7) → so sánh Protobuf/Avro/JSON/Java Serializable (§8) → anti-patterns (§9).
-
----
+Lựa chọn cần xét ngôn ngữ sử dụng, schema evolution, tooling, nhu cầu random access và cách producer/consumer được triển khai độc lập.
 
 ## 2. Protobuf — schema-first & wire format
 

@@ -1,11 +1,13 @@
 ---
-title: "HashMap — Deep Dive"
+title: "HashMap"
 description: "Mổ xẻ chi tiết HashMap trong Java: hashCode/equals contract, hàm hash perturbation, bucket index, collision & separate chaining, treeify thành Red-Black tree, resize & load factor, bug infinite loop khi đa luồng, mutable key trap. Kèm sơ đồ, benchmark và đọc source JDK."
 ---
 
+`HashMap` lưu dữ liệu dạng key–value và cho thời gian tra cứu trung bình gần O(1). Hiệu quả đó phụ thuộc vào hợp đồng `hashCode()`/`equals()`, cách phân phối entry vào bucket và quá trình resize.
+
 ## Mục lục
 
-- [get() chậm gấp 50.000 lần: câu chuyện về một hashCode sai](#1-get-chậm-gấp-50000-lần-câu-chuyện-về-một-hashcode-sai)
+- [Tổng quan](#1-tổng-quan)
 - [HashMap nhìn Key như thế nào — hashCode & equals](#2-hashmap-nhìn-key-như-thế-nào--hashcode--equals)
 - [Cấu trúc nội bộ — Bucket array, Node và các hằng số](#3-cấu-trúc-nội-bộ--bucket-array-node-và-các-hằng-số)
 - [Từ hashCode tới index — hàm hash() và phép & (n-1)](#4-từ-hashcode-tới-index--hàm-hash-và-phép--n-1)
@@ -24,53 +26,11 @@ description: "Mổ xẻ chi tiết HashMap trong Java: hashCode/equals contract,
 
 ---
 
-## 1. get() chậm gấp 50.000 lần: câu chuyện về một hashCode sai
+## 1. Tổng quan
 
-`HashMap` là cấu trúc dữ liệu được dùng nhiều nhất trong Java: tra cứu key→value trung bình **O(1)**. Nó quan trọng vì là nền của `HashSet`, là cache mặc định, là cốt lõi của mọi lookup table — và vì hiệu năng O(1) đó **không miễn phí**: nó phụ thuộc hoàn toàn vào việc bạn viết đúng `hashCode()`.
+Bên trong `HashMap` là một mảng bucket. Hash của key được biến đổi để chọn bucket; nếu nhiều key rơi vào cùng vị trí, `equals()` được dùng để tìm đúng entry trong linked list hoặc red-black tree.
 
-Bài toán kinh điển: một service dedup giao dịch, mỗi giao dịch có `TransactionKey` nhét vào `HashMap` để tra cứu trùng — thao tác mà ai cũng "biết" là O(1):
-
-```java
-Map<TransactionKey, Transaction> seen = new HashMap<>();
-
-for (Transaction tx : incoming) {     // 1.000.000 giao dịch
-    if (!seen.containsKey(tx.key())) {
-        seen.put(tx.key(), tx);
-    }
-}
-```
-
-Trên dev (vài nghìn giao dịch) chạy trong mili-giây. Lên production 1 triệu giao dịch, vòng lặp này ngốn **gần 2 phút** và CPU một core dính **100%** — không I/O, không lock, không GC pause bất thường. Profiler cho thấy 99% thời gian nằm trong `HashMap.getNode()`: một map đáng lẽ O(1) đang hành xử như một danh sách liên kết. Nguyên nhân nằm ở `TransactionKey`:
-
-```java
-public final class TransactionKey {
-    private final String merchantId;
-    private final long    amountCents;
-
-    @Override
-    public boolean equals(Object o) { /* so sánh đầy đủ 2 field */ }
-
-    @Override
-    public int hashCode() {
-        return 42;          // 😱 "tạm thời" — rồi quên sửa
-    }
-}
-```
-
-`hashCode()` trả về **hằng số** → mọi key rơi vào **cùng một bucket**. HashMap vẫn "đúng" về mặt logic (nhờ `equals`), nhưng mỗi `get` phải duyệt qua **toàn bộ** phần tử. Đây là chênh lệch đo được trên cùng 1 triệu key (JMH, JDK 17):
-
-```text
-Benchmark                       Mode  Cnt      Score      Error  Units
-HashMapBench.goodHashCode       avgt    5      0.042 ±    0.003  us/op   ← O(1), ~42 ns
-HashMapBench.constantHashCode   avgt    5   2104.880 ±  61.220  us/op   ← O(n), ~2 ms/op
-```
-
-> [!IMPORTANT]
-> HashMap **không** hỏng vì server yếu hay thiếu RAM. Nó hỏng vì **một method 1 dòng** — `hashCode()`. Hiểu HashMap nghĩa là hiểu chính xác `hashCode` đi vào đâu trong cỗ máy, và điều gì xảy ra khi nó tệ.
-
-**~50.000 lần** chậm hơn, chỉ vì `return 42`. Phần còn lại của doc sẽ đi qua: hợp đồng `hashCode`/`equals` (§2) → cấu trúc nội bộ bucket array (§3) → hàm `hash()` & phép `& (n-1)` (§4) → collision & separate chaining (§5) → treeify thành Red-Black Tree (§6) → resize & load factor 0.75 (§7) → flow `put`/`get` đầy đủ (§8) → bug infinite loop đa luồng (§9) → bad hashCode = O(n) (§10) → mutable key trap (§11) → so sánh HashMap variants (§12) → tuning initialCapacity (§13) → real-world & null handling (§14) → anti-patterns (§15) → cheat sheet (§16).
-
----
+Vì thế, hiệu năng và tính đúng đắn của `HashMap` không tách rời thiết kế key. Hash phân phối kém làm tăng collision, key có trạng thái thay đổi có thể không còn được tìm thấy, còn capacity không phù hợp gây resize không cần thiết.
 
 ## 2. HashMap nhìn Key như thế nào — hashCode & equals
 

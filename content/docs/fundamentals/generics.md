@@ -1,11 +1,13 @@
 ---
-title: "Generics & Type Erasure — Deep Dive"
+title: "Generics & Type Erasure"
 description: "Mổ xẻ Java Generics: type erasure cơ chế biên dịch, bridge methods, wildcards & PECS, type inference, reified types (arrays vs generics), heap pollution, recursive type bounds, và generic anti-patterns. Kèm bytecode analysis và production pitfalls."
 ---
 
+Generics cho phép class, interface và method biểu diễn quan hệ kiểu một cách an toàn tại compile time. Chúng giảm cast thủ công và giúp API nói rõ kiểu dữ liệu được nhận, trả về hoặc biến đổi.
+
 ## Mục lục
 
-- [ClassCastException từ hư không — không có cast nào trong code](#1-classcastexception-từ-hư-không--không-có-cast-nào-trong-code)
+- [Tổng quan](#1-tổng-quan)
 - [Type Erasure — generics biến mất sau compile](#2-type-erasure--generics-biến-mất-sau-compile)
 - [Bridge Methods — compiler tự sinh để giữ polymorphism](#3-bridge-methods--compiler-tự-sinh-để-giữ-polymorphism)
 - [Bounded Type Parameters — extends & super ở khai báo](#4-bounded-type-parameters--extends--super-ở-khai-báo)
@@ -21,47 +23,11 @@ description: "Mổ xẻ Java Generics: type erasure cơ chế biên dịch, brid
 
 ---
 
-## 1. ClassCastException từ hư không — không có cast nào trong code
+## 1. Tổng quan
 
-**Generics** (`List<String>`, `Cache<T>`) cho phép viết code type-safe dùng lại cho nhiều kiểu. Nhưng generics trong Java tồn tại **chỉ lúc compile** — runtime, `Cache<User>` và `Cache<Order>` là *cùng một class* `Cache`. Cơ chế này gọi là **type erasure**: compiler kiểm tra type rồi xoá hết đi và chèn cast ở caller. Type safety phụ thuộc hoàn toàn vào compiler check — mà raw type / unchecked cast bypass check đó, để ClassCastException nổ ở nơi không có cast nào nhìn thấy.
+Java triển khai generics chủ yếu bằng type erasure, nên phần lớn thông tin type parameter không tồn tại trực tiếp lúc runtime. Cơ chế này bảo đảm tương thích với bytecode cũ nhưng dẫn đến các giới hạn như không thể `new T()`, không có `List<int>` và khó kiểm tra parameterized type bằng `instanceof`.
 
-Bạn có service deserialize JSON thành object, lưu vào cache generic:
-
-```java
-public class Cache<T> {
-    private final Map<String, T> store = new HashMap<>();
-    
-    public void put(String key, T value) { store.put(key, value); }
-    public T get(String key) { return store.get(key); }
-}
-```
-
-Dev khác dùng raw type (bỏ generic):
-
-```java
-Cache cache = new Cache();           // raw type — no generic
-cache.put("user", new User("Hiệp"));
-cache.put("order", "not an order");  // ← compile OK! (raw type = no check)
-
-User user = (User) cache.get("user");    // OK
-Order order = (Order) cache.get("order"); // 💥 ClassCastException at runtime!
-```
-
-Tệ hơn — ClassCastException **ở nơi không có cast visible**:
-
-```java
-Cache<Order> typedCache = (Cache<Order>) cache;  // unchecked — raw→generic
-Order o = typedCache.get("order");               
-// 💥 CCE tại dòng này — vì compiler insert cast: (Order) store.get(key)
-// nhưng store chứa String "not an order"
-```
-
-> [!IMPORTANT]
-> Generics tồn tại **chỉ** lúc compile. Runtime, `Cache<User>` và `Cache<Order>` là cùng **một class** `Cache`. Type safety phụ thuộc hoàn toàn vào **compiler check** — mà raw type / unchecked cast bypass check đó.
-
-Phần còn lại của doc sẽ đi qua: type erasure cơ chế (§2) → bridge methods (§3) → bounded type parameters (§4) → wildcards & PECS (§5) → type inference & diamond (§6) → reification arrays vs generics (§7) → heap pollution (§8) → recursive type bounds (§9) → generic methods vs generic classes (§10) → type tokens & super type tokens (§11) → anti-patterns (§12) → cheat sheet (§13).
-
----
+Wildcard, bounds, variance và bridge method là hệ quả quan trọng cần hiểu để thiết kế generic API vừa linh hoạt vừa an toàn.
 
 ## 2. Type Erasure — generics biến mất sau compile
 

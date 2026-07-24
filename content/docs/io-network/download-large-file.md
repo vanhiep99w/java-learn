@@ -5,9 +5,11 @@ description: "Đào sâu kỹ thuật tải/truyền file lớn an toàn bộ nh
 
 # Download File Lớn — Tải gigabyte mà không nổ RAM
 
+Download file lớn cần truyền dữ liệu theo từng phần thay vì nạp toàn bộ nội dung vào bộ nhớ. Thiết kế đúng phải đồng thời kiểm soát memory usage, backpressure, timeout và khả năng tiếp tục khi kết nối bị gián đoạn.
+
 ## Mục lục
 
-- [Tải file lớn mà không nổ RAM](#1-tải-file-lớn-mà-không-nổ-ram)
+- [Tổng quan](#1-tổng-quan)
 - [Quy tắc số một: stream, đừng buffer toàn bộ](#2-quy-tắc-số-một-stream-đừng-buffer-toàn-bộ)
 - [HTTP Range request & resume download](#3-http-range-request--resume-download)
 - [Tải song song nhiều phần (multipart/parallel)](#4-tải-song-song-nhiều-phần-multipartparallel)
@@ -20,28 +22,11 @@ description: "Đào sâu kỹ thuật tải/truyền file lớn an toàn bộ nh
 
 ---
 
-## 1. Tải file lớn mà không nổ RAM
+## 1. Tổng quan
 
-Tải file 5MB thì code nào cũng chạy. Tải file 50GB phơi bày mọi sai lầm:
+Luồng tải file thường nối nguồn dữ liệu với response output stream qua một buffer có kích thước giới hạn. Bộ nhớ khi đó phụ thuộc vào buffer và số download đồng thời, không phụ thuộc trực tiếp vào kích thước từng file.
 
-```java
-// 💥 BốN sai lầm trong một dòng:
-byte[] data = httpClient.send(req, BodyHandlers.ofByteArray()).body();
-Files.write(Path.of("movie.mkv"), data);
-// 1. nạp 50GB vào RAM → OutOfMemoryError
-// 2. mất hết nếu đứt mạng ở 99% (không resume được)
-// 3. không kiểm tra toàn vẹn
-// 4. file dở dang trông như file hoàn chỉnh
-```
-
-Tải file lớn đúng cách phải giải quyết: **bộ nhớ** (stream), **độ tin cậy** (resume + retry), **tốc độ** (song song + zero-copy), **toàn vẹn** (checksum + atomic).
-
-> [!IMPORTANT]
-> Khác biệt tư duy: file nhỏ coi như "một giá trị" (nạp rồi dùng); file lớn coi như "một **luồng** đi qua" (đọc khúc nào ghi khúc đó, không bao giờ giữ toàn bộ). Mọi kỹ thuật dưới đây đều xoay quanh nguyên tắc này.
-
-Phần còn lại của doc sẽ đi qua: quy tắc stream cơ bản (§2) → HTTP Range request & resume (§3) → tải song song nhiều phần (§4) → zero-copy với transferTo/sendfile (§5) → checksum & atomic rename (§6) → xử lý lỗi/retry (§7) → phía server (§8) → anti-patterns (§9).
-
----
+Ngoài streaming, API production còn cần xử lý `Content-Length`, `Content-Disposition`, range request, cache header và việc client hủy kết nối. Các quyết định này ảnh hưởng đến cả server lẫn trải nghiệm tải xuống.
 
 ## 2. Quy tắc số một: stream, đừng buffer toàn bộ
 

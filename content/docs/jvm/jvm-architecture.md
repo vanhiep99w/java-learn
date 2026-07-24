@@ -1,11 +1,13 @@
 ---
-title: "JVM Architecture — Deep Dive"
+title: "JVM Architecture"
 description: "Mổ xẻ kiến trúc JVM: ClassLoader hierarchy (Bootstrap/Platform/App), linking & initialization, bytecode format, JIT compilation (C1/C2/Graal), tiered compilation, method dispatch (invokevirtual/invokeinterface/invokedynamic), runtime data areas, và deoptimization. Kèm bytecode analysis, JIT log đọc hiểu, và anti-patterns."
 ---
 
+JVM là runtime thực thi Java bytecode và cung cấp các dịch vụ như quản lý bộ nhớ, nạp class, kiểm tra bytecode, biên dịch JIT và điều phối thread. Kiến trúc này là nền tảng cho tính độc lập nền tảng của hệ sinh thái Java.
+
 ## Mục lục
 
-- [Java chậm? Vì sao Netflix, LinkedIn chạy Java ở scale tỷ request](#1-java-chậm-vì-sao-netflix-linkedin-chạy-java-ở-scale-tỷ-request)
+- [Tổng quan](#1-tổng-quan)
 - [JVM tổng quan — từ .java đến machine code](#2-jvm-tổng-quan--từ-java-đến-machine-code)
 - [ClassLoader — hierarchy & delegation model](#3-classloader--hierarchy--delegation-model)
 - [Linking: Verify → Prepare → Resolve](#4-linking-verify--prepare--resolve)
@@ -23,28 +25,11 @@ description: "Mổ xẻ kiến trúc JVM: ClassLoader hierarchy (Bootstrap/Platf
 
 ---
 
-## 1. Java chậm? Vì sao Netflix, LinkedIn chạy Java ở scale tỷ request
+## 1. Tổng quan
 
-Năm 2003, "Java chậm" là sự thật — interpreted bytecode, không optimize. Năm 2024, Java xử lý:
-- Netflix: **hàng tỷ API call/ngày**, microservices trên JVM
-- LinkedIn: **5+ triệu request/giây** (peak)
-- Alibaba: **544.000 đơn/giây** trong 11.11
+Source code được compiler chuyển thành bytecode, class loader đưa class vào runtime, execution engine diễn giải hoặc biên dịch bytecode thành machine code, còn runtime data areas giữ trạng thái chương trình. Garbage collector quản lý vòng đời object trên heap.
 
-Bí mật: **JIT compiler** — JVM **quan sát** code chạy, rồi compile hot path thành **native machine code** tối ưu hơn cả C++ compiler (vì có runtime profile data):
-
-```text
-Cold start:  Interpreter → ~50x slower than native
-After 10K calls: C1 compile → ~5x slower
-After 100K calls: C2 compile → on par with / faster than C++
-                   (speculative optimization + inlining + escape analysis)
-```
-
-> [!IMPORTANT]
-> JVM không "chạy bytecode" — nó **biên dịch bytecode thành native code tối ưu** dựa trên runtime behavior thực tế. Đây là adaptive optimization mà AOT compiler (GCC, LLVM) không có được.
-
-Phần còn lại của doc sẽ đi qua: tổng quan từ .java đến machine code (§2) → ClassLoader hierarchy (§3) → linking verify/prepare/resolve (§4) → runtime data areas (§5) → bytecode instruction set (§6) → execution engine interpreter → JIT (§7) → tiered compilation C1/C2 (§8) → method dispatch (§9) → inlining (§10) → deoptimization (§11) → GraalVM & AOT (§12) → diagnostic JIT log (§13) → anti-patterns (§14).
-
----
+Hiểu các thành phần và luồng thực thi giúp liên kết hiện tượng ở tầng code với hành vi thật của JVM khi chẩn đoán hiệu năng, lỗi bộ nhớ và vấn đề class loading.
 
 ## 2. JVM tổng quan — từ .java đến machine code
 

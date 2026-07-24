@@ -5,9 +5,11 @@ description: "Phân biệt rạch ròi hai khái niệm hay bị gộp: data rac
 
 # Data Race vs Race Condition — Hai con quỷ khác nhau
 
+Data race và race condition đều liên quan đến thứ tự thực thi giữa các thread, nhưng chúng không đồng nghĩa. Phân biệt hai khái niệm giúp xác định bug nằm ở truy cập bộ nhớ không đồng bộ hay ở logic phụ thuộc timing.
+
 ## Mục lục
 
-- [Hai bug, hai nguyên nhân, hay bị gọi nhầm tên](#1-hai-bug-hai-nguyên-nhân-hay-bị-gọi-nhầm-tên)
+- [Tổng quan](#1-tổng-quan)
 - [Data race — định nghĩa chính xác theo JMM](#2-data-race--định-nghĩa-chính-xác-theo-jmm)
 - [Vì sao data race nguy hiểm: visibility & reordering](#3-vì-sao-data-race-nguy-hiểm-visibility--reordering)
 - [Race condition — lỗi logic theo thứ tự](#4-race-condition--lỗi-logic-theo-thứ-tự)
@@ -20,30 +22,11 @@ description: "Phân biệt rạch ròi hai khái niệm hay bị gộp: data rac
 
 ---
 
-## 1. Hai bug, hai nguyên nhân, hay bị gọi nhầm tên
+## 1. Tổng quan
 
-"Data race" và "race condition" thường bị gộp làm một, nhưng chúng là hai lỗi **khác hẳn về bản chất**: một cái thuộc mô hình bộ nhớ (JMM), một cái thuộc logic chương trình. Phân biệt rạch ròi hai khái niệm này là nền tảng để sửa đúng — `volatile`/`Atomic` xoá được data race nhưng không xoá được race condition. Bắt đầu từ ví dụ kinh điển.
+Data race xảy ra khi hai thread truy cập cùng một vùng nhớ, có ít nhất một thao tác ghi và không có quan hệ happens-before phù hợp. Race condition rộng hơn: kết quả chương trình phụ thuộc vào thứ tự hoặc thời điểm của các sự kiện, kể cả khi từng truy cập riêng lẻ đã thread-safe.
 
-Đây là `counter++` chạy trên 2 thread, mỗi thread tăng 1 triệu lần:
-
-```java
-class Counter {
-    int value = 0;
-    void inc() { value++; }   // KHÔNG atomic: read → add → write
-}
-```
-
-Kết quả cuối **nhỏ hơn 2.000.000** — kinh điển. Nhưng vì sao? Có **hai** vấn đề chồng lên nhau ở đây, và chúng *khác nhau về bản chất*:
-
-1. **Data race**: hai thread đọc/ghi `value` đồng thời không đồng bộ → JMM không đảm bảo thread này thấy giá trị mới nhất của thread kia (visibility), thậm chí compiler/CPU được phép sắp xếp lại lệnh.
-2. **Race condition**: `value++` gồm 3 bước (read-modify-write); hai thread xen kẽ → một update bị "đè" (lost update) — đây là lỗi *logic* về thứ tự, độc lập với vấn đề bộ nhớ.
-
-Phần còn lại của doc sẽ đi qua: định nghĩa chính xác data race theo JMM (§2) → vì sao nó nguy hiểm — visibility & reordering (§3) → race condition là gì (§4) → 4 tổ hợp có/không data race × có/không race condition (§5) → benign vs harmful (§6) → cách phát hiện (§7) → cách khắc phục (§8).
-
-> [!IMPORTANT]
-> **Data race** là khái niệm ở tầng **mô hình bộ nhớ** (memory model — về visibility & ordering). **Race condition** là khái niệm ở tầng **logic chương trình** (về thứ tự các thao tác tạo kết quả sai). Một chương trình có thể có cái này mà không có cái kia. Gộp chúng làm một là sai lầm phổ biến nhất khi nói về concurrency.
-
----
+Do nguyên nhân khác nhau, cách sửa cũng khác nhau. Loại bỏ data race cần synchronization hoặc publication đúng; loại bỏ race condition có thể cần thiết kế lại toàn bộ thao tác nghiệp vụ thành một đơn vị nguyên tử.
 
 ## 2. Data race — định nghĩa chính xác theo JMM
 

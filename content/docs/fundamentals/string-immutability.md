@@ -1,11 +1,13 @@
 ---
-title: "String, String Pool & StringBuilder — Deep Dive"
+title: "String, String Pool & StringBuilder"
 description: "Mổ xẻ String trong Java: tại sao immutable (security, caching, hashCode, thread-safety), String Pool (intern table) & intern() mechanics, Compact Strings JDK 9 (LATIN1/UTF16 coder), String concatenation evolution (StringBuilder → invokedynamic JDK 9+), G1 String Deduplication, StringBuilder vs StringBuffer internals, và hiệu năng. Kèm bytecode analysis, benchmark, và anti-patterns."
 ---
 
+`String` là kiểu biểu diễn chuỗi ký tự bất biến trong Java. Một khi được tạo, nội dung logic của `String` không thay đổi; mọi thao tác chỉnh sửa đều tạo kết quả mới hoặc sử dụng một cấu trúc mutable trung gian.
+
 ## Mục lục
 
-- [Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap](#1-full-gc-4-giây--2-triệu-string-duplicate-chiếm-60-heap)
+- [Tổng quan](#1-tổng-quan)
 - [String là gì — cấu trúc nội bộ qua các phiên bản JDK](#2-string-là-gì--cấu-trúc-nội-bộ-qua-các-phiên-bản-jdk)
 - [Tại sao String immutable — 5 lý do thiết kế](#3-tại-sao-string-immutable--5-lý-do-thiết-kế)
 - [String Pool — intern table và intern()](#4-string-pool--intern-table-và-intern)
@@ -19,40 +21,11 @@ description: "Mổ xẻ String trong Java: tại sao immutable (security, cachin
 
 ---
 
-## 1. Full GC 4 giây — 2 triệu String duplicate chiếm 60% heap
+## 1. Tổng quan
 
-**String** là class đặc biệt nhất trong JDK: `final`, **immutable**, được JVM đối xử riêng với **String Pool** (intern table) và **Compact Strings** (JDK 9+, 1 byte/char cho ASCII). Vì immutable mà nó an toàn chia sẻ giữa thread, cache hashCode và dùng làm key. Nhưng chính việc mỗi parse sinh ra String object mới khiến string thường chiếm 25–40% heap — và là mục tiêu số một để tối ưu bộ nhớ.
+Tính bất biến cho phép `String` được chia sẻ an toàn, cache hash code và sử dụng trong string pool. Đổi lại, nối chuỗi lặp đi lặp lại có thể tạo nhiều object tạm, nên `StringBuilder` phù hợp hơn khi xây dựng nội dung qua nhiều bước.
 
-Service nhận JSON event từ Kafka, parse rồi lưu vào list:
-
-```java
-List<Event> events = new ArrayList<>();
-
-void onMessage(String json) {
-    Event event = objectMapper.readValue(json, Event.class);
-    events.add(event);
-}
-```
-
-Mỗi `Event` có field `country` (String). 90% traffic từ `"VN"`, 8% từ `"US"`, 2% còn lại. Nhưng Jackson parse tạo **String mới** mỗi lần → 1 triệu event = 900.000 String `"VN"` **khác nhau** (khác reference, cùng nội dung).
-
-Heap dump:
-```
-Class                 | Instances | Shallow Size | Retained Size
-java.lang.String      | 2,100,000 | 50 MB        | 680 MB (60% heap!)
-  └─ byte[] (backing) | 2,100,000 | 630 MB       |
-```
-
-900.000 String `"VN"` × (header 16B + byte[] 2B + array header 16B) ≈ **30 MB** chỉ cho 2 ký tự lặp đi lặp lại.
-
-Fix: `event.setCountry(event.getCountry().intern())` → tất cả `"VN"` trỏ cùng 1 instance → heap giảm 40%.
-
-> [!IMPORTANT]
-> String thường chiếm **25-40% heap** của ứng dụng Java. Hiểu String Pool, intern, compact string, và deduplication là chìa khoá tối ưu bộ nhớ.
-
-Phần còn lại của doc sẽ đi qua: cấu trúc nội bộ String qua các JDK (§2) → 5 lý do immutable (§3) → String Pool & intern() (§4) → Compact Strings (§5) → concatenation từ StringBuilder đến invokedynamic (§6) → StringBuilder vs StringBuffer (§7) → hashCode caching (§8) → G1 String Deduplication (§9) → == vs equals (§10) → anti-patterns & tóm tắt (§11).
-
----
+Phần này nối các đặc tính ngôn ngữ với cấu trúc bên trong, string pool, phép so sánh và tác động lên bộ nhớ.
 
 ## 2. String là gì — cấu trúc nội bộ qua các phiên bản JDK
 

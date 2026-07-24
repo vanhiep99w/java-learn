@@ -5,9 +5,11 @@ description: "Bản đồ kiến trúc Collection Framework: hệ phân cấp It
 
 # Collection Framework — Bản đồ kiến trúc & nội lực
 
+Java Collection Framework cung cấp một hệ thống interface và implementation thống nhất để lưu trữ, truy cập và biến đổi nhóm object. Hiểu đúng hệ phân cấp này giúp chọn cấu trúc dữ liệu theo hành vi cần thiết thay vì theo thói quen.
+
 ## Mục lục
 
-- [Đổi cấu trúc dữ liệu chỉ bằng 1 dòng: sức mạnh của lập trình theo interface](#1-đổi-cấu-trúc-dữ-liệu-chỉ-bằng-1-dòng-sức-mạnh-của-lập-trình-theo-interface)
+- [Tổng quan](#1-tổng-quan)
 - [Hệ phân cấp interface — Collection vs Map](#2-hệ-phân-cấp-interface--collection-vs-map)
 - [Iterable & Iterator — hợp đồng duyệt](#3-iterable--iterator--hợp-đồng-duyệt)
 - [Fail-fast — modCount hoạt động thế nào](#4-fail-fast--modcount-hoạt-động-thế-nào)
@@ -20,24 +22,11 @@ description: "Bản đồ kiến trúc Collection Framework: hệ phân cấp It
 
 ---
 
-## 1. Đổi cấu trúc dữ liệu chỉ bằng 1 dòng: sức mạnh của lập trình theo interface
+## 1. Tổng quan
 
-Collection Framework (Java 1.2, 1998) là một bộ các interface gốc + nhiều implementation thay thế nhau được, cộng các algorithm dùng chung trong `Collections` (sort, binarySearch, shuffle...). Nó quan trọng vì cho phép bạn **tách interface khỏi implementation**: cùng một đoạn code nhận được nhiều cấu trúc dữ liệu khác nhau mà không cần sửa lại.
+Hai nhánh chính của framework là `Collection`, dùng cho nhóm phần tử, và `Map`, dùng cho ánh xạ key–value. Từ đó hình thành các abstraction quen thuộc như `List`, `Set`, `Queue` cùng nhiều implementation có đặc tính khác nhau.
 
-```java
-// Sức mạnh của việc lập trình theo interface, không theo class cụ thể
-void process(Collection<Order> orders) { ... }   // nhận ArrayList, HashSet, LinkedList...
-
-List<Order> a = new ArrayList<>();   // đổi implementation 1 dòng
-List<Order> b = new LinkedList<>();  // code dùng nó không cần biết
-```
-
-Trước khi có framework, mỗi cấu trúc (`Vector`, `Hashtable`, `Stack`) là một class rời rạc với API khác nhau, không hoán đổi được — bạn không thể viết một method "nhận bất kỳ tập hợp nào". Tư tưởng cốt lõi là: **khai báo theo interface (`List`, `Set`, `Map`), khởi tạo theo class (`ArrayList`, `HashSet`)** — nhờ vậy đổi cấu trúc dữ liệu mà không sửa code phụ thuộc.
-
-> [!IMPORTANT]
-> Đây là toàn bộ lý do framework tồn tại: **lập trình theo interface, không theo class cụ thể**. Phần còn lại của doc sẽ đi qua: hệ phân cấp `Collection` vs `Map` (§2) → hợp đồng duyệt `Iterable`/`Iterator` (§3) → cơ chế fail-fast qua `modCount` (§4) → vai trò từng nhánh List/Set/Queue/Deque (§5) → generics & type erasure (§6) → marker interface `RandomAccess` (§7) → immutable collections (§8) → bảng chọn cấu trúc phù hợp (§9) → cheat sheet (§10).
-
----
+Giá trị lớn nhất của Collection Framework không chỉ nằm ở các class có sẵn, mà còn ở khả năng lập trình theo interface. Code phụ thuộc vào hợp đồng `List` hoặc `Map` có thể thay đổi implementation mà không phải viết lại toàn bộ logic sử dụng.
 
 ## 2. Hệ phân cấp interface — Collection vs Map
 

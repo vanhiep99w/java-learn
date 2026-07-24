@@ -5,9 +5,11 @@ description: "Đào sâu nhóm pattern khởi tạo trong Java: Singleton (doubl
 
 # Creational Patterns — Kiểm soát việc tạo object
 
+Creational patterns kiểm soát cách object được tạo và cấu hình. Chúng hữu ích khi việc khởi tạo có nhiều biến thể, phụ thuộc phức tạp hoặc cần tách khỏi code sử dụng object.
+
 ## Mục lục
 
-- [`new` ở khắp nơi và cái giá của nó](#1-new-ở-khắp-nơi-và-cái-giá-của-nó)
+- [Tổng quan](#1-tổng-quan)
 - [Singleton — và mọi cách làm sai](#2-singleton--và-mọi-cách-làm-sai)
 - [Factory Method](#3-factory-method)
 - [Abstract Factory](#4-abstract-factory)
@@ -20,23 +22,11 @@ description: "Đào sâu nhóm pattern khởi tạo trong Java: Singleton (doubl
 
 ---
 
-## 1. `new` ở khắp nơi và cái giá của nó
+## 1. Tổng quan
 
-Các creational pattern (Singleton, Factory Method, Abstract Factory, Builder, Prototype) **tách logic "tạo cái gì và như thế nào" ra khỏi "dùng nó"**, để đổi loại object, kiểm soát số lượng, hay xây object phức tạp mà không phải sửa từng chỗ `new`. Chúng quan trọng vì `new ConcreteClass()` rải khắp code trông vô hại nhưng khoá bạn vào **lớp cụ thể** ngay tại điểm tạo — muốn đổi implementation (vd Stripe → PayPal) là phải lùng sửa mọi chỗ.
+Singleton, Factory Method, Abstract Factory, Builder và Prototype giải quyết các vấn đề tạo object khác nhau. Có pattern quản lý số lượng instance, có pattern lựa chọn concrete type, và có pattern tổ chức quá trình xây dựng nhiều bước.
 
-```java
-// Mỗi chỗ new là một chỗ phải sửa khi đổi implementation
-PaymentGateway g = new StripeGateway();   // muốn đổi sang PayPal? sửa MỌI chỗ new
-```
-
-Creational patterns **tách logic "tạo cái gì và như thế nào" ra khỏi "dùng nó"**. Nhờ vậy bạn đổi loại object, kiểm soát số lượng, hay xây object phức tạp mà không rải `new` cụ thể khắp nơi.
-
-> [!IMPORTANT]
-> Vấn đề cốt lõi các creational pattern giải quyết: **giảm coupling tới lớp cụ thể** (liên hệ DIP/OCP). Code dùng object chỉ nên biết *interface*, còn "object nào, tạo ra sao" do một nơi tập trung quyết định.
-
-Phần còn lại của doc sẽ đi qua: Singleton và mọi cách làm sai (§2) → Factory Method (§3) → Abstract Factory (§4) → Builder thuần hoá constructor khổng lồ (§5) → Prototype deep vs shallow copy (§6) → các pattern trong JDK (§7) → so sánh & khi nào dùng cái nào (§8) → anti-patterns (§9) → cheat sheet (§10).
-
----
+Việc dùng pattern chỉ để tránh từ khóa `new` thường làm thiết kế phức tạp hơn. Giá trị thật nằm ở chỗ cô lập quyết định khởi tạo đang có khả năng thay đổi.
 
 ## 2. Singleton — và mọi cách làm sai
 

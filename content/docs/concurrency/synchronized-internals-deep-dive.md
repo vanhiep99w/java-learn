@@ -1,11 +1,13 @@
 ---
-title: "Synchronized Internals — Deep Dive"
+title: "Synchronized Internals"
 description: "Mổ xẻ synchronized trong JVM: Object header mark word, lock escalation (biased → thin/lightweight → heavyweight/fat lock), monitor enter/exit, ObjectMonitor C++ struct, wait/notify internals, lock coarsening & elimination. Kèm đọc HotSpot source và sơ đồ chi tiết."
 ---
 
+`synchronized` cung cấp mutual exclusion và thiết lập quan hệ happens-before giữa các thread đi qua cùng monitor. Để hiểu chi phí và hành vi của nó, cần nhìn vào object header, monitor và các trạng thái khóa mà JVM quản lý.
+
 ## Mục lục
 
-- [Lock 1 method mà throughput tụt 10× — lock contention](#1-lock-1-method-mà-throughput-tụt-10--lock-contention)
+- [Tổng quan](#1-tổng-quan)
 - [Object Header — Mark Word chứa lock state](#2-object-header--mark-word-chứa-lock-state)
 - [Lock Escalation — 4 cấp độ lock](#3-lock-escalation--4-cấp-độ-lock)
 - [Biased Locking — lock "miễn phí" cho single thread](#4-biased-locking--lock-miễn-phí-cho-single-thread)
@@ -21,37 +23,11 @@ description: "Mổ xẻ synchronized trong JVM: Object header mark word, lock es
 
 ---
 
-## 1. Lock 1 method mà throughput tụt 10× — lock contention
+## 1. Tổng quan
 
-`synchronized` là cơ chế khoá nguyên thuỷ của Java, nhưng bên trong nó **không phải một cơ chế đơn lẻ** mà là cả hệ thống escalation: biased lock → thin lock → fat lock, chọn cấp rẻ nhất có thể dựa vào contention. Hiểu escalation này là hiểu khi nào `synchronized` gần như miễn phí và khi nào nó sập throughput. Bắt đầu từ một service bị chậm bất thường khi scale thread.
+Mỗi object Java có thể đóng vai trò monitor. JVM lưu thông tin liên quan đến lock trong Mark Word và chuyển chiến lược thực thi theo mức contention; khi không thể xử lý bằng đường nhanh, thread có thể phải park và chờ monitor.
 
-Service xử lý order có counter synchronized:
-
-```java
-public class OrderCounter {
-    private long count = 0;
-
-    public synchronized void increment() { count++; }
-    public synchronized long getCount() { return count; }
-}
-```
-
-32 thread gọi `increment()` liên tục. Throughput: **8 triệu ops/s** (1 thread) → **800K ops/s** (32 threads). Chậm **10 lần** — thêm thread mà chậm đi!
-
-```text
-Threads    Ops/s       Avg latency
-1          8,200,000   ~120 ns
-4          3,500,000   ~1.1 µs
-16         1,200,000   ~13 µs
-32           800,000   ~40 µs    ← context switch + OS scheduler overhead
-```
-
-Phần còn lại của doc sẽ đi qua: object header & mark word (§2) → 4 cấp lock escalation (§3) → biased/thin/fat lock chi tiết (§4–§6) → monitor enter/exit bytecode (§7) → wait/notify internals (§8) → lock coarsening/elimination (§9–§10) → adaptive spinning (§11) → synchronized vs ReentrantLock (§12).
-
-> [!IMPORTANT]
-> `synchronized` **không chậm** — lock **contention** chậm. Khi chỉ 1 thread dùng, biased lock gần như zero-cost. Khi nhiều thread tranh nhau, lock escalate → heavyweight → OS context switch. Hiểu escalation = hiểu khi nào synchronized "rẻ" và khi nào "đắt".
-
----
+Chi phí không chỉ đến từ cú pháp `synchronized`, mà chủ yếu từ phạm vi khóa, thời gian giữ khóa và số thread cạnh tranh. Vì vậy tối ưu đúng thường bắt đầu từ thiết kế critical section thay vì loại bỏ khóa một cách máy móc.
 
 ## 2. Object Header — Mark Word chứa lock state
 

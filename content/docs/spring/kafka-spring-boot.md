@@ -1,11 +1,13 @@
 ---
-title: "Kafka + Spring Boot — Deep Dive"
+title: "Kafka + Spring Boot"
 description: "Mổ xẻ Apache Kafka với Spring Boot: broker/topic/partition architecture, producer internals (batching, acks, retries, idempotent, transactional), consumer group protocol (coordinator, rebalancing, partition assignment strategies), offset management (auto vs manual commit, at-least-once/at-most-once/exactly-once), Spring KafkaTemplate & @KafkaListener internals, ConcurrentMessageListenerContainer, error handling (DefaultErrorHandler, retry, DLT), Schema Registry (Avro/Protobuf), monitoring (lag, consumer metrics), và production tuning. Kèm sequence diagrams, config reference, và anti-patterns."
 ---
 
+Spring for Apache Kafka tích hợp producer, consumer, listener container, serialization và transaction của Kafka vào mô hình cấu hình Spring Boot. Abstraction này đơn giản hóa code nhưng không thay đổi semantics phân vùng, offset và delivery của Kafka.
+
 ## Mục lục
 
-- [Message mất — consumer commit trước khi xử lý xong](#1-message-mất--consumer-commit-trước-khi-xử-lý-xong)
+- [Tổng quan](#1-tổng-quan)
 - [Kafka Architecture — Broker, Topic, Partition, Replica](#2-kafka-architecture--broker-topic-partition-replica)
 - [Producer Internals — batching, acks, idempotent](#3-producer-internals--batching-acks-idempotent)
 - [Consumer Group Protocol — coordinator & rebalancing](#4-consumer-group-protocol--coordinator--rebalancing)
@@ -19,42 +21,11 @@ description: "Mổ xẻ Apache Kafka với Spring Boot: broker/topic/partition a
 
 ---
 
-## 1. Message mất — consumer commit trước khi xử lý xong
+## 1. Tổng quan
 
-Kafka là hệ thống log phân tán lưu message theo partition, mỗi message có **offset** tăng dần và **chỉ biến mất** khỏi trách nhiệm của consumer khi offset đã được **commit**. Quyết định *khi nào* commit offset chính là quyết định giữa ba ngữ nghĩa delivery: **at-most-once** (commit trước xử lý → có thể mất message), **at-least-once** (commit sau xử lý → có thể xử lý trùng), và **exactly-once** (xử lý + commit cùng transaction). Cấu hình này không phụ thuộc vào cluster — nó nằm trong tay consumer, và sai một dòng `enable.auto.commit=true` có thể nuốt hàng nghìn message một cách **im lặng**.
+Một consumer group phân phối partition cho các consumer; thứ tự chỉ được bảo đảm trong từng partition. Offset commit xác định khả năng đọc lại message, còn acknowledgement mode và error handler quyết định cách listener phản ứng khi xử lý thất bại.
 
-Order service nhận event từ Kafka:
-
-```java
-@KafkaListener(topics = "orders")
-public void onOrder(OrderEvent event) {
-    orderService.process(event);  // call DB + external API (2-5 giây)
-}
-```
-
-Cấu hình default Spring Kafka: `enable.auto.commit=true`, `auto.commit.interval.ms=5000`.
-
-Kịch bản: consumer poll 100 message → xử lý message 1-50 (25 giây) → **auto-commit offset = 100** (đã poll tất cả) → **crash** → restart → consumer tiếp tục từ offset 101 → **message 51-100 mất** (đã commit nhưng chưa xử lý).
-
-```
-poll 100 messages: [1, 2, 3, ..., 50, 51, ..., 100]
-                    │                  │
-                    ▼                  ▼
-        xử lý xong 1-50      chưa xử lý 51-100
-                    │
-    auto-commit offset = 100 (commit hết batch đã poll)
-                    │
-                CRASH 💥
-                    │
-    restart → resume từ 101 → 51-100 MẤT
-```
-
-> [!IMPORTANT]
-> `enable.auto.commit=true` (default Kafka client) commit offset **theo thời gian**, không theo xử lý. Spring Kafka mặc định **tắt** auto-commit và dùng `AckMode.BATCH` (commit sau khi xử lý hết batch). Nhưng nếu override config sai → message loss.
-
-Phần còn lại của doc sẽ đi qua: kiến trúc Kafka broker/topic/partition (§2) → producer internals batching/acks/idempotent (§3) → consumer group protocol & rebalancing (§4) → offset management & commit strategies (§5) → `KafkaTemplate` producer trong Spring (§6) → `@KafkaListener` consumer trong Spring (§7) → error handling retry/DLT (§8) → exactly-once semantics (§9) → production tuning & monitoring (§10) → anti-patterns & tóm tắt (§11).
-
----
+Thiết kế đúng cần phối hợp key, partition count, concurrency, retry, dead-letter topic và tính idempotent của consumer thay vì chỉ cấu hình một `@KafkaListener`.
 
 ## 2. Kafka Architecture — Broker, Topic, Partition, Replica
 

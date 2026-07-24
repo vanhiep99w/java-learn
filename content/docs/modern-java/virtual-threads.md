@@ -1,11 +1,13 @@
 ---
-title: "Virtual Threads (Project Loom) — Deep Dive"
+title: "Virtual Threads (Project Loom)"
 description: "Mổ xẻ Virtual Threads JDK 21+: từ platform thread OS-level sang virtual thread JVM-managed, continuation & scheduling, carrier thread, pinning problem, structured concurrency, và migration strategy. Kèm benchmark throughput, memory footprint, và anti-patterns."
 ---
 
+Virtual thread là thread nhẹ do JVM quản lý, được thiết kế để chạy số lượng lớn tác vụ chủ yếu chờ I/O. Nó giữ mô hình lập trình tuần tự quen thuộc trong khi giảm chi phí gắn một request với một platform thread riêng.
+
 ## Mục lục
 
-- [10.000 concurrent requests — nhưng chỉ 200 thread](#1-10000-concurrent-requests--nhưng-chỉ-200-thread)
+- [Tổng quan](#1-tổng-quan)
 - [Platform Thread vs Virtual Thread — kiến trúc cơ bản](#2-platform-thread-vs-virtual-thread--kiến-trúc-cơ-bản)
 - [Continuation — trái tim của Virtual Thread](#3-continuation--trái-tim-của-virtual-thread)
 - [Scheduler — ForkJoinPool và work-stealing](#4-scheduler--forkjoinpool-và-work-stealing)
@@ -22,55 +24,11 @@ description: "Mổ xẻ Virtual Threads JDK 21+: từ platform thread OS-level s
 
 ---
 
-## 1. 10.000 concurrent requests — nhưng chỉ 200 thread
+## 1. Tổng quan
 
-Virtual thread là lightweight thread do **JVM quản lý** (không phải OS), ghép (multiplex) hàng triệu task lên chỉ vài carrier thread — biến mỗi blocking I/O thành "unmount & yield" thay vì chiếm cứng OS thread. Nó quan trọng vì mô hình cổ điển "1 platform thread / request" bế tắc khi cần 10.000 request đồng thời: pool 200 thread thì request xếp hàng, còn 10.000 thread thì ngốn tới **10GB RAM** chỉ cho stack.
+Nhiều virtual thread được JVM lập lịch lên một số platform thread carrier. Khi gặp blocking operation được hỗ trợ, virtual thread có thể unmount để carrier chạy công việc khác; một số trường hợp pinning làm giảm lợi ích này.
 
-```java
-ExecutorService pool = Executors.newFixedThreadPool(200);
-
-for (Request req : incoming) {    // 10.000 request
-    pool.submit(() -> {
-        Response resp = httpClient.send(req);  // block 100ms
-        return process(resp);
-    });
-}
-```
-
-**Vấn đề**: pool chỉ có 200 thread. 10.000 request → 9.800 request **xếp hàng** chờ thread rảnh. Latency p99 tăng vọt.
-
-Tăng pool lên 10.000? Mỗi platform thread tốn **~1MB stack** + OS scheduling overhead:
-- 10.000 thread × 1MB = **10GB RAM** chỉ cho stack
-- OS context switch giữa 10.000 thread → scheduler thrashing
-
-Dùng **Virtual Threads** (JDK 21+):
-
-```java
-try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-    for (Request req : incoming) {
-        executor.submit(() -> {
-            Response resp = httpClient.send(req);  // block 100ms — nhưng VT unmount!
-            return process(resp);
-        });
-    }
-}
-```
-
-Kết quả: **10.000 virtual threads đồng thời**, chỉ dùng **~16 carrier threads** (= CPU cores). Memory: ~10.000 × **~1KB** = **10MB** (thay vì 10GB).
-
-```text
-Benchmark (10.000 concurrent I/O tasks, 100ms each)
-Platform thread pool (200):   p99 = 5,200ms   (queueing)
-Platform thread pool (10000): p99 = 120ms      (10GB RAM, OS thrash)
-Virtual threads:              p99 = 105ms      (10MB RAM, smooth)
-```
-
-> [!IMPORTANT]
-> Virtual threads không nhanh hơn platform threads trên CPU-bound work. Chúng nhanh hơn vì **không lãng phí thread khi I/O block** — cho phép scale tới hàng triệu concurrent task mà không tốn RAM hay OS resources.
-
-Phần còn lại của doc sẽ đi qua: platform thread vs virtual thread (§2) → continuation và cơ chế yield/resume (§3) → scheduler ForkJoinPool work-stealing (§4) → mount/unmount giữa carrier (§5) → pinning và cách tránh (§6) → memory footprint (§7) → API thực hành (§8) → Structured Concurrency (§9) → Scoped Values thay ThreadLocal (§10) → migration strategy (§11) → so sánh VT vs platform vs reactive (§12) → anti-patterns (§13) → cheat sheet (§14).
-
----
+Virtual thread cải thiện khả năng mở rộng concurrency chứ không làm CPU mạnh hơn. Giới hạn database connection, rate limit và các tài nguyên phía sau vẫn cần được kiểm soát.
 
 ## 2. Platform Thread vs Virtual Thread — kiến trúc cơ bản
 

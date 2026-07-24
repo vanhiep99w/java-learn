@@ -1,11 +1,13 @@
 ---
-title: "Spring Bean Lifecycle — Deep Dive"
+title: "Spring Bean Lifecycle"
 description: "Mổ xẻ vòng đời Spring Bean: từ BeanDefinition scanning đến destruction. BeanPostProcessor, BeanFactoryPostProcessor, AOP proxy creation, circular dependency resolution (three-level cache), scope (singleton/prototype/request), @PostConstruct/@PreDestroy, InitializingBean, SmartLifecycle. Kèm lifecycle diagram, debug tips, và anti-patterns."
 ---
 
+Spring Bean Lifecycle mô tả các giai đoạn từ lúc container đọc bean definition, tạo instance, inject dependency, chạy callback khởi tạo cho đến khi hủy bean. Thứ tự này quyết định thời điểm một bean thực sự sẵn sàng để sử dụng.
+
 ## Mục lục
 
-- [@Autowired null, @Transactional câm — dùng dependency lúc sai phase](#1-autowired-null-transactional-câm--dùng-dependency-lúc-sai-phase)
+- [Tổng quan](#1-tổng-quan)
 - [Lifecycle tổng quan — 11 bước từ definition đến destruction](#2-lifecycle-tổng-quan--11-bước-từ-definition-đến-destruction)
 - [BeanDefinition — metadata trước khi bean tồn tại](#3-beandefinition--metadata-trước-khi-bean-tồn-tại)
 - [BeanFactoryPostProcessor — sửa definition trước instantiation](#4-beanfactorypostprocessor--sửa-definition-trước-instantiation)
@@ -22,44 +24,11 @@ description: "Mổ xẻ vòng đời Spring Bean: từ BeanDefinition scanning �
 
 ---
 
-## 1. @Autowired null, @Transactional câm — dùng dependency lúc sai phase
+## 1. Tổng quan
 
-Bean Lifecycle là **trình tự cố định** Spring đi qua để biến một class thành bean sẵn sàng dùng: từ lúc scan `BeanDefinition`, instantiate, inject dependency, chạy init callback, đến khi tạo AOP proxy và cuối cùng destroy. Nắm lifecycle không phải để thuộc lòng từng hook — mà để biết **chính xác tại thời điểm nào** một thứ trở nên available. Đa số bug "Spring không hoạt động" đều là người code chạm tới dependency hoặc AOP ở **sai phase**: gọi `@Autowired` field trong constructor (chưa inject), hoặc gọi `@Transactional` method nội bộ (chưa qua proxy).
+Trong quá trình khởi tạo, bean đi qua constructor, dependency injection, các aware callback, `BeanPostProcessor`, init callback và có thể được thay thế bằng proxy. Vì vậy object ở một phase sớm chưa chắc đã có dependency đầy đủ hoặc chưa phải object cuối cùng được inject cho nơi khác.
 
-Production incident điển hình — `NullPointerException` trên field `@Autowired`:
-
-```java
-@Service
-public class OrderService {
-    @Autowired
-    private PaymentClient paymentClient;    // ← NULL lúc runtime!
-    
-    public OrderService() {
-        paymentClient.healthCheck();        // 💥 NPE — constructor chạy TRƯỚC inject
-    }
-}
-```
-
-Hoặc: AOP không hoạt động:
-
-```java
-@Service
-public class UserService {
-    @Transactional
-    public void createUser(User user) { ... }
-    
-    public void register(User user) {
-        createUser(user);    // ← @Transactional KHÔNG hoạt động! (self-invocation)
-    }
-}
-```
-
-> [!IMPORTANT]
-> Hiểu Bean Lifecycle = hiểu **khi nào** dependency available, **khi nào** proxy wrap bean, **tại sao** self-call bypass AOP. Đây không phải kiến thức "lý thuyết" — nó giải thích 80% bug "Spring không hoạt động như expected".
-
-Phần còn lại của doc sẽ đi qua: 11 bước lifecycle tổng quan (§2) → `BeanDefinition` metadata (§3) → `BeanFactoryPostProcessor` sửa definition (§4) → instantiation & DI (§5) → `BeanPostProcessor` hook (§6) → init callbacks (§7) → AOP proxy creation (§8) → circular dependency three-level cache (§9) → bean scopes (§10) → destruction & shutdown (§11) → `SmartLifecycle` ordering (§12) → anti-patterns (§13) → cheat sheet (§14).
-
----
+Hiểu lifecycle giúp chọn đúng extension point và giải thích các lỗi liên quan đến `@PostConstruct`, circular dependency, AOP proxy và cleanup tài nguyên.
 
 ## 2. Lifecycle tổng quan — 11 bước từ definition đến destruction
 

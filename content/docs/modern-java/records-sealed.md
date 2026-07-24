@@ -3,9 +3,11 @@ title: "Records & Sealed Classes"
 description: "Mổ xẻ record & sealed: record bytecode (field final, accessor, equals/hashCode/toString sinh qua invokedynamic + ObjectMethods bootstrap), compact constructor & copy phòng thủ, sealed/permits & PermittedSubclasses attribute, exhaustive switch không cần default, và bộ đôi sealed+record cho data modeling. Kèm javap."
 ---
 
+Records và sealed classes bổ sung hai công cụ để mô hình hóa dữ liệu và hệ phân cấp kiểu rõ ràng hơn. Record giảm boilerplate cho value-like data, còn sealed class giới hạn tập subtype được phép tồn tại.
+
 ## Mục lục
 
-- [80 dòng boilerplate cho một DTO 3 field](#1-80-dòng-boilerplate-cho-một-dto-3-field)
+- [Tổng quan](#1-tổng-quan)
 - [record — class dữ liệu bất biến](#2-record--class-dữ-liệu-bất-biến)
 - [record sinh ra gì — đọc bytecode](#3-record-sinh-ra-gì--đọc-bytecode)
 - [invokedynamic & ObjectMethods bootstrap](#4-invokedynamic--objectmethods-bootstrap)
@@ -19,34 +21,11 @@ description: "Mổ xẻ record & sealed: record bytecode (field final, accessor,
 
 ---
 
-## 1. 80 dòng boilerplate cho một DTO 3 field
+## 1. Tổng quan
 
-`record` là một nominal tuple bất biến — compiler tự sinh field, constructor, accessor, `equals`/`hashCode`/`toString` chuẩn theo giá trị; còn `sealed` cho phép kiểm soát chính xác cây kế thừa để bật pattern matching toàn vẹn. Chúng quan trọng vì trước Java 16, một DTO bất biến 3 field cần **constructor + equals + hashCode + toString** viết tay — mỗi lần thêm field phải sửa bốn chỗ, quên một cái là bug.
+Record tự sinh constructor, accessor, `equals()`, `hashCode()` và `toString()` dựa trên components, nhưng không làm object trở nên deep immutable. Sealed hierarchy khai báo các subtype hợp lệ qua `permits` hoặc quy tắc cùng module/package.
 
-```java
-final class Point {
-    private final int x, y;
-    Point(int x, int y) { this.x = x; this.y = y; }
-    int x() { return x; }
-    int y() { return y; }
-    @Override public boolean equals(Object o) { /* 6 dòng dễ quên đối xứng */ }
-    @Override public int hashCode() { return Objects.hash(x, y); }
-    @Override public String toString() { return "Point[x=" + x + ", y=" + y + "]"; }
-}
-```
-
-Mỗi lần thêm field, phải sửa **constructor + equals + hashCode + toString** — bốn chỗ, quên một là bug (xem [equals & hashCode](/fundamentals/equals-hashcode/)). Java 16 thu gọn còn **một dòng**:
-
-```java
-record Point(int x, int y) {}    // tự sinh tất cả: field, ctor, accessor, equals, hashCode, toString
-```
-
-> [!IMPORTANT]
-> `record` không chỉ là "đường cú pháp ngắn gọn" — nó là **nominal tuple bất biến** với ngữ nghĩa do compiler đảm bảo, sinh `equals`/`hashCode`/`toString` **đúng theo giá trị** qua một cơ chế bytecode hiện đại (`invokedynamic`). `sealed` bổ sung mảnh còn thiếu: **kiểm soát đóng** cây kế thừa để bật pattern matching đầy đủ. Hai thứ cùng nhau cho Java khả năng mô hình hóa dữ liệu kiểu hàm (ADT).
-
-Phần còn lại của doc sẽ đi qua: bản chất record bất biến (§2) → record sinh gì trong bytecode (§3) → `invokedynamic` & ObjectMethods bootstrap (§4) → compact constructor & copy phòng thủ (§5) → giới hạn record, khi nào KHÔNG dùng (§6) → `sealed` kế thừa có kiểm soát (§7) → `PermittedSubclasses` & exhaustive switch (§8) → bộ đôi sealed + record thành ADT (§9) → anti-patterns (§10) → cheat sheet (§11).
-
----
+Kết hợp hai tính năng với pattern matching giúp biểu diễn domain đóng và xử lý đầy đủ các trường hợp ngay tại compile time.
 
 ## 2. record — class dữ liệu bất biến
 

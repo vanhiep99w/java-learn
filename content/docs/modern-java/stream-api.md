@@ -1,11 +1,13 @@
 ---
-title: "Stream API — Deep Dive"
+title: "Stream API"
 description: "Mổ xẻ Stream API Java: lazy evaluation pipeline, Spliterator, intermediate/terminal operations, parallel stream & ForkJoinPool, short-circuiting, collector internals, và performance pitfalls. Kèm benchmark, diagram pipeline, và anti-patterns."
 ---
 
+Stream API biểu diễn quá trình xử lý dữ liệu dưới dạng pipeline gồm source, các intermediate operation và một terminal operation. Nó hướng tới composition và tính khai báo, không phải mặc định nhanh hơn vòng lặp.
+
 ## Mục lục
 
-- [Xử lý 10 triệu record — for loop 8s, stream 0.9s](#1-xử-lý-10-triệu-record--for-loop-8s-stream-09s)
+- [Tổng quan](#1-tổng-quan)
 - [Stream Pipeline Architecture — Source, Intermediate, Terminal](#2-stream-pipeline-architecture--source-intermediate-terminal)
 - [Lazy Evaluation — không gì chạy cho tới terminal](#3-lazy-evaluation--không-gì-chạy-cho-tới-terminal)
 - [Spliterator — nền tảng split & traverse](#4-spliterator--nền-tảng-split--traverse)
@@ -21,47 +23,11 @@ description: "Mổ xẻ Stream API Java: lazy evaluation pipeline, Spliterator, 
 
 ---
 
-## 1. Xử lý 10 triệu record — for loop 8s, stream 0.9s
+## 1. Tổng quan
 
-Stream API là một **pipeline lười (lazy)** gồm source → intermediate ops → terminal op, cho phép khai báo *cái gì* thay vì *làm thế nào* và tự động song song hoá qua `parallelStream`. Nó quan trọng vì cùng bài toán xử lý 10 triệu bản ghi, code khai báo ngắn gọn mà còn **nhanh hơn** for-loop thủ công khi tận dụng được song song.
+Intermediate operation thường được đánh giá lười và chỉ chạy khi terminal operation yêu cầu kết quả. Pipeline có thể hợp nhất nhiều bước, dừng sớm và trong điều kiện phù hợp được chia cho parallel execution.
 
-```java
-long total = 0;
-for (Transaction tx : transactions) {     // 10M items
-    if (tx.status() == COMPLETED) {
-        total += tx.amount();
-    }
-}
-// Sequential: 1.2s
-```
-
-Với parallel stream:
-
-```java
-long total = transactions.parallelStream()
-    .filter(tx -> tx.status() == COMPLETED)
-    .mapToLong(Transaction::amount)
-    .sum();
-// Parallel (8 cores): 0.18s — 6.7x speedup
-```
-
-Nhưng câu chuyện không dừng ở đây. Dev khác viết:
-
-```java
-// ❌ parallelStream trên LinkedList + stateful operation
-List<Transaction> sorted = linkedList.parallelStream()
-    .filter(tx -> tx.amount() > 1000)
-    .sorted()                             // stateful — phải buffer toàn bộ
-    .collect(Collectors.toList());
-// CHẬM HƠN sequential 3x — vì splitting LinkedList = O(n), sorted = barrier
-```
-
-> [!IMPORTANT]
-> Stream API không magic. Hiệu năng phụ thuộc: **(1)** data source (array vs linked), **(2)** operation type (stateless vs stateful), **(3)** element count, **(4)** per-element cost. Doc này mổ xẻ từng yếu tố.
-
-Phần còn lại của doc sẽ đi qua: kiến trúc pipeline Source/Intermediate/Terminal (§2) → lazy evaluation & Sink chain (§3) → Spliterator (§4) → intermediate ops stateless vs stateful (§5) → terminal ops (§6) → short-circuiting (§7) → collector internals (§8) → parallel stream & ForkJoinPool (§9) → khi nào parallel nhanh/chậm (§10) → so sánh stream vs loop (§11) → anti-patterns (§12) → cheat sheet (§13).
-
----
+Hiệu năng phụ thuộc vào nguồn dữ liệu, stateful operation, boxing, allocation và chi phí chia task. Vì vậy cần hiểu cơ chế pipeline trước khi quyết định dùng stream tuần tự hay song song.
 
 ## 2. Stream Pipeline Architecture — Source, Intermediate, Terminal
 

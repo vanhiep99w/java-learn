@@ -1,11 +1,13 @@
 ---
-title: "Exception Handling — Deep Dive"
+title: "Exception Handling"
 description: "Mổ xẻ Exception trong Java: cây Throwable (Error/Exception/RuntimeException), checked vs unchecked debate, JVM exception table & bytecode, try-with-resources internal (addSuppressed), exception cost (stack trace filling), multi-catch & rethrow, custom exception hierarchy, Spring @ExceptionHandler, và production error handling patterns. Kèm bytecode analysis, benchmark, và anti-patterns."
 ---
 
+Exception handling tách luồng xử lý lỗi khỏi luồng thành công và cho phép lỗi được truyền qua nhiều tầng gọi. Thiết kế exception tốt phải thể hiện đúng loại thất bại, nơi chịu trách nhiệm xử lý và thông tin cần để chẩn đoán.
+
 ## Mục lục
 
-- [API chậm 10x khi dùng exception thay control flow](#1-api-chậm-10x-khi-dùng-exception-thay-control-flow)
+- [Tổng quan](#1-tổng-quan)
 - [Cây phân cấp Throwable — Error, Exception, RuntimeException](#2-cây-phân-cấp-throwable--error-exception-runtimeexception)
 - [Checked vs Unchecked — cuộc tranh luận chưa có hồi kết](#3-checked-vs-unchecked--cuộc-tranh-luận-chưa-có-hồi-kết)
 - [JVM Exception Table — cách JVM dispatch exception](#4-jvm-exception-table--cách-jvm-dispatch-exception)
@@ -18,50 +20,11 @@ description: "Mổ xẻ Exception trong Java: cây Throwable (Error/Exception/Ru
 
 ---
 
-## 1. API chậm 10x khi dùng exception thay control flow
+## 1. Tổng quan
 
-**Exception** là cơ chế Java dành cho *tình huống bất thường* (exceptional) — lỗi recovery được (IO, network) hoặc bug lập trình (NPE, illegal argument). Mỗi lần `throw`, JVM phải `fillInStackTrace()` crawl toàn bộ call stack để ghi lại stack trace, rồi unwinding duyệt ngược các exception table — đắt gấp hàng trăm lần một nhánh `if`. Dùng exception thay control flow (như kiểm tra format input phổ thông) là anti-pattern kinh điển bóp nghẹt hiệu năng.
+Java phân biệt `Error`, checked exception và unchecked exception qua cây `Throwable`. Sự phân loại này ảnh hưởng đến chữ ký method, rollback, API boundary và chiến lược phục hồi.
 
-Service validate input. Developer dùng exception để kiểm tra format:
-
-```java
-public boolean isValidEmail(String email) {
-    try {
-        new InternetAddress(email).validate();  // throw nếu invalid
-        return true;
-    } catch (AddressException e) {
-        return false;                           // "tiện" — dùng exception như if/else
-    }
-}
-```
-
-Gọi 100.000 lần/phút với 80% email invalid → **80.000 exception/phút**. Profiler:
-
-```
-CPU: 40% trong fillInStackTrace()
-     25% trong InternetAddress.validate()
-     15% trong catch handler
-     20% còn lại
-```
-
-`fillInStackTrace()` phải **crawl toàn bộ call stack** mỗi lần throw → tốn hàng chục microsecond. So với if/else (nanosecond): **chậm 100-1000x**.
-
-Fix: validate bằng regex/logic trước, **chỉ throw khi thực sự exceptional**:
-
-```java
-private static final Pattern EMAIL = Pattern.compile("^[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}$");
-
-public boolean isValidEmail(String email) {
-    return email != null && EMAIL.matcher(email).matches();  // no exception
-}
-```
-
-> [!IMPORTANT]
-> Exception dành cho **tình huống bất thường** (exceptional), không phải control flow thay if/else. Chi phí throw+catch = `fillInStackTrace()` crawl stack + unwinding — đắt hơn branch prediction hàng trăm lần.
-
-Phần còn lại của doc sẽ đi qua: cây Throwable (§2) → checked vs unchecked (§3) → JVM exception table & bytecode (§4) → try-with-resources & suppressed (§5) → exception cost & fillInStackTrace (§6) → multi-catch & rethrow (§7) → custom exception hierarchy (§8) → Spring error handling & ProblemDetail (§9) → anti-patterns & tóm tắt (§10).
-
----
+Exception dành cho tình huống bất thường, không phải cơ chế điều khiển luồng thông thường. Catch quá rộng, nuốt lỗi, log rồi throw lặp lại hoặc dùng exception cho nhánh phổ biến đều làm code khó hiểu và tốn chi phí không cần thiết.
 
 ## 2. Cây phân cấp Throwable — Error, Exception, RuntimeException
 

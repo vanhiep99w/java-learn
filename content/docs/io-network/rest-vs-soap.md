@@ -5,9 +5,11 @@ description: "So sánh sâu hai phong cách API: REST (kiến trúc ràng buộc
 
 # REST vs SOAP — Phong cách kiến trúc vs Giao thức
 
+REST và SOAP tiếp cận việc xây dựng API từ hai hướng khác nhau. REST là một architectural style xoay quanh resource và semantics của HTTP, còn SOAP là protocol dựa trên message envelope và bộ tiêu chuẩn liên quan.
+
 ## Mục lục
 
-- [Hai triết lý xây API — và vì sao so sánh REST với SOAP dễ khập khiễng](#1-hai-triết-lý-xây-api--và-vì-sao-so-sánh-rest-với-soap-dễ-khập-khiễng)
+- [Tổng quan](#1-tổng-quan)
 - [SOAP — giao thức envelope nghiêm ngặt](#2-soap--giao-thức-envelope-nghiêm-ngặt)
 - [REST — ràng buộc kiến trúc, không phải giao thức](#3-rest--ràng-buộc-kiến-trúc-không-phải-giao-thức)
 - [HTTP method & status làm ngữ nghĩa](#4-http-method--status-làm-ngữ-nghĩa)
@@ -20,37 +22,11 @@ description: "So sánh sâu hai phong cách API: REST (kiến trúc ràng buộc
 
 ---
 
-## 1. Hai triết lý xây API — và vì sao so sánh REST với SOAP dễ khập khiễng
+## 1. Tổng quan
 
-REST và SOAP là hai cách nghĩ khác hẳn nhau về việc xây API: SOAP là một **giao thức** chặt chẽ (quy định cả định dạng message), còn REST chỉ là một **phong cách kiến trúc** (tập ràng buộc, mượn ngữ nghĩa HTTP). So sánh chúng như so sánh "tiêu chuẩn" với "phong cách" — dễ khập khiễng nếu không nắm rõ cấp của từng thứ. Doc này sẽ đặt hai bên đúng cấp, rồi so sánh trên các trục thực sự có ý nghĩa: ngữ nghĩa HTTP, idempotency, contract, và khi nào một bên vượt lên bên kia.
+Việc so sánh chỉ theo JSON và XML bỏ qua khác biệt chính. REST tận dụng URI, HTTP method, status code và cache; SOAP cung cấp contract WSDL cùng các chuẩn như WS-Security và reliable messaging.
 
-```
-SOAP  = giao thức: bắt buộc XML envelope, WSDL, WS-* — "phải làm thế này"
-REST  = phong cách: stateless, resource, dùng HTTP đúng cách — "tuân các ràng buộc"
-```
-
-Cùng một việc "lấy thông tin user 123", hai phong cách làm khác hẳn nhau. SOAP `POST` tới một endpoint duy nhất, mọi ngữ nghĩa nằm gọn trong envelope XML:
-
-```xml
-<!-- SOAP: POST tới 1 endpoint, mọi thứ trong envelope XML -->
-<soap:Envelope><soap:Body>
-  <getUser><id>123</id></getUser>
-</soap:Body></soap:Envelope>
-```
-
-REST thì dùng chính HTTP method + URL làm ngữ nghĩa, không cần bọc gì thêm:
-
-```http
-GET /users/123 HTTP/1.1     # REST: HTTP method + URL chính LÀ ngữ nghĩa
-Accept: application/json
-```
-
-Sau khi đã thấy khác biệt cơ bản, doc sẽ đi sâu vào từng bên — **SOAP** với envelope & WSDL (§2), **REST** với các ràng buộc kiến trúc (§3) — rồi so trên các trục thực tế: **HTTP method & status** làm ngữ nghĩa (§4), **idempotency** (§5), **Richardson Maturity Model & HATEOAS** (§6), **contract & versioning** (§7), và cuối cùng là câu hỏi quan trọng nhất: *khi nào SOAP vẫn vượt trội hơn REST?* (§8).
-
-> [!IMPORTANT]
-> Nắm sự khác cấp này là chìa khoá: SOAP *quy định* cấu trúc message và bộ chuẩn WS-*; REST *mượn* sẵn ngữ nghĩa của HTTP (method, status, header, URL) và thêm vài ràng buộc kiến trúc. REST không "phát minh" gì — nó dùng HTTP đúng như thiết kế ban đầu.
-
----
+Lựa chọn phụ thuộc vào contract, interoperability, yêu cầu bảo mật, hạ tầng và hệ sinh thái tích hợp. Cả hai đều có thể phù hợp nếu được đặt đúng bối cảnh.
 
 ## 2. SOAP — giao thức envelope nghiêm ngặt
 
