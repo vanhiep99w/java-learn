@@ -91,12 +91,12 @@ Một `Dog extends Animal` được layout trong heap như sau (HotSpot, 64-bit,
 
 ```
 ┌──────────────────────────────────────┐  địa chỉ object Dog
-│ Mark Word        (8 byte)             │  ← object header
-│ Klass Pointer    (4 byte, nén)        │  ← trỏ tới metadata lớp Dog (chứa vtable)
+│ Mark Word        (8 byte)            │  ← object header
+│ Klass Pointer    (4 byte, nén)       │  ← trỏ tới metadata lớp Dog (chứa vtable)
 ├──────────────────────────────────────┤
-│ field của Animal (vd: name)           │  ← field LỚP CHA nằm trước
+│ field của Animal (vd: name)          │  ← field LỚP CHA nằm trước
 ├──────────────────────────────────────┤
-│ field của Dog    (vd: breed)          │  ← field lớp con nằm sau
+│ field của Dog    (vd: breed)         │  ← field lớp con nằm sau
 └──────────────────────────────────────┘
 ```
 
