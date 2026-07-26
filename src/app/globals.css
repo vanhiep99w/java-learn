@@ -6,8 +6,23 @@
   --fd-font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Wider content area */
-#nd-page article {
+/* Use the desktop viewport more efficiently instead of large outer gutters. */
+@media (min-width: 1280px) {
+  #nd-docs-layout {
+    --fd-layout-width: calc(100vw - 2rem);
+  }
+
+  #nd-page {
+    padding-inline: 1rem;
+  }
+
+  #nd-toc {
+    padding-inline-end: 0.5rem;
+  }
+}
+
+/* Let the page fill the middle column instead of staying centered at 900px. */
+#nd-page {
   max-width: none;
 }
 
