@@ -354,14 +354,84 @@ INVOKEVIRTUAL StringBuilder.toString
 ASTORE_2         // s
 ```
 
-Vấn đề trong vòng lặp:
+Một biểu thức nối đơn như trên không có vấn đề lớn: compiler tạo **một** `StringBuilder`, append các thành phần rồi gọi `toString()` một lần. Vấn đề xuất hiện khi biểu thức `+=` nằm trong vòng lặp.
+
+#### Vì sao nối String trong vòng lặp thành O(n²)?
+
 ```java
 String result = "";
-for (String s : list) {
-    result += s;    // mỗi iteration: new StringBuilder → append → toString → new String
+for (String part : list) {
+    result += part;
 }
-// O(n²) vì mỗi lần tạo String mới copy toàn bộ nội dung cũ
 ```
+
+Trong JDK 8, mỗi lần lặp được hiểu gần tương đương với:
+
+```java
+result = new StringBuilder()
+        .append(result) // copy TOÀN BỘ nội dung result cũ
+        .append(part)   // copy phần mới
+        .toString();    // tạo String mới và copy buffer sang char[] mới
+```
+
+`String` là immutable nên JVM không thể nối trực tiếp `part` vào object mà `result` đang trỏ tới. Ở mỗi iteration, chuỗi cũ phải được đưa vào một builder mới, sau đó tạo một `String` kết quả mới.
+
+Ví dụ mỗi lần chỉ thêm một ký tự:
+
+| Lần lặp | `result` cũ | Số ký tự cũ phải copy lại | `result` mới |
+|---------|--------------|----------------------------|--------------|
+| 1 | `""` | 0 | `"A"` |
+| 2 | `"A"` | 1 | `"AB"` |
+| 3 | `"AB"` | 2 | `"ABC"` |
+| 4 | `"ABC"` | 3 | `"ABCD"` |
+| ... | ... | ... | ... |
+| n | dài `n - 1` | `n - 1` | dài `n` |
+
+Chỉ tính phần **nội dung cũ bị copy lại**, tổng số ký tự đã copy là:
+
+```text
+0 + 1 + 2 + 3 + ... + (n - 1)
+= n × (n - 1) / 2
+≈ n² / 2
+→ O(n²)
+```
+
+Trên thực tế còn có lần copy khi `StringBuilder.toString()` tạo backing `char[]` cho `String` mới, cùng các lần resize buffer có thể xảy ra. Các bước này làm tăng chi phí thực tế nhưng không đổi kết luận O(n²).
+
+```text
+Iteration 1: ""      + "A" → "A"       String cũ: ""      → bỏ
+Iteration 2: "A"     + "B" → "AB"      String cũ: "A"     → chờ GC
+Iteration 3: "AB"    + "C" → "ABC"     String cũ: "AB"    → chờ GC
+Iteration 4: "ABC"   + "D" → "ABCD"    String cũ: "ABC"   → chờ GC
+```
+
+Ngoài thời gian copy, mỗi iteration còn tạo ít nhất một `StringBuilder` và một `String` mới, khiến nhiều object tạm chờ GC.
+
+> [!NOTE]
+> O(n²) ở đây giả sử mỗi iteration thêm một đoạn có độ dài cố định và `n` tỷ lệ với độ dài output. Công thức chính xác hơn cho các đoạn dài ngắn khác nhau là **tổng độ dài của tất cả prefix trước đó**.
+
+#### Đưa StringBuilder ra ngoài vòng lặp
+
+```java
+StringBuilder builder = new StringBuilder();
+for (String part : list) {
+    builder.append(part); // chỉ append phần mới, không copy lại toàn bộ prefix mỗi vòng
+}
+String result = builder.toString(); // tạo String kết quả đúng một lần
+```
+
+Lúc này cùng một buffer được tái sử dụng:
+
+```text
+"" → append "A" → append "B" → append "C" → append "D" → toString()
+```
+
+Mỗi phần mới chỉ được append một lần. Buffer của `StringBuilder` đôi khi vẫn phải resize và copy, nhưng capacity tăng theo cấp số nhân nên tổng chi phí resize là **amortized O(n)**. `toString()` chỉ copy toàn bộ kết quả một lần ở cuối, cũng là O(n).
+
+| Cách viết | Builder được tạo | String kết quả được tạo | Độ phức tạp |
+|-----------|------------------|-------------------------|--------------|
+| `result += part` trong loop | Mỗi iteration | Mỗi iteration | O(n²) |
+| Một `StringBuilder` ngoài loop | Một lần | Một lần ở cuối | Amortized O(n) |
 
 ### 6.2. JDK 9+ — invokedynamic (StringConcatFactory)
 
