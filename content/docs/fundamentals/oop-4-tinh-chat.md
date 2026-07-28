@@ -9,25 +9,43 @@ Lập trình hướng đối tượng trong Java thường được trình bày 
 
 ## Mục lục
 
-- [Tổng quan](#1-tổng-quan)
-- [Encapsulation — đóng gói không chỉ là getter/setter](#2-encapsulation--đóng-gói-không-chỉ-là-gettersetter)
-- [Inheritance — object layout & super constructor chaining](#3-inheritance--object-layout--super-constructor-chaining)
-- [Polymorphism — invokevirtual, vtable và động cơ dispatch](#4-polymorphism--invokevirtual-vtable-và-động-cơ-dispatch)
-- [Overriding vs Overloading — runtime vs compile-time](#5-overriding-vs-overloading--runtime-vs-compile-time)
-- [Abstraction — abstract class vs interface vs default method](#6-abstraction--abstract-class-vs-interface-vs-default-method)
-- [So sánh & khi nào dùng cái nào](#7-so-sánh--khi-nào-dùng-cái-nào)
-- [Anti-patterns cần tránh](#8-anti-patterns-cần-tránh)
-- [Tóm tắt — Cheat sheet](#9-tóm-tắt--cheat-sheet)
+- [Tổng quan — đâu là 4 tính chất OOP?](#1-tổng-quan--đâu-là-4-tính-chất-oop)
+- [Tính chất số 1 — Encapsulation](#2-tính-chất-oop-số-1--encapsulation-đóng-gói)
+- [Tính chất số 2 — Inheritance](#3-tính-chất-oop-số-2--inheritance-kế-thừa)
+- [Tính chất số 3 — Polymorphism](#4-tính-chất-oop-số-3--polymorphism-đa-hình)
+- [Tính chất số 4 — Abstraction](#5-tính-chất-oop-số-4--abstraction-trừu-tượng)
+- [So sánh & khi nào dùng cái nào](#6-so-sánh--khi-nào-dùng-cái-nào)
+- [Anti-patterns cần tránh](#7-anti-patterns-cần-tránh)
+- [Tóm tắt — Cheat sheet](#8-tóm-tắt--cheat-sheet)
 
 ---
 
-## 1. Tổng quan
+## 1. Tổng quan — đâu là 4 tính chất OOP?
 
-Encapsulation bảo vệ invariant chứ không chỉ tạo getter/setter; inheritance thiết lập quan hệ “is-a” và kéo theo yêu cầu thay thế; polymorphism chọn implementation theo object thực tế; abstraction giữ lại những chi tiết cần thiết cho người sử dụng.
+OOP có đúng **4 tính chất cốt lõi** trong phạm vi tài liệu này:
+
+| Số | Tính chất | Câu hỏi mà nó trả lời | Ý chính |
+|----|-----------|------------------------|---------|
+| **1** | **Encapsulation — Đóng gói** | Ai được phép đọc hoặc thay đổi trạng thái? | Giấu state và bảo vệ invariant qua API có kiểm soát |
+| **2** | **Inheritance — Kế thừa** | Lớp mới có quan hệ “is-a” với lớp nào? | Lớp con nhận state/hành vi từ lớp cha và có thể mở rộng chúng |
+| **3** | **Polymorphism — Đa hình** | Cùng một lời gọi nhưng implementation nào sẽ chạy? | Chọn bản override theo object thật tại runtime |
+| **4** | **Abstraction — Trừu tượng** | Người dùng cần biết điều gì và không cần biết điều gì? | Chỉ lộ hợp đồng cần thiết, ẩn chi tiết cài đặt |
+
+Có thể nhớ bằng bốn động từ:
+
+```text
+Encapsulation → bảo vệ
+Inheritance   → kế thừa
+Polymorphism  → thay đổi hành vi
+Abstraction   → ẩn chi tiết
+```
+
+> [!IMPORTANT]
+> Bốn phần chính tiếp theo được ghi rõ **“Tính chất OOP số 1”** đến **“Tính chất OOP số 4”**. Overriding và overloading không phải tính chất thứ năm; chúng được giải thích bên trong phần Polymorphism để tránh nhầm lẫn.
 
 Các tính chất này có giá trị khi chúng làm ranh giới thiết kế rõ hơn. Lạm dụng kế thừa hoặc tạo abstraction không có điểm biến đổi thường khiến code khó thay đổi hơn thay vì linh hoạt hơn.
 
-## 2. Encapsulation — đóng gói không chỉ là getter/setter
+## 2. Tính chất OOP số 1 — Encapsulation (Đóng gói)
 
 **Encapsulation** = che giấu trạng thái nội bộ, chỉ expose hành vi qua interface công khai. Nhưng nói "tạo getter/setter cho mọi field" là **hiểu sai** bản chất.
 
@@ -81,7 +99,7 @@ public List<Player> players() {
 
 ---
 
-## 3. Inheritance — object layout & super constructor chaining
+## 3. Tính chất OOP số 2 — Inheritance (Kế thừa)
 
 **Inheritance** cho phép một class tái sử dụng và mở rộng class khác. Nhưng điều ít người để ý: kế thừa ảnh hưởng tới **bố cục bộ nhớ** của object và **thứ tự khởi tạo**.
 
@@ -128,53 +146,230 @@ invokespecial Dog.<init>()V
 
 ---
 
-## 4. Polymorphism — invokevirtual, vtable và động cơ dispatch
+## 4. Tính chất OOP số 3 — Polymorphism (Đa hình)
 
-Đây là phần "động cơ" của OOP. Khi bạn gọi `a.sound()`, compiler **không biết** object thật là gì, nên sinh ra:
+Đừng bắt đầu bằng vtable. Trước hết, chỉ cần nhớ một câu:
 
+> **Kiểu của biến quyết định method nào được phép gọi; kiểu thật của object quyết định bản override nào sẽ chạy.**
+
+Ví dụ:
+
+```java
+class Animal {
+    String sound() {
+        return "?";
+    }
+}
+
+class Dog extends Animal {
+    @Override
+    String sound() {
+        return "Gâu";
+    }
+}
+
+class Cat extends Animal {
+    @Override
+    String sound() {
+        return "Meo";
+    }
+}
+
+Animal animal = new Dog();
+System.out.println(animal.sound()); // Gâu
+
+animal = new Cat();
+System.out.println(animal.sound()); // Meo
 ```
-aload_1                          // đẩy tham chiếu a lên stack
-invokevirtual Animal.sound()Ljava/lang/String;
+
+Trong câu `Animal animal = new Dog()` có hai kiểu khác nhau:
+
+| Thành phần | Giá trị | Dùng để làm gì? |
+|------------|---------|-----------------|
+| Kiểu của biến, hay **kiểu tĩnh** | `Animal` | Compiler kiểm tra có được gọi `sound()` hay không |
+| Kiểu của object, hay **kiểu runtime** | `Dog` | JVM chọn implementation thực sự sẽ chạy |
+
+Vì `Animal` khai báo `sound()`, câu `animal.sound()` hợp lệ khi compile. Khi chạy, object đang được tham chiếu là `Dog`, nên `Dog.sound()` được gọi. Việc chọn method tại runtime này gọi là **dynamic dispatch**.
+
+### 4.1. Từ lời gọi Java đến `invokevirtual`
+
+Với lời gọi `animal.sound()`, bytecode có dạng rút gọn:
+
+```text
+aload_1
+invokevirtual Animal.sound:()Ljava/lang/String;
 ```
 
-`invokevirtual` không phải "nhảy thẳng tới `Animal.sound`". Nó nói: *"tìm method `sound` trong **vtable của kiểu thực** của object trên stack"*.
+Dòng `Animal.sound` trong bytecode dễ gây hiểu nhầm. Nó **không có nghĩa** JVM luôn chạy `Animal.sound()`. `Animal` là lớp mà compiler dùng để xác nhận lời gọi và ghi tham chiếu method vào bytecode.
 
-### 4.1. Vtable hoạt động thế nào
+Khi thực thi `invokevirtual`, có thể hình dung JVM làm bốn bước:
 
-Mỗi class có một **vtable** (virtual method table) — mảng con trỏ tới các method. Klass pointer trong object header trỏ tới metadata lớp, từ đó tới vtable:
-
-```
-Object header của Dog ──► Klass(Dog) ──► vtable:
-                                          [0] Object.toString
-                                          [1] Object.equals
-                                          ...
-                                          [k] Animal.describe   (Dog không override → trỏ về Animal)
-                                          [k+1] Dog.sound       (Dog override → trỏ về Dog!)
-```
-
-Điểm mấu chốt: **slot của `sound()` trong vtable của `Dog` trỏ tới `Dog.sound`**. Compiler chỉ cần biết *chỉ số slot* (cố định cho mọi lớp con), JVM dùng object thật để chọn vtable. Vì thế dispatch chỉ tốn ~1-2 lần truy cập bộ nhớ — gần như O(1).
+1. Lấy tham chiếu `animal` trên operand stack.
+2. Kiểm tra object thật mà tham chiếu đang trỏ tới — ví dụ `Dog`.
+3. Tìm implementation cụ thể nhất của `sound()` cho `Dog`.
+4. Chạy `Dog.sound()`.
 
 ```mermaid
 flowchart LR
-    A["a.sound()<br/>invokevirtual"] --> B["đọc Klass pointer<br/>từ header của object"]
-    B --> C["tra vtable[slot_sound]"]
-    C --> D["nhảy tới Dog.sound"]
+    Call["animal.sound()"] --> Compile["Compile-time<br/>Animal có sound()?"]
+    Compile --> Bytecode["invokevirtual<br/>Animal.sound"]
+    Bytecode --> Runtime{"Runtime object<br/>là lớp nào?"}
+    Runtime -->|Dog| Dog["Dog.sound()"]
+    Runtime -->|Cat| Cat["Cat.sound()"]
 ```
 
-### 4.2. interface dùng invokeinterface + itable
+> [!IMPORTANT]
+> `Animal` quyết định **có được gọi** `sound()`; `Dog` hoặc `Cat` quyết định **bản nào chạy**. Đây là ý nghĩa cốt lõi của polymorphism trong ví dụ này.
 
-Với interface, không thể dùng slot cố định (một class implement nhiều interface, thứ tự khác nhau). JVM dùng **itable** (interface method table) — tra cứu phức tạp hơn chút: tìm itable của interface trong class, rồi tra method. Chậm hơn `invokevirtual` một chút nhưng JIT thường tối ưu được.
+### 4.2. Vtable giúp chọn method nhanh như thế nào?
 
-### 4.3. JIT khử ảo (devirtualization)
+Nếu mỗi lần gọi JVM phải tìm method theo tên từ `Dog` lên `Animal` rồi lên `Object`, dispatch sẽ tốn kém. JVM thường tổ chức các virtual method thành một bảng gọi là **vtable** (*virtual method table*).
 
-Nếu JIT phát hiện một call site **luôn** gặp đúng một kiểu (monomorphic), nó **inline** thẳng method, bỏ qua vtable hoàn toàn. Nếu gặp 2 kiểu (bimorphic) → kiểm tra rẻ rồi inline. Đây là lý do code OOP "nhiều lớp ảo" vẫn nhanh trong thực tế.
+Hãy coi mỗi method là một ô có số thứ tự cố định:
+
+| Vtable slot | `Animal` | `Dog` | `Cat` |
+|-------------|----------|-------|-------|
+| `sound()` | `Animal.sound` | `Dog.sound` | `Cat.sound` |
+| `describe()` | `Animal.describe` | `Animal.describe` | `Animal.describe` |
+
+Khi lớp con override một method, nó **thay địa chỉ method ở cùng slot**:
+
+- `Dog` override `sound()` → slot `sound` trỏ tới `Dog.sound`.
+- `Dog` không override `describe()` → slot `describe` vẫn trỏ tới `Animal.describe`.
+
+Object `Dog` chứa thông tin để JVM biết nó thuộc lớp `Dog`. Từ metadata của lớp, JVM có thể đến vtable và lấy đúng slot:
+
+```text
+tham chiếu animal
+       │
+       ▼
+┌──────────────────┐
+│ object Dog       │
+│ class → Dog      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ vtable của Dog   │
+│ sound → Dog.sound│
+└──────────────────┘
+```
+
+Do đó có thể ghi nhớ `invokevirtual` theo mô hình đơn giản sau:
+
+```text
+object thật → class thật → slot method trong vtable → implementation cần chạy
+```
+
+> [!NOTE]
+> JVM Specification quy định **kết quả của method lookup**, không bắt buộc JVM phải cài đặt bằng vtable. Vtable là mô hình triển khai phổ biến trong HotSpot và là cách trực quan để hiểu dispatch.
+
+### 4.3. Điều gì được dispatch động, điều gì không?
+
+Dynamic dispatch áp dụng cho **instance method có thể override**. Nó không áp dụng giống vậy cho field và `static` method:
+
+```java
+class Animal {
+    String label = "Animal";
+
+    static String kind() {
+        return "Animal";
+    }
+
+    String sound() {
+        return "?";
+    }
+}
+
+class Dog extends Animal {
+    String label = "Dog";
+
+    static String kind() {
+        return "Dog";
+    }
+
+    @Override
+    String sound() {
+        return "Gâu";
+    }
+}
+
+Animal animal = new Dog();
+
+System.out.println(animal.label);   // Animal
+System.out.println(animal.kind());  // Animal — hợp lệ nhưng không nên viết
+System.out.println(animal.sound()); // Gâu
+```
+
+| Thành phần | Cách chọn | Kết quả trong ví dụ |
+|------------|-----------|---------------------|
+| Instance method override | Theo kiểu runtime của object | `Dog.sound()` |
+| Field | Theo kiểu tĩnh của biến | `Animal.label` |
+| `static` method | Theo kiểu tĩnh tại compile-time | `Animal.kind()` |
+
+Field chỉ bị **che** (*field hiding*), còn `static` method chỉ bị **ẩn** (*method hiding*), không override theo nghĩa đa hình. `animal.kind()` được compiler hiểu như `Animal.kind()`, không dispatch sang `Dog.kind()`. Vì vậy nên viết trực tiếp `Animal.kind()` để tránh gây hiểu nhầm.
+
+### 4.4. Interface dùng `invokeinterface`
+
+Cùng một nguyên tắc cũng áp dụng khi biến có kiểu interface:
+
+```java
+interface Speaker {
+    String sound();
+}
+
+class Dog implements Speaker {
+    @Override
+    public String sound() {
+        return "Gâu";
+    }
+}
+
+Speaker speaker = new Dog();
+speaker.sound(); // chạy Dog.sound()
+```
+
+Bytecode thường dùng `invokeinterface` thay vì `invokevirtual`. JVM phải tìm implementation của method interface trong lớp thật; HotSpot có thể dùng cấu trúc như **itable** (*interface method table*) và các cache hỗ trợ dispatch.
+
+Điểm cần nhớ không đổi:
+
+```text
+Speaker quyết định lời gọi hợp lệ
+Dog quyết định implementation chạy ở runtime
+```
+
+### 4.5. JIT có thể bỏ luôn bước tra bảng
+
+Sau một thời gian chạy, JIT quan sát kiểu object xuất hiện tại từng call site:
+
+- Chỉ gặp `Dog` (**monomorphic**) → JIT có thể inline trực tiếp `Dog.sound()`.
+- Thường gặp `Dog` và `Cat` (**bimorphic**) → JIT có thể tạo vài phép kiểm tra kiểu nhanh rồi inline.
+- Gặp quá nhiều kiểu (**megamorphic**) → thường phải giữ lời gọi gián tiếp.
+
+Vì vậy vtable giải thích đúng **ngữ nghĩa dispatch**, nhưng code máy sau khi JIT tối ưu không nhất thiết còn thực hiện một lần tra vtable ở mọi lời gọi.
 
 > [!TIP]
-> `final`, `private`, `static` method → dùng `invokespecial`/`invokestatic` (binding tĩnh, không qua vtable) → JIT inline dễ hơn. Đánh dấu `final` cho method không cần override vừa rõ ý định vừa giúp tối ưu.
+> Dùng `final` khi thiết kế yêu cầu class hoặc method không được override. Ngoài việc thể hiện ý định rõ ràng, nó còn làm đích gọi dễ xác định hơn; tuy nhiên JIT cũng có thể tự khử dispatch dựa trên dữ liệu profiling mà không cần `final`.
 
----
+### 4.6. Tóm tắt luồng dispatch
 
-## 5. Overriding vs Overloading — runtime vs compile-time
+```text
+Animal animal = new Dog();
+animal.sound();
+
+Compile-time: Animal có sound() không?  → Có, cho phép compile
+Bytecode:     invokevirtual Animal.sound
+Runtime:      object thật là Dog         → chọn Dog.sound()
+JIT:          nếu call site ổn định       → có thể inline Dog.sound()
+```
+
+Nếu chỉ nhớ một dòng, hãy nhớ:
+
+```text
+Kiểu biến kiểm tra lời gọi; kiểu object chọn bản override.
+```
+
+### 4.7. Overriding vs Overloading — runtime vs compile-time
 
 Hai khái niệm dễ nhầm vì tên giống nhau, nhưng được giải quyết ở **hai thời điểm khác nhau**:
 
@@ -206,11 +401,11 @@ g(1);   // gọi g(long) — widening int→long được ưu tiên hơn boxing 
 
 ---
 
-## 6. Abstraction — abstract class vs interface vs default method
+## 5. Tính chất OOP số 4 — Abstraction (Trừu tượng)
 
 **Abstraction** = lộ "cái gì làm được" (hành vi), giấu "làm thế nào" (cài đặt). Java có 2 công cụ: `abstract class` và `interface`.
 
-### 6.1. Khác biệt cốt lõi
+### 5.1. Khác biệt cốt lõi
 
 | | `abstract class` | `interface` |
 |---|------------------|-------------|
@@ -220,7 +415,7 @@ g(1);   // gọi g(long) — widening int→long được ưu tiên hơn boxing 
 | Method có thân | Có (cả non-abstract) | `default` / `static` / `private` (Java 8/9+) |
 | Dùng khi | "is-a" + chia sẻ state/code | "can-do" + hợp đồng hành vi |
 
-### 6.2. Default method & bài toán đa kế thừa hành vi
+### 5.2. Default method & bài toán đa kế thừa hành vi
 
 Java 8 thêm `default` method vào interface → tái xuất hiện **diamond problem** ở mức hành vi. Nếu hai interface có cùng default method, lớp implement **bắt buộc** phải override để khử mơ hồ:
 
@@ -254,7 +449,7 @@ flowchart TD
 
 ---
 
-## 7. So sánh & khi nào dùng cái nào
+## 6. So sánh & khi nào dùng cái nào
 
 | Tình huống | Chọn | Lý do |
 |------------|------|-------|
@@ -269,7 +464,7 @@ flowchart TD
 
 ---
 
-## 8. Anti-patterns cần tránh
+## 7. Anti-patterns cần tránh
 
 | Anti-pattern | Vì sao sai | Thay bằng |
 |--------------|-----------|-----------|
@@ -285,7 +480,7 @@ flowchart TD
 
 ---
 
-## 9. Tóm tắt — Cheat sheet
+## 8. Tóm tắt — Cheat sheet
 
 **4 tính chất ↔ cơ chế JVM:**
 
@@ -311,4 +506,4 @@ Abstraction    → abstract method (no body) + default method resolution rule
 5. **Composition > Inheritance** khi quan hệ không thật sự là "is-a".
 
 > [!TIP]
-> Một câu để nhớ: *Bốn tính chất OOP chỉ là cách con người mô tả ba cơ chế JVM — che field (encapsulation), nối layout + vtable (inheritance + polymorphism), và bỏ trống thân method (abstraction).*
+> Một câu để nhớ: **Encapsulation bảo vệ state; Inheritance tạo quan hệ cha–con; Polymorphism chọn hành vi theo object thật; Abstraction chỉ lộ hợp đồng cần thiết.**
