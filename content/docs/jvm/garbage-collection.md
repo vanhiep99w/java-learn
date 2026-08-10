@@ -33,41 +33,120 @@ Không có collector tốt nhất cho mọi hệ thống. Việc chọn và tuni
 
 ## 2. GC Roots & Reachability — ai sống, ai chết?
 
-GC xác định object **sống** hay **chết** bằng **reachability analysis** (không dùng reference counting như Python):
+### 2.1. GC Root là biến nào trong code?
+
+> [!IMPORTANT]
+> **Không có biến đặc biệt nào tên hoặc kiểu là `GC Root`.** Một biến trở thành **nguồn GC Root** vì vị trí mà reference của nó đang được lưu, không phải vì tên, kiểu dữ liệu hay annotation.
+
+Xét trực tiếp đoạn code sau:
+
+```java
+class OrderService {
+    // (1) CACHE: static reference → nguồn GC Root khi class còn được load
+    static final List<Order> CACHE = new ArrayList<>();
+
+    void process() {
+        // (2) order: local reference → nguồn GC Root khi method đang chạy
+        Order order = new Order();
+
+        // (3) customer: cũng là local reference → nguồn GC Root khi còn được dùng
+        Customer customer = order.customer();
+
+        // Phần tử nằm trong ArrayList KHÔNG phải root
+        CACHE.add(order);
+        sendEmail(customer);
+    }
+}
+```
+
+Trong ví dụ này, câu trả lời cho “biến nào là GC Root?” là:
+
+| Thành phần | Là nguồn GC Root? | Lý do |
+|------------|-------------------|-------|
+| Static reference `CACHE` | **Có** | JVM có thể bắt đầu từ static field của class đang được load |
+| Local reference `order` | **Có**, khi còn live trong method | JVM có thể bắt đầu từ slot `order` trong stack frame đang chạy |
+| Local reference `customer` | **Có**, khi còn live trong method | Nó cũng nằm trong stack frame đang chạy |
+| Object tạo bởi `new Order()` | **Không** | Đây là object trong Heap được `order` trỏ tới |
+| Field bên trong object `Order` | **Không** | GC chỉ thấy field này sau khi đã đi tới object `Order` |
+| Phần tử `Order` bên trong `CACHE` | **Không** | Đây là reference thông thường bên trong `ArrayList` |
+| Biến primitive như `int count` | **Không** | Primitive không trỏ tới object nào trong Heap |
+
+Có thể hình dung Heap nằm bên phải đường phân cách:
+
+```text
+        NƠI JVM BẮT ĐẦU                         HEAP
+
+[stack slot: order] ────────────────────────→ [Order object]
+      GC Root                                    │
+                                                 └──→ [Customer object]
+
+[static slot: CACHE] ───────────────────────→ [ArrayList object]
+      GC Root                                    │
+                                                 └──→ [Order object]
+```
+
+**GC Root là nơi bắt đầu mũi tên ở bên trái, không phải object `Order` hay `ArrayList` ở bên phải.** Nói ngắn gọn:
+
+> GC Root = reference mà JVM có thể lấy ra trực tiếp từ trạng thái thực thi như stack, static storage, thread hoặc JNI, thay vì phải đi qua một object khác trong Heap.
+
+Khi `process()` kết thúc, stack frame bị xóa nên hai nguồn root `order` và `customer` biến mất. Nhưng object `Order` vẫn sống vì còn đường khác:
+
+```text
+static root CACHE → ArrayList → Order
+```
+
+Nếu gọi `CACHE.clear()` và không còn root nào khác dẫn tới `Order`, object đó mới trở thành đối tượng có thể được GC thu hồi.
+
+> [!NOTE]
+> Nói chính xác ở mức JVM, root là **slot/handle đang chứa reference**, không phải cái tên `order` hay `CACHE`. Các tên biến chỉ giúp lập trình viên nhận ra slot đó trong source code. Heap dump tool đôi khi gọi luôn object được slot trỏ tới là “GC Root”, nên cách hiển thị có thể gây nhầm.
+
+### 2.2. JVM dùng GC Roots như thế nào?
+
+GC xác định object **sống** hay **chết** bằng **reachability analysis** (không dùng reference counting):
 
 ```mermaid
 flowchart TD
-    R1["GC Root: local var trong stack frame"] --> A["Object A"]
-    R2["GC Root: static field"] --> B["Object B"]
+    R1["GC Root: local reference trong stack frame"] --> A["Object A"]
+    R2["GC Root: static reference"] --> B["Object B"]
     A --> C["Object C"]
     A --> D["Object D"]
     C --> E["Object E"]
-    
-    F["Object F"] -.->|"không reachable"| X["GC sẽ thu hồi"]
-    G["Object G"] -.-> F
-    
+
+    F["Object F"] -.->|"không có đường từ root"| X["Có thể được GC thu hồi"]
+    G["Object G"] --> F
+
     style F fill:#ff6b6b
     style G fill:#ff6b6b
     style X fill:#ff6b6b
 ```
 
-**GC Roots** — tập hợp gốc mà GC bắt đầu duyệt:
+Trong sơ đồ, `A`, `B`, `C`, `D`, `E` sống vì có ít nhất một đường đi từ GC Root. `F` và `G` có thể tham chiếu lẫn nhau nhưng vẫn chết vì cả cụm không có đường đi từ bất kỳ root nào.
 
-| GC Root | Ví dụ |
-|---------|-------|
-| Local variables trong stack frame | Biến `order` trong method đang chạy |
-| Active thread (Thread object) | Thread pool thread |
-| Static fields của loaded class | `static Map<> cache` |
-| JNI references | Native code giữ reference |
-| Synchronized monitor | Object đang bị lock |
-| Class loaded bởi system ClassLoader | `java.lang.String.class` |
+Các nguồn GC Root phổ biến:
 
-**Thuật toán**: bắt đầu từ tất cả GC Roots, duyệt theo reference (BFS/DFS). Mọi object **không reachable** từ bất kỳ root nào → **eligible for collection**.
+| Nguồn GC Root | Ví dụ | Root tồn tại trong bao lâu? |
+|----------------|-------|-----------------------------|
+| Local reference trong stack frame | Biến `order` của method đang chạy | Đến khi JVM không còn cần slot đó hoặc stack frame kết thúc |
+| Active thread | Thread pool worker chưa dừng | Trong khi thread còn được JVM xem là active |
+| Static reference của loaded class | `static Map<String, User> cache` | Thường đến khi class được unload hoặc field được gán lại |
+| JNI global/local reference | Native code giữ Java object | Đến khi native code xóa handle hoặc native frame kết thúc |
+| JVM internal reference | System class, class loader, một số VM structure | Theo vòng đời structure tương ứng trong JVM |
+| Monitor đang được JVM sử dụng | Object liên quan đến synchronization đang hoạt động | Trong thời gian JVM còn cần monitor đó |
+
+**Thuật toán khái niệm**:
+
+1. JVM chụp tập GC Roots tại thời điểm phù hợp.
+2. Đánh dấu object được các root trỏ trực tiếp tới.
+3. Duyệt tiếp toàn bộ reference từ các object đã đánh dấu.
+4. Object nào không được đánh dấu, tức không có đường từ root, thì **eligible for collection**.
+
+> [!IMPORTANT]
+> “Eligible for collection” nghĩa là GC **được phép** thu hồi, không đảm bảo object sẽ được thu hồi ngay lập tức. Thời điểm thực tế phụ thuộc collector và chu kỳ GC.
 
 > [!WARNING]
-> Object có thể vẫn **chiếm memory** dù bạn đã "xoá reference" — nếu còn một reference ẩn giữ nó (memory leak). Ví dụ điển hình: `static List<>` chỉ `add()` không bao giờ `remove()` → Old Gen đầy dần.
+> Object có thể vẫn **chiếm memory** dù ứng dụng không còn cần nó nếu vẫn có đường reference từ một GC Root — đây là bản chất của memory leak trong Java. Ví dụ: `static List<>` chỉ `add()` mà không `remove()` sẽ giữ toàn bộ phần tử sống.
 
-### 2.1. Finalization & Phantom Reference
+### 2.3. Finalization & Phantom Reference
 
 Object có `finalize()` **không bị thu hồi ngay** — nó phải qua hàng đợi finalization (chạy bởi `FinalizerThread`), sau đó **lần GC tiếp theo** mới thực sự giải phóng. Nghĩa là object "chết" tồn tại thêm **ít nhất 1 GC cycle**.
 
