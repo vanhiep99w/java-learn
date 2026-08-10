@@ -1,0 +1,14 @@
+{
+  "title": "JPA & Hibernate",
+  "pages": [
+    "jpa-hibernate-overview",
+    "entity-mapping-and-identity",
+    "persistence-context-and-entity-lifecycle",
+    "relationships-mapping",
+    "fetching-strategies-and-proxies",
+    "jpql-criteria-and-native-query",
+    "spring-data-jpa",
+    "transactions-with-jpa",
+    "hibernate-performance-troubleshooting"
+  ]
+}
