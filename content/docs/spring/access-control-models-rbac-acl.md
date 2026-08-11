@@ -40,25 +40,28 @@ Authorization trả lời câu hỏi: **một principal đã được xác thự
   - [Cấu trúc một ACE](#52-cấu-trúc-một-ace)
   - [Thứ tự đánh giá allow và deny](#53-thứ-tự-đánh-giá-allow-và-deny)
   - [RBAC và ACL phối hợp](#54-rbac-và-acl-phối-hợp)
-  - [Cách implement bitmask permission check](#55-cách-implement-bitmask-permission-check)
-- [6. Cách 1 — tự triển khai domain ACL](#6-cách-1--tự-triển-khai-domain-acl)
+- [6. Tự triển khai ACL không dùng bitmask](#6-tự-triển-khai-acl-không-dùng-bitmask)
   - [Schema ACL thực dụng](#61-schema-acl-thực-dụng)
   - [Repository đọc ACL](#62-repository-đọc-acl)
   - [Authorization service](#63-authorization-service)
   - [Tích hợp với @PreAuthorize](#64-tích-hợp-với-preauthorize)
   - [Grant và revoke an toàn](#65-grant-và-revoke-an-toàn)
-- [7. Cách 2 — dùng Spring Security ACL module](#7-cách-2--dùng-spring-security-acl-module)
-  - [Bốn bảng cốt lõi](#71-bốn-bảng-cốt-lõi)
-  - [Dependency và cấu hình](#72-dependency-và-cấu-hình)
-  - [Tạo ACL và ACE](#73-tạo-acl-và-ace)
-  - [Kiểm tra bằng hasPermission](#74-kiểm-tra-bằng-haspermission)
-  - [Khi nào không nên dùng module này](#75-khi-nào-không-nên-dùng-module-này)
-- [8. Query danh sách có phân quyền](#8-query-danh-sách-có-phân-quyền)
-- [9. Context-Based, PBAC và ReBAC trong Spring](#9-context-based-pbac-và-rebac-trong-spring)
-- [10. Kiểm thử authorization](#10-kiểm-thử-authorization)
-- [11. Security checklist và anti-pattern](#11-security-checklist-và-anti-pattern)
-- [12. Chọn mô hình nào](#12-chọn-mô-hình-nào)
-- [13. Tóm tắt](#13-tóm-tắt)
+- [7. Tối ưu ACL bằng bitmask](#7-tối-ưu-acl-bằng-bitmask)
+- [8. Dùng Spring Security ACL module](#8-dùng-spring-security-acl-module)
+  - [Bốn bảng cốt lõi](#81-bốn-bảng-cốt-lõi)
+  - [Dependency và cấu hình](#82-dependency-và-cấu-hình)
+  - [Tạo ACL và ACE](#83-tạo-acl-và-ace)
+  - [Kiểm tra bằng hasPermission](#84-kiểm-tra-bằng-haspermission)
+  - [Khi nào không nên dùng module này](#85-khi-nào-không-nên-dùng-module-này)
+- [9. Query danh sách có phân quyền](#9-query-danh-sách-có-phân-quyền)
+- [10. Context-Based, PBAC và ReBAC trong Spring](#10-context-based-pbac-và-rebac-trong-spring)
+- [11. Kiểm thử authorization](#11-kiểm-thử-authorization)
+- [12. Security checklist và anti-pattern](#12-security-checklist-và-anti-pattern)
+  - [Checklist](#checklist)
+  - [Anti-pattern](#anti-pattern)
+- [13. Chọn mô hình nào](#13-chọn-mô-hình-nào)
+- [14. Tóm tắt](#14-tóm-tắt)
+  - [Tài liệu liên quan](#tài-liệu-liên-quan)
 
 ---
 
@@ -693,7 +696,232 @@ flowchart TD
     E -->|Có| F[ALLOW]
 ```
 
-### 5.5. Cách implement bitmask permission check
+## 6. Tự triển khai ACL không dùng bitmask
+
+Hãy bắt đầu bằng schema **mỗi permission một row**. Cách này thể hiện trực tiếp mô hình ACL, dễ đọc trong database và chưa cần biết phép toán bit. Sau khi hiểu đầy đủ luồng lưu ACE, truy vấn và kiểm tra quyền ở phần này, phần 7 mới thay cột `permission` bằng bitmask như một tối ưu lưu trữ.
+
+Custom domain ACL không dùng bitmask thường dễ hiểu hơn Spring Security ACL module khi:
+
+- ID là UUID/string.
+- Permission theo domain như `APPROVE`, `EXPORT`, `COMMENT`.
+- Cần join ACL trực tiếp trong query danh sách.
+- Team muốn schema minh bạch và ít abstraction.
+
+### 6.1. Schema ACL thực dụng
+
+```sql
+CREATE TABLE resource_acl (
+    id              BIGSERIAL PRIMARY KEY,
+    resource_type   VARCHAR(80) NOT NULL,
+    resource_id     VARCHAR(100) NOT NULL,
+    subject_type    VARCHAR(20) NOT NULL,
+    subject_id      VARCHAR(120) NOT NULL,
+    permission      VARCHAR(80) NOT NULL,
+    effect          VARCHAR(10) NOT NULL DEFAULT 'ALLOW',
+    granted_by      BIGINT NOT NULL,
+    reason          VARCHAR(255),
+    expires_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT ck_acl_subject_type
+        CHECK (subject_type IN ('USER', 'ROLE')),
+    CONSTRAINT ck_acl_effect
+        CHECK (effect IN ('ALLOW', 'DENY')),
+    CONSTRAINT uk_resource_acl UNIQUE
+        (resource_type, resource_id, subject_type, subject_id, permission)
+);
+
+CREATE INDEX idx_acl_resource_lookup
+    ON resource_acl
+       (resource_type, resource_id, permission, effect);
+
+CREATE INDEX idx_acl_subject_lookup
+    ON resource_acl
+       (subject_type, subject_id, permission);
+```
+
+`resource_type` và `permission` phải lấy từ allow-list server-side. Không cho client gửi một chuỗi class name tùy ý.
+
+### 6.2. Repository đọc ACL
+
+Projection tối thiểu:
+
+```java
+public record AclEntryView(String permission, String effect) {
+    boolean denies() { return "DENY".equals(effect); }
+    boolean grants() { return "ALLOW".equals(effect); }
+}
+```
+
+Dùng `NamedParameterJdbcTemplate` để query cả user SID và role SID trong một lần:
+
+```java
+@Repository
+@RequiredArgsConstructor
+public class ResourceAclRepository {
+    private final NamedParameterJdbcTemplate jdbc;
+
+    public List<AclEntryView> findRelevant(
+            String resourceType,
+            String resourceId,
+            String username,
+            Set<String> roles,
+            String permission) {
+
+        Set<String> safeRoles = roles.isEmpty() ? Set.of("__NO_ROLE__") : roles;
+
+        String sql = """
+            SELECT permission, effect
+            FROM resource_acl
+            WHERE resource_type = :resourceType
+              AND resource_id = :resourceId
+              AND (expires_at IS NULL OR expires_at > now())
+              AND permission IN (:permission, 'ADMINISTER')
+              AND (
+                    (subject_type = 'USER' AND subject_id = :username)
+                 OR (subject_type = 'ROLE' AND subject_id IN (:roles))
+              )
+            """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("resourceType", resourceType)
+                .addValue("resourceId", resourceId)
+                .addValue("username", username)
+                .addValue("roles", safeRoles)
+                .addValue("permission", permission);
+
+        return jdbc.query(sql, params, (rs, rowNum) ->
+                new AclEntryView(
+                        rs.getString("permission"),
+                        rs.getString("effect")));
+    }
+}
+```
+
+### 6.3. Authorization service
+
+Service này là PDP của custom ACL:
+
+```java
+@Component("acl")
+@RequiredArgsConstructor
+public class AclAuthorizationService {
+    private static final Set<String> RESOURCE_TYPES =
+            Set.of("INVOICE", "DOCUMENT", "PROJECT");
+    private static final Set<String> PERMISSIONS =
+            Set.of("READ", "WRITE", "DELETE", "APPROVE", "ADMINISTER");
+
+    private final ResourceAclRepository aclRepository;
+
+    public boolean can(
+            Authentication authentication,
+            String resourceType,
+            Object resourceId,
+            String permission) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        if (!RESOURCE_TYPES.contains(resourceType)
+                || !PERMISSIONS.contains(permission)) {
+            return false;
+        }
+
+        Set<String> roles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a.startsWith("ROLE_"))
+                .collect(Collectors.toUnmodifiableSet());
+
+        List<AclEntryView> entries = aclRepository.findRelevant(
+                resourceType,
+                resourceId.toString(),
+                authentication.getName(),
+                roles,
+                permission);
+
+        boolean denied = entries.stream().anyMatch(AclEntryView::denies);
+        if (denied) return false;
+
+        return entries.stream().anyMatch(AclEntryView::grants);
+    }
+}
+```
+
+Đây là policy **deny-overrides**. Nếu không dùng explicit deny, bỏ cột `effect` và chỉ kiểm tra sự tồn tại của grant.
+
+### 6.4. Tích hợp với @PreAuthorize
+
+Expression ghi rõ RBAC gate và ACL scope:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class InvoiceService {
+
+    @PreAuthorize("hasAuthority('invoice:read') and " +
+                  "@acl.can(authentication, 'INVOICE', #invoiceId, 'READ')")
+    @Transactional(readOnly = true)
+    public InvoiceDto get(UUID invoiceId) {
+        return loadInvoice(invoiceId);
+    }
+
+    @PreAuthorize("hasAuthority('invoice:update') and " +
+                  "@acl.can(authentication, 'INVOICE', #invoiceId, 'WRITE')")
+    @Transactional
+    public void update(UUID invoiceId, UpdateInvoiceCommand command) {
+        // update
+    }
+}
+```
+
+Đóng gói expression lặp lại bằng meta-annotation:
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@PreAuthorize("hasAuthority('invoice:read') and " +
+              "@acl.can(authentication, 'INVOICE', #invoiceId, 'READ')")
+public @interface CanReadInvoice {
+}
+```
+
+> [!IMPORTANT]
+> Tên parameter trong SpEL phải còn trong bytecode. Với build chuẩn Spring Boot, giữ compiler flag `-parameters`. Integration test phải gọi đúng proxy để bắt lỗi expression sớm.
+
+### 6.5. Grant và revoke an toàn
+
+Chỉ principal có `ADMINISTER` trên object hoặc capability quản trị đặc biệt mới được grant ACL:
+
+```java
+@PreAuthorize("hasAuthority('acl:grant') and " +
+              "@acl.can(authentication, #resourceType, " +
+              "#resourceId, 'ADMINISTER')")
+@Transactional
+public void grant(
+        String resourceType,
+        UUID resourceId,
+        GrantAclCommand command) {
+
+    validatePermission(command.permission());
+    validateSubject(command.subjectType(), command.subjectId());
+    aclRepository.upsertGrant(/* ... */, currentUserId());
+    auditPublisher.aclGranted(/* before/after, actor, reason */);
+    aclCache.evict(resourceType, resourceId);
+}
+```
+
+Các invariant cần bảo vệ:
+
+- Không tự thu hồi ACE `ADMINISTER` cuối cùng nếu object bắt buộc có admin.
+- Không grant cho subject không tồn tại.
+- Không cho người có `READ` tự nâng lên `ADMINISTER`.
+- Revoke phải idempotent.
+- Grant/revoke và audit event nằm trong cùng transaction hoặc dùng transactional outbox.
+- Cache chỉ được evict sau commit để tránh cache đọc trạng thái chưa commit.
+
+## 7. Tối ưu ACL bằng bitmask
+
+Phần 6 đã triển khai ACL theo cách dễ hiểu nhất: mỗi permission là một ACE riêng. Khi số row trở thành vấn đề và tập permission đủ nhỏ, ổn định, có thể nén nhiều permission của cùng một subject-resource vào một bitmask.
 
 Trước hết cần tách hai khái niệm:
 
@@ -1221,232 +1449,12 @@ Các quy tắc vận hành quan trọng:
 - API và audit log nên trả tên như `READ`, `WRITE`, không chỉ trả số `3`.
 - Dùng `long`/`BIGINT` và chỉ dùng bit `0..62` để tránh vấn đề signed integer.
 - Bitmask chỉ tối ưu cách lưu permission; nó không thay thế ownership, scope hoặc các policy nghiệp vụ khác.
-## 6. Cách 1 — tự triển khai domain ACL
 
-Custom domain ACL thường dễ hiểu hơn Spring Security ACL module khi:
-
-- ID là UUID/string.
-- Permission theo domain như `APPROVE`, `EXPORT`, `COMMENT`.
-- Cần join ACL trực tiếp trong query danh sách.
-- Team muốn schema minh bạch và ít abstraction.
-
-### 6.1. Schema ACL thực dụng
-
-```sql
-CREATE TABLE resource_acl (
-    id              BIGSERIAL PRIMARY KEY,
-    resource_type   VARCHAR(80) NOT NULL,
-    resource_id     VARCHAR(100) NOT NULL,
-    subject_type    VARCHAR(20) NOT NULL,
-    subject_id      VARCHAR(120) NOT NULL,
-    permission      VARCHAR(80) NOT NULL,
-    effect          VARCHAR(10) NOT NULL DEFAULT 'ALLOW',
-    granted_by      BIGINT NOT NULL,
-    reason          VARCHAR(255),
-    expires_at      TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    CONSTRAINT ck_acl_subject_type
-        CHECK (subject_type IN ('USER', 'ROLE')),
-    CONSTRAINT ck_acl_effect
-        CHECK (effect IN ('ALLOW', 'DENY')),
-    CONSTRAINT uk_resource_acl UNIQUE
-        (resource_type, resource_id, subject_type, subject_id, permission)
-);
-
-CREATE INDEX idx_acl_resource_lookup
-    ON resource_acl
-       (resource_type, resource_id, permission, effect);
-
-CREATE INDEX idx_acl_subject_lookup
-    ON resource_acl
-       (subject_type, subject_id, permission);
-```
-
-`resource_type` và `permission` phải lấy từ allow-list server-side. Không cho client gửi một chuỗi class name tùy ý.
-
-### 6.2. Repository đọc ACL
-
-Projection tối thiểu:
-
-```java
-public record AclEntryView(String permission, String effect) {
-    boolean denies() { return "DENY".equals(effect); }
-    boolean grants() { return "ALLOW".equals(effect); }
-}
-```
-
-Dùng `NamedParameterJdbcTemplate` để query cả user SID và role SID trong một lần:
-
-```java
-@Repository
-@RequiredArgsConstructor
-public class ResourceAclRepository {
-    private final NamedParameterJdbcTemplate jdbc;
-
-    public List<AclEntryView> findRelevant(
-            String resourceType,
-            String resourceId,
-            String username,
-            Set<String> roles,
-            String permission) {
-
-        Set<String> safeRoles = roles.isEmpty() ? Set.of("__NO_ROLE__") : roles;
-
-        String sql = """
-            SELECT permission, effect
-            FROM resource_acl
-            WHERE resource_type = :resourceType
-              AND resource_id = :resourceId
-              AND (expires_at IS NULL OR expires_at > now())
-              AND permission IN (:permission, 'ADMINISTER')
-              AND (
-                    (subject_type = 'USER' AND subject_id = :username)
-                 OR (subject_type = 'ROLE' AND subject_id IN (:roles))
-              )
-            """;
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("resourceType", resourceType)
-                .addValue("resourceId", resourceId)
-                .addValue("username", username)
-                .addValue("roles", safeRoles)
-                .addValue("permission", permission);
-
-        return jdbc.query(sql, params, (rs, rowNum) ->
-                new AclEntryView(
-                        rs.getString("permission"),
-                        rs.getString("effect")));
-    }
-}
-```
-
-### 6.3. Authorization service
-
-Service này là PDP của custom ACL:
-
-```java
-@Component("acl")
-@RequiredArgsConstructor
-public class AclAuthorizationService {
-    private static final Set<String> RESOURCE_TYPES =
-            Set.of("INVOICE", "DOCUMENT", "PROJECT");
-    private static final Set<String> PERMISSIONS =
-            Set.of("READ", "WRITE", "DELETE", "APPROVE", "ADMINISTER");
-
-    private final ResourceAclRepository aclRepository;
-
-    public boolean can(
-            Authentication authentication,
-            String resourceType,
-            Object resourceId,
-            String permission) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-        if (!RESOURCE_TYPES.contains(resourceType)
-                || !PERMISSIONS.contains(permission)) {
-            return false;
-        }
-
-        Set<String> roles = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .filter(a -> a.startsWith("ROLE_"))
-                .collect(Collectors.toUnmodifiableSet());
-
-        List<AclEntryView> entries = aclRepository.findRelevant(
-                resourceType,
-                resourceId.toString(),
-                authentication.getName(),
-                roles,
-                permission);
-
-        boolean denied = entries.stream().anyMatch(AclEntryView::denies);
-        if (denied) return false;
-
-        return entries.stream().anyMatch(AclEntryView::grants);
-    }
-}
-```
-
-Đây là policy **deny-overrides**. Nếu không dùng explicit deny, bỏ cột `effect` và chỉ kiểm tra sự tồn tại của grant.
-
-### 6.4. Tích hợp với @PreAuthorize
-
-Expression ghi rõ RBAC gate và ACL scope:
-
-```java
-@Service
-@RequiredArgsConstructor
-public class InvoiceService {
-
-    @PreAuthorize("hasAuthority('invoice:read') and " +
-                  "@acl.can(authentication, 'INVOICE', #invoiceId, 'READ')")
-    @Transactional(readOnly = true)
-    public InvoiceDto get(UUID invoiceId) {
-        return loadInvoice(invoiceId);
-    }
-
-    @PreAuthorize("hasAuthority('invoice:update') and " +
-                  "@acl.can(authentication, 'INVOICE', #invoiceId, 'WRITE')")
-    @Transactional
-    public void update(UUID invoiceId, UpdateInvoiceCommand command) {
-        // update
-    }
-}
-```
-
-Đóng gói expression lặp lại bằng meta-annotation:
-
-```java
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)
-@PreAuthorize("hasAuthority('invoice:read') and " +
-              "@acl.can(authentication, 'INVOICE', #invoiceId, 'READ')")
-public @interface CanReadInvoice {
-}
-```
-
-> [!IMPORTANT]
-> Tên parameter trong SpEL phải còn trong bytecode. Với build chuẩn Spring Boot, giữ compiler flag `-parameters`. Integration test phải gọi đúng proxy để bắt lỗi expression sớm.
-
-### 6.5. Grant và revoke an toàn
-
-Chỉ principal có `ADMINISTER` trên object hoặc capability quản trị đặc biệt mới được grant ACL:
-
-```java
-@PreAuthorize("hasAuthority('acl:grant') and " +
-              "@acl.can(authentication, #resourceType, " +
-              "#resourceId, 'ADMINISTER')")
-@Transactional
-public void grant(
-        String resourceType,
-        UUID resourceId,
-        GrantAclCommand command) {
-
-    validatePermission(command.permission());
-    validateSubject(command.subjectType(), command.subjectId());
-    aclRepository.upsertGrant(/* ... */, currentUserId());
-    auditPublisher.aclGranted(/* before/after, actor, reason */);
-    aclCache.evict(resourceType, resourceId);
-}
-```
-
-Các invariant cần bảo vệ:
-
-- Không tự thu hồi ACE `ADMINISTER` cuối cùng nếu object bắt buộc có admin.
-- Không grant cho subject không tồn tại.
-- Không cho người có `READ` tự nâng lên `ADMINISTER`.
-- Revoke phải idempotent.
-- Grant/revoke và audit event nằm trong cùng transaction hoặc dùng transactional outbox.
-- Cache chỉ được evict sau commit để tránh cache đọc trạng thái chưa commit.
-
-## 7. Cách 2 — dùng Spring Security ACL module
+## 8. Dùng Spring Security ACL module
 
 Spring Security cung cấp module `spring-security-acl`. Module này dùng JDBC, bit mask permission, object identity và cache để giải quyết object-level ACL theo mô hình chuẩn.
 
-### 7.1. Bốn bảng cốt lõi
+### 8.1. Bốn bảng cốt lõi
 
 ```mermaid
 erDiagram
@@ -1497,7 +1505,7 @@ Các khái niệm:
 > [!WARNING]
 > Hãy dùng đúng file schema dành cho database và đúng version Spring Security của dự án. Identity/sequence query khác nhau giữa PostgreSQL, MySQL, Oracle và H2. Module truyền thống phù hợp nhất với numeric ID kiểu `long`; UUID/string ID cần kiểm chứng kỹ hoặc custom implementation.
 
-### 7.2. Dependency và cấu hình
+### 8.2. Dependency và cấu hình
 
 Maven:
 
@@ -1594,7 +1602,7 @@ service.setSidIdentityQuery(
 
 Đừng copy query này nếu migration dùng sequence tên riêng. Query phải khớp chính xác DDL thực tế.
 
-### 7.3. Tạo ACL và ACE
+### 8.3. Tạo ACL và ACE
 
 ACL phải được tạo sau khi domain object đã có ID:
 
@@ -1657,7 +1665,7 @@ public class InvoiceAclAdminService {
 
 Spring Security ACL không tự tạo/xóa ACL khi JPA entity được tạo/xóa. Application service phải phối hợp domain transaction và ACL lifecycle. Hãy có cleanup job hoặc foreign-key strategy để tránh orphan ACL.
 
-### 7.4. Kiểm tra bằng hasPermission
+### 8.4. Kiểm tra bằng hasPermission
 
 Khi truyền object:
 
@@ -1690,7 +1698,7 @@ public List<Invoice> findAll() { ... }
 
 Cách này chỉ chấp nhận được với tập nhỏ đã được giới hạn. Với hàng nghìn row, hãy đẩy authorization predicate xuống SQL.
 
-### 7.5. Khi nào không nên dùng module này
+### 8.5. Khi nào không nên dùng module này
 
 Cân nhắc custom ACL hoặc authorization service khác nếu:
 
@@ -1703,7 +1711,7 @@ Cân nhắc custom ACL hoặc authorization service khác nếu:
 
 Spring Security ACL không “tốt hơn” custom ACL trong mọi trường hợp. Nó tốt khi domain phù hợp với abstraction của module và team muốn dùng sẵn `AclService` + `hasPermission`.
 
-## 8. Query danh sách có phân quyền
+## 9. Query danh sách có phân quyền
 
 Không nên làm:
 
@@ -1740,7 +1748,7 @@ Nếu hỗ trợ explicit deny, query phải loại object có ACE deny ưu tiê
 
 Với pagination, authorization phải nằm **trong query trước LIMIT/OFFSET**. Lọc sau pagination tạo page thiếu item, sai total count và có thể rò rỉ timing/metadata.
 
-## 9. Context-Based, PBAC và ReBAC trong Spring
+## 10. Context-Based, PBAC và ReBAC trong Spring
 
 Spring Security không buộc ứng dụng dùng RBAC. `AuthorizationManager` và method expression có thể gọi policy bean tùy chỉnh.
 
@@ -1799,7 +1807,7 @@ sequenceDiagram
 
 Phải quy định timeout và failure mode. Với authorization, policy engine timeout thường phải **fail closed**: từ chối thay vì cho qua.
 
-## 10. Kiểm thử authorization
+## 11. Kiểm thử authorization
 
 RBAC method test:
 
@@ -1847,7 +1855,7 @@ Các test quan trọng khác:
 
 Với Spring Security ACL/JDBC, integration test nên dùng cùng database engine production qua Testcontainers. H2 có identity, locking và SQL behavior khác PostgreSQL/MySQL nên có thể che giấu lỗi.
 
-## 11. Security checklist và anti-pattern
+## 12. Security checklist và anti-pattern
 
 ### Checklist
 
@@ -1877,7 +1885,7 @@ Với Spring Security ACL/JDBC, integration test nên dùng cùng database engin
 | permission lấy từ frontend | client tự nâng quyền | server-side allow-list |
 | cache ACL không invalidation | quyền đã revoke vẫn dùng được | version/event-driven eviction |
 
-## 12. Chọn mô hình nào
+## 13. Chọn mô hình nào
 
 ```mermaid
 flowchart TD
@@ -1905,7 +1913,7 @@ Khuyến nghị thực dụng cho đa số Spring Boot business application:
 3. Tách context rule vào policy bean có test độc lập.
 4. Chuyển sang external PBAC/ReBAC engine khi nhiều service cần cùng policy hoặc graph đã vượt khả năng query đơn giản.
 
-## 13. Tóm tắt
+## 14. Tóm tắt
 
 - **RBAC** quản trị quyền qua role; code nên enforce permission thay vì tên role.
 - **ACL** quyết định quyền trên từng object instance; phù hợp sharing và object scope.
