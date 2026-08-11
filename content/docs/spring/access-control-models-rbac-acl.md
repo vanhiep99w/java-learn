@@ -1,0 +1,1860 @@
+---
+title: "Access Control Models: RBAC, ACL, DAC, MAC, PBAC, Context-Based và ReBAC"
+description: "So sánh các mô hình kiểm soát truy cập và đi sâu cách thiết kế, triển khai RBAC cùng object-level ACL trong Spring Boot/Spring Security: schema, GrantedAuthority, @PreAuthorize, PermissionEvaluator, multi-tenant, cache, audit và kiểm thử."
+---
+
+Authorization trả lời câu hỏi: **một principal đã được xác thực có được phép thực hiện action trên resource cụ thể trong context hiện tại hay không?** Tài liệu này phân biệt các mô hình access control phổ biến, sau đó đi sâu vào hai mô hình thường gặp nhất trong ứng dụng Spring Boot: **RBAC** và **ACL**.
+
+> [!NOTE]
+> Ví dụ dùng API của Spring Boot 3.x và Spring Security 6.x. Các khái niệm và phần lớn cấu hình vẫn áp dụng cho Spring Boot 4/Spring Security 7; hãy kiểm tra migration guide nếu API nhỏ thay đổi theo phiên bản.
+
+## Mục lục
+
+- [1. Mental model chung](#1-mental-model-chung)
+  - [Authentication khác authorization](#11-authentication-khác-authorization)
+  - [Một quyết định authorization gồm những gì](#12-một-quyết-định-authorization-gồm-những-gì)
+- [2. Bản đồ các mô hình access control](#2-bản-đồ-các-mô-hình-access-control)
+  - [DAC — Discretionary Access Control](#21-dac--discretionary-access-control)
+  - [MAC — Mandatory Access Control](#22-mac--mandatory-access-control)
+  - [RBAC — Role-Based Access Control](#23-rbac--role-based-access-control)
+  - [ACL — Access Control List](#24-acl--access-control-list)
+  - [PBAC — Policy-Based Access Control](#25-pbac--policy-based-access-control)
+  - [Context-Based Access Control](#26-context-based-access-control)
+  - [ReBAC — Relationship-Based Access Control](#27-rebac--relationship-based-access-control)
+  - [Bảng so sánh nhanh](#28-bảng-so-sánh-nhanh)
+- [3. RBAC chuyên sâu](#3-rbac-chuyên-sâu)
+  - [Mô hình dữ liệu](#31-mô-hình-dữ-liệu)
+  - [Role không phải permission](#32-role-không-phải-permission)
+  - [Role hierarchy và separation of duties](#33-role-hierarchy-và-separation-of-duties)
+  - [RBAC trong hệ thống multi-tenant](#34-rbac-trong-hệ-thống-multi-tenant)
+- [4. Triển khai RBAC trong Spring Boot](#4-triển-khai-rbac-trong-spring-boot)
+  - [Bước 1 — thiết kế permission vocabulary](#41-bước-1--thiết-kế-permission-vocabulary)
+  - [Bước 2 — tạo database schema](#42-bước-2--tạo-database-schema)
+  - [Bước 3 — nạp authority khi đăng nhập](#43-bước-3--nạp-authority-khi-đăng-nhập)
+  - [Bước 4 — cấu hình request và method security](#44-bước-4--cấu-hình-request-và-method-security)
+  - [Bước 5 — đóng gói rule bằng meta-annotation](#45-bước-5--đóng-gói-rule-bằng-meta-annotation)
+  - [Bước 6 — role hierarchy](#46-bước-6--role-hierarchy)
+  - [RBAC với JWT](#47-rbac-với-jwt)
+  - [Cache và thay đổi quyền thời gian thực](#48-cache-và-thay-đổi-quyền-thời-gian-thực)
+- [5. ACL chuyên sâu](#5-acl-chuyên-sâu)
+  - [ACL giải quyết bài toán nào](#51-acl-giải-quyết-bài-toán-nào)
+  - [Cấu trúc một ACE](#52-cấu-trúc-một-ace)
+  - [Thứ tự đánh giá allow và deny](#53-thứ-tự-đánh-giá-allow-và-deny)
+  - [RBAC và ACL phối hợp](#54-rbac-và-acl-phối-hợp)
+  - [Cách implement bitmask permission check](#55-cách-implement-bitmask-permission-check)
+- [6. Cách 1 — tự triển khai domain ACL](#6-cách-1--tự-triển-khai-domain-acl)
+  - [Schema ACL thực dụng](#61-schema-acl-thực-dụng)
+  - [Repository đọc ACL](#62-repository-đọc-acl)
+  - [Authorization service](#63-authorization-service)
+  - [Tích hợp với @PreAuthorize](#64-tích-hợp-với-preauthorize)
+  - [Grant và revoke an toàn](#65-grant-và-revoke-an-toàn)
+- [7. Cách 2 — dùng Spring Security ACL module](#7-cách-2--dùng-spring-security-acl-module)
+  - [Bốn bảng cốt lõi](#71-bốn-bảng-cốt-lõi)
+  - [Dependency và cấu hình](#72-dependency-và-cấu-hình)
+  - [Tạo ACL và ACE](#73-tạo-acl-và-ace)
+  - [Kiểm tra bằng hasPermission](#74-kiểm-tra-bằng-haspermission)
+  - [Khi nào không nên dùng module này](#75-khi-nào-không-nên-dùng-module-này)
+- [8. Query danh sách có phân quyền](#8-query-danh-sách-có-phân-quyền)
+- [9. Context-Based, PBAC và ReBAC trong Spring](#9-context-based-pbac-và-rebac-trong-spring)
+- [10. Kiểm thử authorization](#10-kiểm-thử-authorization)
+- [11. Security checklist và anti-pattern](#11-security-checklist-và-anti-pattern)
+- [12. Chọn mô hình nào](#12-chọn-mô-hình-nào)
+- [13. Tóm tắt](#13-tóm-tắt)
+
+---
+
+## 1. Mental model chung
+
+### 1.1. Authentication khác authorization
+
+- **Authentication** xác minh danh tính: “đây có thật là Alice không?”.
+- **Authorization** kiểm tra quyền: “Alice có được duyệt hóa đơn `INV-42` không?”.
+
+Spring Security lưu danh tính đã xác thực trong `Authentication`. Object này chứa principal và tập `GrantedAuthority`. Sau đó `AuthorizationManager`, expression trong `@PreAuthorize`, hoặc ACL service dùng dữ liệu đó để ra quyết định.
+
+> [!WARNING]
+> Đã đăng nhập không có nghĩa là được truy cập mọi resource. Nếu API chỉ gọi `.authenticated()` mà không kiểm tra quyền hoặc ownership, ứng dụng rất dễ mắc **IDOR/BOLA**: người dùng đổi ID trong URL để đọc object của người khác.
+
+### 1.2. Một quyết định authorization gồm những gì
+
+Có thể chuẩn hóa mọi rule thành năm thành phần:
+
+```text
+Decision = f(subject, action, resource, context, relationships)
+
+subject       ai đang gọi? user, service account, role, group
+action        đang làm gì? read, create, update, approve, delete
+resource      tác động lên gì? Invoice, Project, File, API
+context       tenant, thời gian, IP, device, risk score, MFA level
+relationships owner, member, manager-of, parent-of, shared-with
+```
+
+Ví dụ:
+
+> Cho phép Alice `APPROVE` invoice `INV-42` nếu Alice có permission `invoice:approve`, invoice thuộc cùng tenant, Alice không phải người tạo invoice, số tiền dưới hạn mức phê duyệt, và phiên đăng nhập đã hoàn tất MFA.
+
+Rule này không còn là RBAC thuần túy. Nó kết hợp RBAC, context và relationship. Hệ thống thực tế thường là **hybrid**, không bắt buộc chỉ dùng đúng một mô hình.
+
+```mermaid
+flowchart LR
+    S[Subject] --> PDP[Policy Decision Point]
+    A[Action] --> PDP
+    R[Resource] --> PDP
+    C[Context] --> PDP
+    REL[Relationships] --> PDP
+    P[Policies] --> PDP
+    PDP -->|ALLOW| PEPA[Thực thi action]
+    PDP -->|DENY| PEPD[Trả 403]
+```
+
+- **PEP — Policy Enforcement Point**: nơi chặn request, ví dụ `AuthorizationFilter` hoặc method interceptor.
+- **PDP — Policy Decision Point**: nơi tính quyết định allow/deny.
+- **PIP — Policy Information Point**: nơi cung cấp dữ liệu cho policy, ví dụ database, tenant context hoặc risk service.
+
+## 2. Bản đồ các mô hình access control
+
+### 2.1. DAC — Discretionary Access Control
+
+Trong DAC, **chủ sở hữu resource tự quyết định** ai được truy cập. Google Drive là ví dụ trực quan: người tạo file chia sẻ file cho user hoặc group khác.
+
+```text
+Alice sở hữu File-1
+└── Alice cấp Bob quyền READ
+    └── tùy policy, Bob có thể hoặc không thể chia sẻ tiếp
+```
+
+ACL thường là cơ chế lưu trữ để hiện thực DAC. Tuy nhiên hai khái niệm không đồng nhất:
+
+- DAC là **mô hình quản trị quyền**: owner có quyền tùy nghi cấp lại.
+- ACL là **cấu trúc quyền gắn với object**: object nào có danh sách ACE của object đó.
+
+DAC phù hợp với collaboration, file sharing và project workspace. Nhược điểm chính là quyền có thể lan truyền khó kiểm soát nếu cho phép người nhận chia sẻ tiếp.
+
+### 2.2. MAC — Mandatory Access Control
+
+Trong MAC, policy trung tâm quyết định quyền dựa trên **security label**. Owner không được tự ý hạ hoặc bỏ policy.
+
+Ví dụ:
+
+- Subject có clearance `SECRET`.
+- Document có classification `TOP_SECRET`.
+- Policy yêu cầu clearance của subject phải đủ cao và compartment phải khớp.
+
+MAC phổ biến trong quốc phòng, chính phủ và hệ điều hành có SELinux. Nó chặt chẽ nhưng ít linh hoạt hơn ứng dụng doanh nghiệp thông thường.
+
+> [!NOTE]
+> “Admin có mọi quyền” chưa đủ để gọi là MAC. MAC cần policy bắt buộc, label và cơ chế enforcement mà owner/resource admin không thể tùy ý vượt qua.
+
+### 2.3. RBAC — Role-Based Access Control
+
+RBAC gán user vào **role**, rồi role chứa **permission**:
+
+```text
+User ──► Role ──► Permission ──► Action trên Resource Type
+Alice    FINANCE_MANAGER        invoice:approve
+```
+
+RBAC phù hợp khi quyền đi theo chức danh hoặc trách nhiệm ổn định: kế toán, hỗ trợ, quản trị viên, kiểm toán viên.
+
+Điểm mạnh là dễ quản trị hàng loạt. Điểm yếu là **role explosion**: tạo role mới cho mọi tổ hợp ngoại lệ, tenant và phạm vi dữ liệu.
+
+### 2.4. ACL — Access Control List
+
+Mỗi resource instance có danh sách **ACE — Access Control Entry**. Mỗi ACE nói subject nào được hoặc bị từ chối permission nào.
+
+```text
+Invoice INV-42 ACL
+├── USER:alice      → READ, WRITE
+├── USER:bob        → READ
+├── ROLE:AUDITOR    → READ
+└── USER:eve        → DENY READ
+```
+
+ACL cho phép object-level authorization chính xác. Chi phí đổi lại là số ACE có thể rất lớn, query phức tạp hơn và cache invalidation khó hơn RBAC.
+
+### 2.5. PBAC — Policy-Based Access Control
+
+PBAC đưa rule vào các **policy có thể quản trị độc lập** với code nghiệp vụ. Một policy có thể kết hợp role, attribute, context và relationship:
+
+```text
+ALLOW invoice.approve WHEN
+  subject.department == resource.department
+  AND subject.approvalLimit >= resource.amount
+  AND context.mfa == true
+  AND context.time within businessHours
+```
+
+Thuật ngữ PBAC đôi khi được dùng gần nghĩa với ABAC — Attribute-Based Access Control. Cách hiểu thực dụng:
+
+- **ABAC** nhấn mạnh dữ liệu đầu vào là attribute.
+- **PBAC** nhấn mạnh rule được biểu diễn, quản trị và đánh giá như policy.
+
+OPA/Rego, Cedar và các policy engine là lựa chọn khi rule cần thay đổi độc lập với deployment hoặc cần dùng chung giữa nhiều service.
+
+### 2.6. Context-Based Access Control
+
+Context-Based Access Control dùng thông tin **tại thời điểm request**:
+
+- IP hoặc network zone.
+- Thời gian trong ngày.
+- Device trust.
+- Geo-location.
+- Mức rủi ro.
+- Trạng thái MFA.
+- Tenant hiện tại.
+
+Ví dụ: role `SUPPORT` chỉ được xem PII khi đang dùng thiết bị công ty, trong giờ trực và ticket đã được gán cho họ.
+
+Context thường là một phần của ABAC/PBAC, không nhất thiết là hệ thống độc lập.
+
+### 2.7. ReBAC — Relationship-Based Access Control
+
+ReBAC quyết định dựa trên quan hệ giữa subject và resource. Quan hệ có thể trực tiếp hoặc đi qua graph:
+
+```text
+Alice ──member_of──► Team A ──owns──► Project P ──contains──► Document D
+```
+
+Nếu policy nói “member của team sở hữu project được đọc document”, Alice được đọc `D` nhờ đường đi trên graph.
+
+ReBAC phù hợp với collaboration, social network, organization tree và hệ thống kiểu Google Zanzibar. Khi quan hệ sâu, nhiều loại và cần truy vấn ở quy mô lớn, một authorization graph chuyên dụng thường phù hợp hơn việc nối nhiều bảng JPA trong mỗi request.
+
+### 2.8. Bảng so sánh nhanh
+
+| Mô hình | Quyền dựa trên | Granularity | Điểm mạnh | Rủi ro chính |
+|---|---|---:|---|---|
+| DAC | quyết định của owner | object | chia sẻ linh hoạt | quyền lan truyền khó kiểm soát |
+| MAC | label và policy bắt buộc | object/data | kiểm soát rất chặt | cứng, chi phí vận hành cao |
+| RBAC | role → permission | resource type/action | dễ quản trị theo chức danh | role explosion, thiếu object scope |
+| ACL | ACE trên từng object | object instance | chia sẻ chính xác | nhiều row, query/cache phức tạp |
+| PBAC | policy tổng hợp | tùy policy | rule linh hoạt, quản trị tập trung | khó debug và test policy |
+| Context-Based | request context | request/action | adaptive, zero-trust friendly | context giả mạo hoặc không ổn định |
+| ReBAC | graph quan hệ | object/graph | tự nhiên cho collaboration | graph traversal và consistency |
+
+## 3. RBAC chuyên sâu
+
+### 3.1. Mô hình dữ liệu
+
+RBAC cơ bản có bốn quan hệ:
+
+```mermaid
+erDiagram
+    APP_USER ||--o{ USER_ROLE : assigned
+    ROLE ||--o{ USER_ROLE : contains
+    ROLE ||--o{ ROLE_PERMISSION : grants
+    PERMISSION ||--o{ ROLE_PERMISSION : contains
+
+    APP_USER {
+      bigint id PK
+      varchar username UK
+      boolean enabled
+    }
+    ROLE {
+      bigint id PK
+      varchar code UK
+    }
+    PERMISSION {
+      bigint id PK
+      varchar code UK
+    }
+    USER_ROLE {
+      bigint user_id FK
+      bigint role_id FK
+      bigint tenant_id
+    }
+    ROLE_PERMISSION {
+      bigint role_id FK
+      bigint permission_id FK
+    }
+```
+
+Trong NIST RBAC, có thể mở rộng thêm:
+
+- **Role hierarchy**: role cao bao hàm role thấp.
+- **Static Separation of Duties — SSD**: một user không được đồng thời có hai role xung đột.
+- **Dynamic Separation of Duties — DSD**: user có thể sở hữu nhiều role nhưng không được kích hoạt cùng lúc trong một session hoặc transaction.
+- **Cardinality constraint**: giới hạn số user có một role nhạy cảm.
+
+### 3.2. Role không phải permission
+
+Role mô tả **trách nhiệm tổ chức**. Permission mô tả **khả năng kỹ thuật**.
+
+```text
+Role:       FINANCE_MANAGER
+Permissions:
+  invoice:read
+  invoice:approve
+  payment:read
+```
+
+Nên viết code kiểm tra permission:
+
+```java
+@PreAuthorize("hasAuthority('invoice:approve')")
+void approveInvoice(long invoiceId) { }
+```
+
+Không nên rải role khắp business service:
+
+```java
+@PreAuthorize("hasAnyRole('ADMIN', 'FINANCE_MANAGER', 'CFO', 'SUPER_USER')")
+void approveInvoice(long invoiceId) { }
+```
+
+Khi tổ chức đổi role nhưng capability không đổi, cách thứ nhất chỉ cần cập nhật mapping trong database. Code không phải redeploy.
+
+> [!TIP]
+> Dùng role để **quản trị assignment**, dùng permission để **enforce trong code**. Đây là cách giảm coupling giữa sơ đồ tổ chức và logic ứng dụng.
+
+### 3.3. Role hierarchy và separation of duties
+
+Role hierarchy tiện lợi nhưng dễ vô tình cấp quá nhiều quyền:
+
+```text
+ADMIN > MANAGER > USER
+```
+
+Nếu `MANAGER` về sau nhận quyền đọc lương, mọi `ADMIN` cũng tự động nhận quyền đó. Vì vậy hierarchy chỉ nên diễn tả quan hệ bao hàm thật sự ổn định.
+
+Với quy trình maker-checker, chỉ role là chưa đủ:
+
+```text
+Người tạo invoice != người duyệt invoice
+```
+
+Rule này phụ thuộc vào relationship giữa user và object. Hãy kết hợp permission với kiểm tra creator:
+
+```java
+@PreAuthorize("hasAuthority('invoice:approve') and " +
+              "@invoiceAuth.isNotCreator(authentication, #invoiceId)")
+public void approve(long invoiceId) { }
+```
+
+### 3.4. RBAC trong hệ thống multi-tenant
+
+Câu hỏi quan trọng là role có scope nào:
+
+```text
+Alice có ROLE_ADMIN ở Tenant A
+Alice chỉ có ROLE_VIEWER ở Tenant B
+```
+
+Không được biến assignment trên thành `ROLE_ADMIN` toàn cục. `user_role` phải chứa `tenant_id`, và authority phải được nạp theo tenant đã xác thực.
+
+Các cách biểu diễn authority:
+
+| Cách | Ví dụ | Nhận xét |
+|---|---|---|
+| authority theo tenant | `tenant:42:invoice:approve` | rõ scope nhưng authority phình to |
+| tenant context + permission | context `42`, authority `invoice:approve` | gọn; phải bảo vệ tenant context |
+| query policy mỗi lần | tra DB theo user + tenant + action | quyền mới nhất; latency cao hơn |
+
+Cách thứ hai thường cân bằng nhất cho một request chỉ hoạt động trong một tenant. Tenant ID phải lấy từ membership đã xác minh hoặc token đã ký, không lấy thẳng từ header rồi tin tưởng.
+
+## 4. Triển khai RBAC trong Spring Boot
+
+### 4.1. Bước 1 — thiết kế permission vocabulary
+
+Dùng format ổn định `resource:action`:
+
+```text
+invoice:read
+invoice:create
+invoice:update
+invoice:approve
+invoice:delete
+acl:grant
+acl:revoke
+```
+
+Tránh permission mơ hồ như `CAN_MANAGE` hoặc `FULL_ACCESS`. Tên permission là public contract giữa database, token, backend và đôi khi cả frontend.
+
+> [!NOTE]
+> Frontend có thể dùng permission để ẩn nút, nhưng backend vẫn phải enforce. Ẩn nút không phải security boundary.
+
+### 4.2. Bước 2 — tạo database schema
+
+Ví dụ PostgreSQL:
+
+```sql
+CREATE TABLE app_user (
+    id          BIGSERIAL PRIMARY KEY,
+    username    VARCHAR(100) NOT NULL UNIQUE,
+    password    VARCHAR(255) NOT NULL,
+    enabled     BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE role (
+    id          BIGSERIAL PRIMARY KEY,
+    code        VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(255)
+);
+
+CREATE TABLE permission (
+    id          BIGSERIAL PRIMARY KEY,
+    code        VARCHAR(120) NOT NULL UNIQUE,
+    description VARCHAR(255)
+);
+
+CREATE TABLE tenant_membership (
+    tenant_id   BIGINT NOT NULL,
+    user_id     BIGINT NOT NULL REFERENCES app_user(id),
+    status      VARCHAR(20) NOT NULL,
+    PRIMARY KEY (tenant_id, user_id)
+);
+
+CREATE TABLE user_role (
+    tenant_id   BIGINT NOT NULL,
+    user_id     BIGINT NOT NULL REFERENCES app_user(id),
+    role_id     BIGINT NOT NULL REFERENCES role(id),
+    PRIMARY KEY (tenant_id, user_id, role_id),
+    FOREIGN KEY (tenant_id, user_id)
+        REFERENCES tenant_membership(tenant_id, user_id)
+);
+
+CREATE TABLE role_permission (
+    role_id       BIGINT NOT NULL REFERENCES role(id),
+    permission_id BIGINT NOT NULL REFERENCES permission(id),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+CREATE INDEX idx_user_role_lookup
+    ON user_role (tenant_id, user_id, role_id);
+CREATE INDEX idx_role_permission_lookup
+    ON role_permission (role_id, permission_id);
+```
+
+Query nạp permission hiệu lực:
+
+```sql
+SELECT DISTINCT p.code
+FROM user_role ur
+JOIN role_permission rp ON rp.role_id = ur.role_id
+JOIN permission p ON p.id = rp.permission_id
+WHERE ur.tenant_id = :tenantId
+  AND ur.user_id = :userId;
+```
+
+Dùng Flyway hoặc Liquibase để version schema và seed permission. Không tự động tạo permission từ annotation khi startup trong production, vì typo trong code có thể âm thầm tạo một capability mới.
+
+### 4.3. Bước 3 — nạp authority khi đăng nhập
+
+Tách repository chỉ đọc projection cần thiết:
+
+```java
+public interface AuthorizationQueryRepository {
+    Set<String> findRoleCodes(long userId, long tenantId);
+    Set<String> findPermissionCodes(long userId, long tenantId);
+}
+```
+
+Tạo principal chứa `userId` và `tenantId` đã được xác minh:
+
+```java
+public record AppPrincipal(
+        long userId,
+        long tenantId,
+        String username,
+        String password,
+        Collection<? extends GrantedAuthority> authorities
+) implements UserDetails {
+
+    @Override public String getUsername() { return username; }
+    @Override public String getPassword() { return password; }
+    @Override public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities;
+    }
+}
+```
+
+`UserDetailsService` nạp cả role lẫn permission:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class DatabaseUserDetailsService implements UserDetailsService {
+    private final UserRepository users;
+    private final AuthorizationQueryRepository authorization;
+    private final LoginTenantResolver tenantResolver;
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUsername(String username) {
+        AppUser user = users.findEnabledByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException(username));
+
+        long tenantId = tenantResolver.requireVerifiedTenant(user.getId());
+
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        authorization.findRoleCodes(user.getId(), tenantId).stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .forEach(authorities::add);
+        authorization.findPermissionCodes(user.getId(), tenantId).stream()
+                .map(SimpleGrantedAuthority::new)
+                .forEach(authorities::add);
+
+        return new AppPrincipal(
+                user.getId(), tenantId, user.getUsername(),
+                user.getPassword(), Set.copyOf(authorities));
+    }
+}
+```
+
+Không để `LoginTenantResolver` chỉ đọc `X-Tenant-Id` rồi trả về. Nó phải xác minh membership của user với tenant trước khi tạo principal.
+
+### 4.4. Bước 4 — cấu hình request và method security
+
+```java
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .csrf(csrf -> csrf.disable()) // Chỉ phù hợp API stateless không dùng cookie
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/invoices/**")
+                            .hasAuthority("invoice:read")
+                        .requestMatchers(HttpMethod.POST, "/api/invoices")
+                            .hasAuthority("invoice:create")
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                .build();
+    }
+}
+```
+
+Request-level rule bảo vệ bề mặt HTTP. Method-level rule bảo vệ use case kể cả khi được gọi từ controller khác, scheduler hoặc message consumer:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class InvoiceService {
+    private final InvoiceRepository invoices;
+
+    @PreAuthorize("hasAuthority('invoice:approve')")
+    @Transactional
+    public void approve(long invoiceId) {
+        Invoice invoice = invoices.findById(invoiceId)
+                .orElseThrow(InvoiceNotFoundException::new);
+        invoice.approve();
+    }
+}
+```
+
+> [!IMPORTANT]
+> Giữ rule quan trọng ở service layer. Controller rule chỉ là lớp phòng thủ sớm. Ngoài ra, method security chạy qua Spring AOP proxy; self-invocation `this.approve(...)` không đi qua proxy nên có thể bỏ qua annotation.
+
+### 4.5. Bước 5 — đóng gói rule bằng meta-annotation
+
+Meta-annotation làm code dễ đọc và giảm typo:
+
+```java
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@PreAuthorize("hasAuthority('invoice:approve')")
+public @interface CanApproveInvoice {
+}
+```
+
+```java
+@CanApproveInvoice
+@Transactional
+public void approve(long invoiceId) {
+    // business logic
+}
+```
+
+Nếu permission có tham số động, dùng bean trong SpEL thay vì viết expression dài ở mọi method.
+
+### 4.6. Bước 6 — role hierarchy
+
+Spring Security có `RoleHierarchy`:
+
+```java
+@Bean
+static RoleHierarchy roleHierarchy() {
+    return RoleHierarchyImpl.fromHierarchy("""
+        ROLE_ADMIN > ROLE_MANAGER
+        ROLE_MANAGER > ROLE_USER
+        """);
+}
+
+@Bean
+static MethodSecurityExpressionHandler methodSecurityExpressionHandler(
+        RoleHierarchy roleHierarchy) {
+    var handler = new DefaultMethodSecurityExpressionHandler();
+    handler.setRoleHierarchy(roleHierarchy);
+    return handler;
+}
+```
+
+Với mapping role → permission lưu trong database, thường nên **expand permission khi tạo `Authentication`** thay vì hard-code toàn bộ mapping trong `RoleHierarchy`. `RoleHierarchy` phù hợp nhất cho hierarchy nhỏ và ổn định.
+
+### 4.7. RBAC với JWT
+
+Resource server có thể map claim thành authority:
+
+```json
+{
+  "sub": "alice",
+  "tenant_id": 42,
+  "roles": ["FINANCE_MANAGER"],
+  "permissions": ["invoice:read", "invoice:approve"],
+  "exp": 1770000000
+}
+```
+
+```java
+@Bean
+JwtAuthenticationConverter jwtAuthenticationConverter() {
+    JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
+
+    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+        Set<GrantedAuthority> result = new HashSet<>(scopes.convert(jwt));
+
+        jwt.getClaimAsStringList("roles").stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .forEach(result::add);
+
+        jwt.getClaimAsStringList("permissions").stream()
+                .map(SimpleGrantedAuthority::new)
+                .forEach(result::add);
+
+        return result;
+    });
+    return converter;
+}
+```
+
+Đăng ký converter:
+
+```java
+.oauth2ResourceServer(oauth2 -> oauth2
+    .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+```
+
+JWT là snapshot quyền tại thời điểm phát hành. Nếu admin thu hồi role, token cũ vẫn có quyền tới khi hết hạn. Các lựa chọn:
+
+- Access token ngắn hạn.
+- Token version/security stamp và kiểm tra server-side.
+- Introspection/opaque token cho quyền cần revoke gần real-time.
+- Deny-list cho sự cố khẩn cấp.
+- Không nhét hàng nghìn object ID hoặc ACL entry vào JWT.
+
+### 4.8. Cache và thay đổi quyền thời gian thực
+
+Có ba mức cache khác nhau:
+
+1. `Authentication` trong session hoặc token.
+2. Cache mapping user → roles/permissions.
+3. Cache policy/ACL decision.
+
+Khi grant/revoke quyền, phải xác định mức nào cần invalidation. Cache TTL không thay thế invalidation với quyền nhạy cảm.
+
+Một chiến lược phổ biến:
+
+```text
+Grant/revoke role
+    ├── commit database transaction
+    ├── publish AuthorizationChanged(userId, tenantId)
+    ├── evict distributed cache
+    └── tăng authz_version để token/session cũ bị từ chối
+```
+
+## 5. ACL chuyên sâu
+
+### 5.1. ACL giải quyết bài toán nào
+
+RBAC nói “Alice có thể đọc invoice”. ACL nói “Alice có thể đọc **invoice 42**, nhưng không thể đọc invoice 43”.
+
+Các use case điển hình:
+
+- Owner chia sẻ một document cho user khác.
+- Auditor chỉ được xem một số case được giao.
+- Project private chỉ cho member cụ thể.
+- Support engineer chỉ được mở ticket đã assign.
+
+### 5.2. Cấu trúc một ACE
+
+Một ACE nên chứa ít nhất:
+
+```text
+(resource_type, resource_id, subject_type, subject_id, permission, effect)
+```
+
+Ví dụ:
+
+```text
+(INVOICE, 42, USER, alice, READ, ALLOW)
+(INVOICE, 42, ROLE, AUDITOR, READ, ALLOW)
+(INVOICE, 42, USER, eve, READ, DENY)
+```
+
+Có thể thêm `tenant_id`, thời hạn, người cấp, lý do và audit timestamp.
+
+### 5.3. Thứ tự đánh giá allow và deny
+
+Hãy định nghĩa semantics trước khi code. Một policy dễ hiểu:
+
+1. Không tìm thấy rule phù hợp → `DENY`.
+2. Explicit `DENY` khớp subject và permission → `DENY`.
+3. `ADMINISTER` hoặc wildcard grant → `ALLOW`.
+4. Explicit `ALLOW` → `ALLOW`.
+5. Nếu có parent ACL, đánh giá parent.
+6. Còn lại → `DENY`.
+
+Không nên phụ thuộc vào thứ tự row ngẫu nhiên từ database. Nếu dùng deny override, query và code phải thể hiện rõ điều đó.
+
+> [!WARNING]
+> Kết hợp user grant và role deny cần rule ưu tiên rõ ràng. Nếu team không thực sự cần explicit deny, chỉ hỗ trợ grant và default-deny thường đơn giản, ít bất ngờ hơn.
+
+### 5.4. RBAC và ACL phối hợp
+
+Mô hình hybrid khuyên dùng:
+
+```text
+ALLOW = RBAC capability AND object scope
+
+invoice:read              AND ACL READ trên INV-42
+invoice:update            AND ACL WRITE trên INV-42
+invoice:approve           AND cùng tenant + không phải creator
+```
+
+RBAC là coarse-grained gate. ACL thu hẹp object nào được thao tác. Không nên để ACL `READ` tự động cấp capability đọc invoice cho một principal vốn không thuộc module invoice, trừ khi đó là policy chia sẻ được chủ ý thiết kế.
+
+```mermaid
+flowchart TD
+    A[Request update INV-42] --> B{Có invoice:update?}
+    B -->|Không| D[DENY 403]
+    B -->|Có| C{Cùng tenant?}
+    C -->|Không| D
+    C -->|Có| E{ACL WRITE?}
+    E -->|Không| D
+    E -->|Có| F[ALLOW]
+```
+
+### 5.5. Cách implement bitmask permission check
+
+Bitmask lưu nhiều permission trong một số nguyên. Mỗi permission chiếm đúng một bit:
+
+| Permission | Bit | Binary | Decimal |
+|---|---:|---:|---:|
+| `READ` | 0 | `000001` | 1 |
+| `WRITE` | 1 | `000010` | 2 |
+| `CREATE` | 2 | `000100` | 4 |
+| `DELETE` | 3 | `001000` | 8 |
+| `APPROVE` | 4 | `010000` | 16 |
+| `ADMINISTER` | 5 | `100000` | 32 |
+
+Ví dụ một ACE có `READ + WRITE + APPROVE`:
+
+```text
+READ       000001
+WRITE      000010
+APPROVE    010000
+           ------ OR
+Granted    010011 = 19
+```
+
+Bitmask chỉ mã hóa **tập action**. Nó không mã hóa resource ID hoặc user ID. ACL vẫn cần row xác định subject và resource:
+
+```text
+(INVOICE, 42, USER, alice, allowMask=19, denyMask=0)
+```
+
+**Định nghĩa permission trong Java**
+
+Dùng vị trí bit cố định, không dùng `enum.ordinal()`:
+
+```java
+public enum Permission {
+    READ(0),
+    WRITE(1),
+    CREATE(2),
+    DELETE(3),
+    APPROVE(4),
+    ADMINISTER(5);
+
+    private final int bit;
+    private final long mask;
+
+    Permission(int bit) {
+        if (bit < 0 || bit > 62) {
+            throw new IllegalArgumentException("Permission bit must be between 0 and 62");
+        }
+        this.bit = bit;
+        this.mask = 1L << bit;
+    }
+
+    public int bit() {
+        return bit;
+    }
+
+    public long mask() {
+        return mask;
+    }
+
+    public static long maskOf(Permission... permissions) {
+        long result = 0L;
+        for (Permission permission : permissions) {
+            result |= permission.mask;
+        }
+        return result;
+    }
+
+    public static long allKnownMask() {
+        long result = 0L;
+        for (Permission permission : values()) {
+            result |= permission.mask;
+        }
+        return result;
+    }
+}
+```
+
+Dùng `long` tương ứng với `BIGINT`. Chỉ dùng bit `0..62` để giá trị luôn không âm và dễ xử lý giữa Java, SQL, JSON và công cụ vận hành.
+
+> [!WARNING]
+> Không dùng `ordinal()` làm bit index. Khi chèn hoặc sắp xếp lại enum, toàn bộ mask đã lưu trong database sẽ đổi nghĩa. Bit number là schema dữ liệu và phải ổn định vĩnh viễn.
+
+**Các phép toán cốt lõi**
+
+```java
+public final class PermissionMasks {
+    private PermissionMasks() {
+    }
+
+    public static long add(long current, Permission permission) {
+        return current | permission.mask();
+    }
+
+    public static long remove(long current, Permission permission) {
+        return current & ~permission.mask();
+    }
+
+    public static boolean contains(long granted, Permission required) {
+        return (granted & required.mask()) == required.mask();
+    }
+
+    public static boolean containsAll(long granted, long required) {
+        requireValidRequiredMask(required);
+        return (granted & required) == required;
+    }
+
+    public static boolean containsAny(long granted, long required) {
+        requireValidRequiredMask(required);
+        return (granted & required) != 0L;
+    }
+
+    public static void requireValidRequiredMask(long required) {
+        if (required == 0L) {
+            throw new IllegalArgumentException("Required permission mask must not be empty");
+        }
+
+        long unknownBits = required & ~Permission.allKnownMask();
+        if (unknownBits != 0L) {
+            throw new IllegalArgumentException(
+                    "Required mask contains unknown permission bits: " + unknownBits);
+        }
+    }
+}
+```
+
+Ba công thức cần nhớ:
+
+```text
+Thêm permission:       current | permission
+Xóa permission:        current & ~permission
+Có đủ mọi permission: (granted & required) == required
+Có ít nhất một quyền: (granted & required) != 0
+```
+
+`containsAll` và `containsAny` có semantics khác nhau. Với `required = READ | WRITE`:
+
+```text
+Granted chỉ READ
+containsAll → false
+containsAny → true
+```
+
+Authorization API phải nói rõ đang yêu cầu **tất cả** hay **bất kỳ** permission nào. Không đặt một method mơ hồ tên `checkPermission`.
+
+**Lưu allow và deny mask**
+
+Nếu ACL cần explicit deny, nên lưu hai cột riêng:
+
+```sql
+CREATE TABLE resource_acl_mask (
+    id              BIGSERIAL PRIMARY KEY,
+    tenant_id       BIGINT NOT NULL,
+    resource_type   VARCHAR(80) NOT NULL,
+    resource_id     VARCHAR(100) NOT NULL,
+    subject_type    VARCHAR(20) NOT NULL,
+    subject_id      VARCHAR(120) NOT NULL,
+    allow_mask      BIGINT NOT NULL DEFAULT 0,
+    deny_mask       BIGINT NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uk_resource_acl_mask UNIQUE
+        (tenant_id, resource_type, resource_id, subject_type, subject_id),
+    CONSTRAINT ck_acl_masks_non_negative
+        CHECK (allow_mask >= 0 AND deny_mask >= 0),
+    CONSTRAINT ck_acl_masks_no_overlap
+        CHECK ((allow_mask & deny_mask) = 0)
+);
+
+CREATE INDEX idx_acl_mask_resource
+    ON resource_acl_mask
+       (tenant_id, resource_type, resource_id, subject_type, subject_id);
+```
+
+Một permission không nên đồng thời nằm trong `allow_mask` và `deny_mask` của cùng ACE. Constraint `ck_acl_masks_no_overlap` bảo vệ invariant này.
+
+Đây là một lựa chọn thay thế cho schema “mỗi permission một row” ở phần sau:
+
+| Thiết kế | Ưu điểm | Nhược điểm |
+|---|---|---|
+| một permission mỗi row | dễ query/audit, không giới hạn số permission | nhiều row hơn |
+| một ACE chứa bitmask | compact, check nhanh | tối đa số bit cố định, migration khó hơn |
+
+Không nên lưu cả hai kiểu cùng lúc nếu không có một source of truth rõ ràng.
+
+**Evaluator với deny-overrides**
+
+Một user có thể khớp nhiều ACE: ACE trực tiếp của user và các ACE từ role. Ta OR tất cả allow mask và deny mask, sau đó áp dụng policy rõ ràng:
+
+```java
+public record AclMaskEntry(long allowMask, long denyMask) {
+}
+```
+
+```java
+@Component
+public class BitmaskPermissionEvaluator {
+
+    public boolean hasAllPermissions(
+            Collection<AclMaskEntry> entries,
+            Permission... requiredPermissions) {
+
+        long required = Permission.maskOf(requiredPermissions);
+        PermissionMasks.requireValidRequiredMask(required);
+
+        long aggregatedAllow = 0L;
+        long aggregatedDeny = 0L;
+
+        for (AclMaskEntry entry : entries) {
+            aggregatedAllow |= entry.allowMask();
+            aggregatedDeny |= entry.denyMask();
+        }
+
+        // Policy 1: một DENY khớp action sẽ thắng mọi ALLOW.
+        if ((aggregatedDeny & required) != 0L) {
+            return false;
+        }
+
+        // Policy 2: ADMINISTER cho phép mọi action nếu chính bit
+        // ADMINISTER không bị deny.
+        boolean administerGranted =
+                (aggregatedAllow & Permission.ADMINISTER.mask()) != 0L
+                && (aggregatedDeny & Permission.ADMINISTER.mask()) == 0L;
+
+        if (administerGranted) {
+            return true;
+        }
+
+        // Policy 3: mặc định phải có đủ tất cả bit được yêu cầu.
+        return PermissionMasks.containsAll(aggregatedAllow, required);
+    }
+}
+```
+
+Ví dụ:
+
+```text
+USER:alice  → allow READ
+ROLE:EDITOR → allow WRITE
+ROLE:GUEST  → deny DELETE
+
+READ + WRITE → ALLOW
+DELETE       → DENY
+READ + DELETE→ DENY
+```
+
+Policy trên là **deny-overrides giữa mọi subject**. Điều đó có nghĩa một deny từ role sẽ thắng direct allow của user. Nếu business muốn direct-user rule ưu tiên role rule, evaluator phải tách từng loại subject và định nghĩa precedence khác. Đừng để precedence phụ thuộc vào thứ tự row trả về từ database.
+
+**Permission check trực tiếp trong SQL**
+
+Kiểm tra một ACE có đủ mask:
+
+```sql
+SELECT EXISTS (
+    SELECT 1
+    FROM resource_acl_mask
+    WHERE tenant_id = :tenantId
+      AND resource_type = :resourceType
+      AND resource_id = :resourceId
+      AND subject_type = :subjectType
+      AND subject_id = :subjectId
+      AND (deny_mask & :requiredMask) = 0
+      AND (
+            (allow_mask & :requiredMask) = :requiredMask
+         OR (allow_mask & :administerMask) = :administerMask
+      )
+);
+```
+
+Query này đúng cho **một ACE**. Nếu permission được cộng dồn từ nhiều ACE, ví dụ `READ` từ user và `WRITE` từ role, phải aggregate mask của tất cả ACE trước khi gọi `containsAll`. Có thể đọc vài ACE liên quan rồi aggregate trong Java; cách này thường portable hơn việc dùng aggregate bitwise khác nhau giữa các database.
+
+**Grant, revoke và deny nguyên tử**
+
+Bitwise update tránh read-modify-write race giữa hai request:
+
+```sql
+-- Grant: thêm bit vào allow và xóa cùng bit khỏi deny.
+UPDATE resource_acl_mask
+SET allow_mask = allow_mask | :mask,
+    deny_mask = deny_mask & ~:mask,
+    updated_at = now()
+WHERE id = :aclId;
+
+-- Revoke: xóa bit khỏi allow; kết quả quay về default deny.
+UPDATE resource_acl_mask
+SET allow_mask = allow_mask & ~:mask,
+    updated_at = now()
+WHERE id = :aclId;
+
+-- Explicit deny: thêm bit vào deny và xóa cùng bit khỏi allow.
+UPDATE resource_acl_mask
+SET deny_mask = deny_mask | :mask,
+    allow_mask = allow_mask & ~:mask,
+    updated_at = now()
+WHERE id = :aclId;
+```
+
+`revoke` và `deny` không giống nhau:
+
+- **Revoke** xóa grant; nếu một role khác vẫn grant thì user vẫn có thể được phép.
+- **Deny** tạo rule phủ định; với deny-overrides, nó chặn cả grant từ role khác.
+
+Nếu row chưa tồn tại, dùng database upsert trong cùng statement. Không `SELECT` rồi `INSERT`, vì hai request đồng thời có thể cùng thấy row chưa tồn tại.
+
+**Tích hợp với method security**
+
+Không truyền raw numeric mask từ controller. Controller nhận tên permission, server map qua enum, rồi evaluator dùng mask nội bộ:
+
+```java
+@Component("invoiceMaskAuth")
+@RequiredArgsConstructor
+public class InvoiceMaskAuthorization {
+    private final AclMaskRepository repository;
+    private final BitmaskPermissionEvaluator evaluator;
+
+    public boolean canRead(
+            Authentication authentication,
+            long tenantId,
+            UUID invoiceId) {
+
+        List<AclMaskEntry> entries = repository.findEffectiveEntries(
+                authentication, tenantId, "INVOICE", invoiceId.toString());
+
+        return evaluator.hasAllPermissions(entries, Permission.READ);
+    }
+}
+```
+
+```java
+@PreAuthorize("hasAuthority('invoice:read') and " +
+              "@invoiceMaskAuth.canRead(authentication, #tenantId, #invoiceId)")
+public InvoiceDto get(long tenantId, UUID invoiceId) {
+    // business logic
+}
+```
+
+RBAC gate vẫn dùng authority dễ đọc. Bitmask là chi tiết lưu trữ và evaluate object-level ACL.
+
+**Kiểm thử bitmask**
+
+```java
+class PermissionMasksTest {
+
+    @Test
+    void combinesAndChecksPermissions() {
+        long granted = Permission.maskOf(
+                Permission.READ,
+                Permission.WRITE,
+                Permission.APPROVE);
+
+        assertThat(granted).isEqualTo(19L);
+        assertThat(PermissionMasks.contains(granted, Permission.READ)).isTrue();
+        assertThat(PermissionMasks.contains(granted, Permission.DELETE)).isFalse();
+
+        long readAndWrite = Permission.maskOf(Permission.READ, Permission.WRITE);
+        assertThat(PermissionMasks.containsAll(granted, readAndWrite)).isTrue();
+    }
+
+    @Test
+    void removesOnlyRequestedPermission() {
+        long original = Permission.maskOf(Permission.READ, Permission.WRITE);
+        long result = PermissionMasks.remove(original, Permission.WRITE);
+
+        assertThat(result).isEqualTo(Permission.READ.mask());
+    }
+
+    @Test
+    void denyOverridesAllow() {
+        var evaluator = new BitmaskPermissionEvaluator();
+        var entries = List.of(
+                new AclMaskEntry(Permission.READ.mask(), 0L),
+                new AclMaskEntry(0L, Permission.READ.mask()));
+
+        assertThat(evaluator.hasAllPermissions(entries, Permission.READ)).isFalse();
+    }
+}
+```
+
+**Quy tắc migration và vận hành**
+
+- Không bao giờ tái sử dụng bit của permission đã xóa.
+- Rename permission được, nhưng bit number phải giữ nguyên.
+- Permission đã bỏ nên để bit ở trạng thái reserved.
+- Khi thêm permission mới, code cũ sẽ không biết bit mới; validate unknown bit và rollout theo thứ tự có chủ ý.
+- API và audit log nên hiển thị tên permission, không chỉ số `19`.
+- Với hơn 63 permission hoặc permission thay đổi thường xuyên, dùng row-per-permission hoặc `BitSet`/binary type thay vì `long`.
+- Bitmask tối ưu storage và phép check; nó không thay thế tenant check, ownership, relationship hoặc context policy.
+
+## 6. Cách 1 — tự triển khai domain ACL
+
+Custom domain ACL thường dễ hiểu hơn Spring Security ACL module khi:
+
+- ID là UUID/string.
+- Có multi-tenant.
+- Permission theo domain như `APPROVE`, `EXPORT`, `COMMENT`.
+- Cần join ACL trực tiếp trong query danh sách.
+- Team muốn schema minh bạch và ít abstraction.
+
+### 6.1. Schema ACL thực dụng
+
+```sql
+CREATE TABLE resource_acl (
+    id              BIGSERIAL PRIMARY KEY,
+    tenant_id       BIGINT NOT NULL,
+    resource_type   VARCHAR(80) NOT NULL,
+    resource_id     VARCHAR(100) NOT NULL,
+    subject_type    VARCHAR(20) NOT NULL,
+    subject_id      VARCHAR(120) NOT NULL,
+    permission      VARCHAR(80) NOT NULL,
+    effect          VARCHAR(10) NOT NULL DEFAULT 'ALLOW',
+    granted_by      BIGINT NOT NULL,
+    reason          VARCHAR(255),
+    expires_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT ck_acl_subject_type
+        CHECK (subject_type IN ('USER', 'ROLE')),
+    CONSTRAINT ck_acl_effect
+        CHECK (effect IN ('ALLOW', 'DENY')),
+    CONSTRAINT uk_resource_acl UNIQUE
+        (tenant_id, resource_type, resource_id,
+         subject_type, subject_id, permission)
+);
+
+CREATE INDEX idx_acl_resource_lookup
+    ON resource_acl
+       (tenant_id, resource_type, resource_id, permission, effect);
+
+CREATE INDEX idx_acl_subject_lookup
+    ON resource_acl
+       (tenant_id, subject_type, subject_id, permission);
+```
+
+`resource_type` và `permission` phải lấy từ allow-list server-side. Không cho client gửi một chuỗi class name tùy ý.
+
+### 6.2. Repository đọc ACL
+
+Projection tối thiểu:
+
+```java
+public record AclEntryView(String permission, String effect) {
+    boolean denies() { return "DENY".equals(effect); }
+    boolean grants() { return "ALLOW".equals(effect); }
+}
+```
+
+Dùng `NamedParameterJdbcTemplate` để query cả user SID và role SID trong một lần:
+
+```java
+@Repository
+@RequiredArgsConstructor
+public class ResourceAclRepository {
+    private final NamedParameterJdbcTemplate jdbc;
+
+    public List<AclEntryView> findRelevant(
+            long tenantId,
+            String resourceType,
+            String resourceId,
+            String username,
+            Set<String> roles,
+            String permission) {
+
+        Set<String> safeRoles = roles.isEmpty() ? Set.of("__NO_ROLE__") : roles;
+
+        String sql = """
+            SELECT permission, effect
+            FROM resource_acl
+            WHERE tenant_id = :tenantId
+              AND resource_type = :resourceType
+              AND resource_id = :resourceId
+              AND (expires_at IS NULL OR expires_at > now())
+              AND permission IN (:permission, 'ADMINISTER')
+              AND (
+                    (subject_type = 'USER' AND subject_id = :username)
+                 OR (subject_type = 'ROLE' AND subject_id IN (:roles))
+              )
+            """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("tenantId", tenantId)
+                .addValue("resourceType", resourceType)
+                .addValue("resourceId", resourceId)
+                .addValue("username", username)
+                .addValue("roles", safeRoles)
+                .addValue("permission", permission);
+
+        return jdbc.query(sql, params, (rs, rowNum) ->
+                new AclEntryView(
+                        rs.getString("permission"),
+                        rs.getString("effect")));
+    }
+}
+```
+
+### 6.3. Authorization service
+
+Service này là PDP của custom ACL:
+
+```java
+@Component("acl")
+@RequiredArgsConstructor
+public class AclAuthorizationService {
+    private static final Set<String> RESOURCE_TYPES =
+            Set.of("INVOICE", "DOCUMENT", "PROJECT");
+    private static final Set<String> PERMISSIONS =
+            Set.of("READ", "WRITE", "DELETE", "APPROVE", "ADMINISTER");
+
+    private final ResourceAclRepository aclRepository;
+    private final TenantMembershipService memberships;
+
+    public boolean can(
+            Authentication authentication,
+            long tenantId,
+            String resourceType,
+            Object resourceId,
+            String permission) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        if (!RESOURCE_TYPES.contains(resourceType)
+                || !PERMISSIONS.contains(permission)) {
+            return false;
+        }
+        if (!memberships.isActive(authentication.getName(), tenantId)) {
+            return false;
+        }
+
+        Set<String> roles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a.startsWith("ROLE_"))
+                .collect(Collectors.toUnmodifiableSet());
+
+        List<AclEntryView> entries = aclRepository.findRelevant(
+                tenantId,
+                resourceType,
+                resourceId.toString(),
+                authentication.getName(),
+                roles,
+                permission);
+
+        boolean denied = entries.stream().anyMatch(AclEntryView::denies);
+        if (denied) return false;
+
+        return entries.stream().anyMatch(AclEntryView::grants);
+    }
+}
+```
+
+Đây là policy **deny-overrides**. Nếu không dùng explicit deny, bỏ cột `effect` và chỉ kiểm tra sự tồn tại của grant.
+
+`memberships.isActive` phải được cache có kiểm soát hoặc gộp vào query để tránh một network/database call phụ cho mỗi decision. Tuy nhiên, không được bỏ kiểm tra tenant.
+
+### 6.4. Tích hợp với @PreAuthorize
+
+Expression ghi rõ RBAC gate và ACL scope:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class InvoiceService {
+
+    @PreAuthorize("hasAuthority('invoice:read') and " +
+                  "@acl.can(authentication, #tenantId, 'INVOICE', #invoiceId, 'READ')")
+    @Transactional(readOnly = true)
+    public InvoiceDto get(long tenantId, UUID invoiceId) {
+        // Query cũng bắt buộc filter tenant_id để defense in depth.
+        return loadInvoice(tenantId, invoiceId);
+    }
+
+    @PreAuthorize("hasAuthority('invoice:update') and " +
+                  "@acl.can(authentication, #tenantId, 'INVOICE', #invoiceId, 'WRITE')")
+    @Transactional
+    public void update(long tenantId, UUID invoiceId, UpdateInvoiceCommand command) {
+        // update
+    }
+}
+```
+
+Đóng gói expression lặp lại bằng meta-annotation:
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@PreAuthorize("hasAuthority('invoice:read') and " +
+              "@acl.can(authentication, #tenantId, 'INVOICE', #invoiceId, 'READ')")
+public @interface CanReadInvoice {
+}
+```
+
+> [!IMPORTANT]
+> Tên parameter trong SpEL phải còn trong bytecode. Với build chuẩn Spring Boot, giữ compiler flag `-parameters`. Integration test phải gọi đúng proxy để bắt lỗi expression sớm.
+
+### 6.5. Grant và revoke an toàn
+
+Chỉ principal có `ADMINISTER` trên object hoặc capability quản trị đặc biệt mới được grant ACL:
+
+```java
+@PreAuthorize("hasAuthority('acl:grant') and " +
+              "@acl.can(authentication, #tenantId, #resourceType, " +
+              "#resourceId, 'ADMINISTER')")
+@Transactional
+public void grant(
+        long tenantId,
+        String resourceType,
+        UUID resourceId,
+        GrantAclCommand command) {
+
+    validatePermission(command.permission());
+    validateSubject(command.subjectType(), command.subjectId(), tenantId);
+    aclRepository.upsertGrant(/* ... */, currentUserId());
+    auditPublisher.aclGranted(/* before/after, actor, reason */);
+    aclCache.evict(tenantId, resourceType, resourceId);
+}
+```
+
+Các invariant cần bảo vệ:
+
+- Không tự thu hồi ACE `ADMINISTER` cuối cùng nếu object bắt buộc có admin.
+- Không grant cho user ngoài tenant.
+- Không cho người có `READ` tự nâng lên `ADMINISTER`.
+- Revoke phải idempotent.
+- Grant/revoke và audit event nằm trong cùng transaction hoặc dùng transactional outbox.
+- Cache chỉ được evict sau commit để tránh cache đọc trạng thái chưa commit.
+
+## 7. Cách 2 — dùng Spring Security ACL module
+
+Spring Security cung cấp module `spring-security-acl`. Module này dùng JDBC, bit mask permission, object identity và cache để giải quyết object-level ACL theo mô hình chuẩn.
+
+### 7.1. Bốn bảng cốt lõi
+
+```mermaid
+erDiagram
+    ACL_SID ||--o{ ACL_ENTRY : recipient
+    ACL_CLASS ||--o{ ACL_OBJECT_IDENTITY : classifies
+    ACL_OBJECT_IDENTITY ||--o{ ACL_ENTRY : contains
+    ACL_OBJECT_IDENTITY ||--o{ ACL_OBJECT_IDENTITY : inherits
+
+    ACL_SID {
+      bigint id PK
+      boolean principal
+      varchar sid
+    }
+    ACL_CLASS {
+      bigint id PK
+      varchar class
+    }
+    ACL_OBJECT_IDENTITY {
+      bigint id PK
+      bigint object_id_class FK
+      bigint object_id_identity
+      bigint parent_object FK
+      bigint owner_sid FK
+      boolean entries_inheriting
+    }
+    ACL_ENTRY {
+      bigint id PK
+      bigint acl_object_identity FK
+      int ace_order
+      bigint sid FK
+      int mask
+      boolean granting
+      boolean audit_success
+      boolean audit_failure
+    }
+```
+
+Các khái niệm:
+
+- `Sid`: principal hoặc authority nhận quyền.
+- `ObjectIdentity`: cặp domain type + object ID.
+- `Acl`: ACL của một object.
+- `AccessControlEntry`: một ACE trong ACL.
+- `Permission`: bit mask. Mặc định có `READ`, `WRITE`, `CREATE`, `DELETE`, `ADMINISTRATION`.
+- `AclService`: đọc ACL.
+- `MutableAclService`: tạo, sửa và xóa ACL.
+
+> [!WARNING]
+> Hãy dùng đúng file schema dành cho database và đúng version Spring Security của dự án. Identity/sequence query khác nhau giữa PostgreSQL, MySQL, Oracle và H2. Module truyền thống phù hợp nhất với numeric ID kiểu `long`; UUID/string ID cần kiểm chứng kỹ hoặc custom implementation.
+
+### 7.2. Dependency và cấu hình
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-acl</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context-support</artifactId>
+</dependency>
+```
+
+Cấu hình các component chính:
+
+```java
+@Configuration
+@EnableMethodSecurity
+public class AclSecurityConfig {
+
+    @Bean
+    static MethodSecurityExpressionHandler methodSecurityExpressionHandler(
+            AclPermissionEvaluator permissionEvaluator) {
+        var handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setPermissionEvaluator(permissionEvaluator);
+        return handler;
+    }
+
+    @Bean
+    static AclPermissionEvaluator aclPermissionEvaluator(AclService aclService) {
+        return new AclPermissionEvaluator(aclService);
+    }
+
+    @Bean
+    static PermissionGrantingStrategy permissionGrantingStrategy() {
+        return new DefaultPermissionGrantingStrategy(new ConsoleAuditLogger());
+    }
+
+    @Bean
+    static AclAuthorizationStrategy aclAuthorizationStrategy() {
+        return new AclAuthorizationStrategyImpl(
+                new SimpleGrantedAuthority("ROLE_ACL_ADMIN"));
+    }
+
+    @Bean
+    static AclCache aclCache(
+            PermissionGrantingStrategy permissionGrantingStrategy,
+            AclAuthorizationStrategy aclAuthorizationStrategy) {
+        Cache springCache = new ConcurrentMapCache("aclCache");
+        return new SpringCacheBasedAclCache(
+                springCache,
+                permissionGrantingStrategy,
+                aclAuthorizationStrategy);
+    }
+
+    @Bean
+    static LookupStrategy lookupStrategy(
+            DataSource dataSource,
+            AclCache aclCache,
+            AclAuthorizationStrategy aclAuthorizationStrategy,
+            PermissionGrantingStrategy permissionGrantingStrategy) {
+        return new BasicLookupStrategy(
+                dataSource,
+                aclCache,
+                aclAuthorizationStrategy,
+                permissionGrantingStrategy);
+    }
+
+    @Bean
+    static JdbcMutableAclService aclService(
+            DataSource dataSource,
+            LookupStrategy lookupStrategy,
+            AclCache aclCache) {
+        return new JdbcMutableAclService(dataSource, lookupStrategy, aclCache);
+    }
+}
+```
+
+`ConcurrentMapCache` chỉ phù hợp để minh họa hoặc chạy một instance. Với nhiều application instance, cần distributed cache hoặc event invalidation; nếu không mỗi node có thể giữ quyết định ACL cũ.
+
+Với PostgreSQL dùng `BIGSERIAL`, có thể cần cấu hình identity query tương ứng với schema/version:
+
+```java
+service.setClassIdentityQuery(
+    "select currval(pg_get_serial_sequence('acl_class', 'id'))");
+service.setSidIdentityQuery(
+    "select currval(pg_get_serial_sequence('acl_sid', 'id'))");
+```
+
+Đừng copy query này nếu migration dùng sequence tên riêng. Query phải khớp chính xác DDL thực tế.
+
+### 7.3. Tạo ACL và ACE
+
+ACL phải được tạo sau khi domain object đã có ID:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class InvoiceAclAdminService {
+    private final MutableAclService aclService;
+
+    @Transactional
+    public void createAclForInvoice(long invoiceId, String ownerUsername) {
+        ObjectIdentity objectIdentity =
+                new ObjectIdentityImpl(Invoice.class, invoiceId);
+
+        MutableAcl acl = aclService.createAcl(objectIdentity);
+        acl.setOwner(new PrincipalSid(ownerUsername));
+        acl.insertAce(
+                acl.getEntries().size(),
+                BasePermission.ADMINISTRATION,
+                new PrincipalSid(ownerUsername),
+                true);
+        acl.insertAce(
+                acl.getEntries().size(),
+                BasePermission.READ,
+                new PrincipalSid(ownerUsername),
+                true);
+
+        aclService.updateAcl(acl);
+    }
+
+    @Transactional
+    public void grantReadToUser(long invoiceId, String username) {
+        ObjectIdentity oid = new ObjectIdentityImpl(Invoice.class, invoiceId);
+        MutableAcl acl = (MutableAcl) aclService.readAclById(oid);
+
+        acl.insertAce(
+                acl.getEntries().size(),
+                BasePermission.READ,
+                new PrincipalSid(username),
+                true);
+
+        aclService.updateAcl(acl);
+    }
+
+    @Transactional
+    public void grantReadToRole(long invoiceId, String role) {
+        ObjectIdentity oid = new ObjectIdentityImpl(Invoice.class, invoiceId);
+        MutableAcl acl = (MutableAcl) aclService.readAclById(oid);
+
+        acl.insertAce(
+                acl.getEntries().size(),
+                BasePermission.READ,
+                new GrantedAuthoritySid("ROLE_" + role),
+                true);
+
+        aclService.updateAcl(acl);
+    }
+}
+```
+
+Spring Security ACL không tự tạo/xóa ACL khi JPA entity được tạo/xóa. Application service phải phối hợp domain transaction và ACL lifecycle. Hãy có cleanup job hoặc foreign-key strategy để tránh orphan ACL.
+
+### 7.4. Kiểm tra bằng hasPermission
+
+Khi truyền object:
+
+```java
+@PreAuthorize("hasAuthority('invoice:read') and hasPermission(#invoice, 'read')")
+public InvoiceDto read(Invoice invoice) {
+    return mapper.toDto(invoice);
+}
+```
+
+Khi chỉ có ID:
+
+```java
+@PreAuthorize("hasAuthority('invoice:update') and " +
+              "hasPermission(#invoiceId, 'com.acme.invoice.Invoice', 'write')")
+@Transactional
+public void update(long invoiceId, UpdateInvoiceCommand command) {
+    // update
+}
+```
+
+`AclPermissionEvaluator` đọc ACL qua `AclService`, chuyển principal và authorities thành SID, rồi kiểm tra ACE phù hợp với permission.
+
+Có thể dùng `@PostFilter`, nhưng không nên tải toàn bộ bảng rồi lọc trong memory:
+
+```java
+@PostFilter("hasPermission(filterObject, 'read')")
+public List<Invoice> findAll() { ... }
+```
+
+Cách này chỉ chấp nhận được với tập nhỏ đã được giới hạn. Với hàng nghìn row, hãy đẩy authorization predicate xuống SQL.
+
+### 7.5. Khi nào không nên dùng module này
+
+Cân nhắc custom ACL hoặc authorization service khác nếu:
+
+- Domain dùng UUID/string ID rộng rãi.
+- Permission không phù hợp bit mask 32-bit.
+- Multi-tenant là yêu cầu cốt lõi trong mọi key/query.
+- Cần explain decision chi tiết.
+- Cần query list trực tiếp theo ACL với SQL riêng.
+- Cần graph relationship nhiều bước.
+- Team không muốn vận hành bốn bảng và cache semantics của framework.
+
+Spring Security ACL không “tốt hơn” custom ACL trong mọi trường hợp. Nó tốt khi domain phù hợp với abstraction của module và team muốn dùng sẵn `AclService` + `hasPermission`.
+
+## 8. Query danh sách có phân quyền
+
+Không nên làm:
+
+```text
+SELECT * FROM invoice
+→ tạo 100.000 object
+→ @PostFilter từng object
+→ trả 20 object
+```
+
+Đúng hơn là đưa tenant, RBAC scope và ACL vào query:
+
+```sql
+SELECT DISTINCT i.*
+FROM invoice i
+WHERE i.tenant_id = :tenantId
+  AND (
+        i.owner_username = :username
+        OR EXISTS (
+            SELECT 1
+            FROM resource_acl a
+            WHERE a.tenant_id = i.tenant_id
+              AND a.resource_type = 'INVOICE'
+              AND a.resource_id = CAST(i.id AS VARCHAR)
+              AND a.permission IN ('READ', 'ADMINISTER')
+              AND a.effect = 'ALLOW'
+              AND (
+                    (a.subject_type = 'USER' AND a.subject_id = :username)
+                 OR (a.subject_type = 'ROLE' AND a.subject_id IN (:roles))
+              )
+        )
+      )
+ORDER BY i.created_at DESC
+LIMIT :limit OFFSET :offset;
+```
+
+Nếu hỗ trợ explicit deny, query phải loại object có ACE deny ưu tiên. Luôn đo bằng `EXPLAIN ANALYZE`; index tốt phụ thuộc pattern query và độ phân bố dữ liệu thật.
+
+Với pagination, authorization phải nằm **trong query trước LIMIT/OFFSET**. Lọc sau pagination tạo page thiếu item, sai total count và có thể rò rỉ timing/metadata.
+
+## 9. Context-Based, PBAC và ReBAC trong Spring
+
+Spring Security không buộc ứng dụng dùng RBAC. `AuthorizationManager` và method expression có thể gọi policy bean tùy chỉnh.
+
+Ví dụ context-based:
+
+```java
+@Component("riskPolicy")
+public class RiskPolicy {
+    public boolean lowRisk(Authentication authentication, HttpServletRequest request) {
+        boolean corporateNetwork = isCorporateIp(request.getRemoteAddr());
+        boolean mfa = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("FACTOR_MFA"));
+        return corporateNetwork && mfa;
+    }
+}
+```
+
+```java
+@PreAuthorize("hasAuthority('customer:export') and " +
+              "@riskPolicy.lowRisk(authentication, @requestContext.request)")
+public byte[] exportCustomers() { ... }
+```
+
+Trong code production, nên gom `AuthorizationContext` thành object rõ ràng thay vì để SpEL phụ thuộc nhiều bean toàn cục.
+
+Ví dụ ReBAC đơn giản:
+
+```java
+@PreAuthorize("@projectPolicy.canRead(authentication, #projectId)")
+public ProjectDto getProject(UUID projectId) { ... }
+```
+
+`projectPolicy` có thể query quan hệ:
+
+```text
+user --member_of--> team --owns--> project
+user --manager_of--> project.owner
+user --shared_with--> project
+```
+
+Khi relation graph sâu hoặc nhiều service cùng cần policy, cân nhắc external PDP. Request flow khi đó là:
+
+```mermaid
+sequenceDiagram
+    participant API as Spring Boot API
+    participant PDP as Policy Engine
+    participant DB as Relation/Policy Store
+
+    API->>API: Xác thực token
+    API->>PDP: subject, action, resource, context
+    PDP->>DB: Đọc policy/relationship
+    DB-->>PDP: Attributes + tuples
+    PDP-->>API: ALLOW/DENY + reason + policyVersion
+    API->>API: Enforce, audit decision
+```
+
+Phải quy định timeout và failure mode. Với authorization, policy engine timeout thường phải **fail closed**: từ chối thay vì cho qua.
+
+## 10. Kiểm thử authorization
+
+RBAC method test:
+
+```java
+@SpringBootTest
+class InvoiceServiceSecurityTest {
+    @Autowired InvoiceService invoiceService;
+
+    @Test
+    @WithMockUser(authorities = "invoice:approve")
+    void approve_withPermission_isAllowed() {
+        invoiceService.approve(42L);
+    }
+
+    @Test
+    @WithMockUser(authorities = "invoice:read")
+    void approve_withoutPermission_isDenied() {
+        assertThatThrownBy(() -> invoiceService.approve(42L))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+}
+```
+
+Với `hasRole('ADMIN')`, test dùng `roles = "ADMIN"`. Với `hasAuthority('invoice:approve')`, test dùng `authorities = "invoice:approve"`. Không thêm `ROLE_` nhầm chỗ.
+
+ACL test phải bao phủ ma trận:
+
+| Capability | Object ACE | Tenant | Kỳ vọng |
+|---|---|---|---|
+| có | allow | đúng | allow |
+| thiếu | allow | đúng | deny |
+| có | thiếu | đúng | deny |
+| có | deny | đúng | deny |
+| có | allow | sai | deny |
+| admin ACL | administer | đúng | grant/revoke được |
+| read ACL | read | đúng | không grant được |
+
+Các test quan trọng khác:
+
+- User đổi `tenantId` trong URL/header.
+- User sửa `resourceId` sang object của người khác.
+- Role bị revoke nhưng session/token/cache còn cũ.
+- Hai request đồng thời grant/revoke.
+- ACL hết hạn đúng thời điểm biên.
+- Service được gọi từ message listener, không qua controller.
+- Self-invocation không vô tình bypass method security.
+
+Với Spring Security ACL/JDBC, integration test nên dùng cùng database engine production qua Testcontainers. H2 có identity, locking và SQL behavior khác PostgreSQL/MySQL nên có thể che giấu lỗi.
+
+## 11. Security checklist và anti-pattern
+
+### Checklist
+
+- [ ] Default deny: không có rule rõ ràng thì từ chối.
+- [ ] Enforce ở service layer, không chỉ ở UI/controller.
+- [ ] Mọi object query đều scope theo `tenant_id`.
+- [ ] Permission name ổn định và có owner quản trị.
+- [ ] Role → permission mapping được version/audit.
+- [ ] Grant/revoke ACL yêu cầu `ADMINISTER` hoặc permission riêng.
+- [ ] JWT/session/cache có kế hoạch revoke và invalidation.
+- [ ] Write operation kiểm tra quyền **trước** khi thay đổi dữ liệu.
+- [ ] Authorization decision quan trọng có audit: actor, action, resource, result, reason, policy version.
+- [ ] Test cả allow path lẫn deny path.
+- [ ] List query lọc quyền trong database trước pagination.
+- [ ] External policy engine timeout thì fail closed.
+
+### Anti-pattern
+
+| Anti-pattern | Tại sao nguy hiểm | Cách sửa |
+|---|---|---|
+| `if (user.isAdmin())` rải khắp code | coupling, khó audit | permission + policy service |
+| tin `tenantId` từ client | cross-tenant access | verify membership/token claim |
+| chỉ kiểm tra role ở controller | bypass từ entry point khác | method security ở service |
+| ACL object ID trong JWT | token phình, stale | query/cached PDP |
+| `@PostAuthorize` sau write | dữ liệu có thể đã thay đổi | pre-authorize trước write |
+| `@PostFilter(findAll())` | tốn memory, sai pagination | filter trong SQL |
+| grant mặc định khi policy lỗi | fail open | deny + alert |
+| role `SUPER_ADMIN` không giới hạn | blast radius lớn | JIT access, MFA, audit, scope |
+| permission lấy từ frontend | client tự nâng quyền | server-side allow-list |
+| cache ACL không invalidation | quyền đã revoke vẫn dùng được | version/event-driven eviction |
+
+## 12. Chọn mô hình nào
+
+```mermaid
+flowchart TD
+    A{Quyền chủ yếu theo chức danh?} -->|Có| RBAC[RBAC làm nền]
+    A -->|Không| B{Owner chia sẻ từng object?}
+    B -->|Có| ACL[DAC + ACL]
+    B -->|Không| C{Rule phụ thuộc nhiều attribute/context?}
+    C -->|Có| PBAC[ABAC/PBAC]
+    C -->|Không| D{Quyền dựa trên graph quan hệ?}
+    D -->|Có| ReBAC[ReBAC]
+    D -->|Không| E{Có classification bắt buộc?}
+    E -->|Có| MAC[MAC]
+    E -->|Không| SIMPLE[Permission check đơn giản]
+
+    RBAC --> H[Thường kết hợp ACL/context]
+    ACL --> H
+    PBAC --> H
+    ReBAC --> H
+```
+
+Khuyến nghị thực dụng cho đa số Spring Boot business application:
+
+1. Bắt đầu bằng **permission-based RBAC**.
+2. Thêm tenant scope ngay từ schema nếu là SaaS.
+3. Thêm ACL chỉ cho resource thật sự cần share/object-level access.
+4. Tách context rule vào policy bean có test độc lập.
+5. Chuyển sang external PBAC/ReBAC engine khi nhiều service cần cùng policy hoặc graph đã vượt khả năng query đơn giản.
+
+## 13. Tóm tắt
+
+- **RBAC** quản trị quyền qua role; code nên enforce permission thay vì tên role.
+- **ACL** quyết định quyền trên từng object instance; phù hợp sharing và object scope.
+- **DAC** nói owner được tự quyết; ACL thường là cách hiện thực DAC.
+- **MAC** dùng label và policy bắt buộc mà owner không thể tùy ý bỏ qua.
+- **PBAC/ABAC** phù hợp rule nhiều attribute và cần quản trị như policy.
+- **Context-Based** thêm dữ liệu thời gian thực như tenant, MFA, IP và risk.
+- **ReBAC** dùng graph relationship như owner, member và parent.
+- Trong Spring Boot, dùng `GrantedAuthority` + `@PreAuthorize` cho RBAC; dùng custom policy bean, `PermissionEvaluator`, hoặc `spring-security-acl` cho object-level ACL.
+- Thiết kế production phải xử lý tenant isolation, revoke, cache invalidation, audit, list filtering và default deny.
+
+> [!TIP]
+> Công thức dễ nhớ: **RBAC quyết định “được làm loại việc gì”; ACL/ReBAC quyết định “được làm trên object nào”; context/PBAC quyết định “được làm trong điều kiện nào”.**
+
+### Tài liệu liên quan
+
+- [Spring Security](/docs/spring/spring-security)
+- [Spring Security — Method Security](https://docs.spring.io/spring-security/reference/servlet/authorization/method-security.html)
+- [Spring Security — Domain Object Security ACL](https://docs.spring.io/spring-security/reference/servlet/authorization/acls.html)
+- [Spring Security — Authorization Architecture](https://docs.spring.io/spring-security/reference/servlet/authorization/architecture.html)
