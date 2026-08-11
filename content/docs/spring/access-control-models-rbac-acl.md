@@ -739,93 +739,124 @@ flowchart TD
 
 ### 5.5. Cách implement bitmask permission check
 
-Bitmask lưu nhiều permission trong một số nguyên. Mỗi permission chiếm đúng một bit:
+Trước hết cần tách hai khái niệm:
 
-| Permission | Bit | Binary | Decimal |
-|---|---:|---:|---:|
-| `READ` | 0 | `000001` | 1 |
-| `WRITE` | 1 | `000010` | 2 |
-| `CREATE` | 2 | `000100` | 4 |
-| `DELETE` | 3 | `001000` | 8 |
-| `APPROVE` | 4 | `010000` | 16 |
-| `ADMINISTER` | 5 | `100000` | 32 |
+- **ACL** trả lời: subject nào có quyền gì trên resource nào.
+- **Bitmask** chỉ là cách nén nhiều permission của một ACL entry vào một số nguyên.
 
-Ví dụ một ACE có `READ + WRITE + APPROVE`:
+Vì vậy, bitmask **không thay thế ACL**. Nó là một cách lưu trường `permissions` bên trong ACL.
 
 ```text
-READ       000001
-WRITE      000010
-APPROVE    010000
-           ------ OR
-Granted    010011 = 19
+ACL entry
+├── resource: Document 42
+├── subject: alice
+└── permissions: READ + WRITE  ← có thể lưu bằng nhiều row hoặc một bitmask
 ```
 
-Bitmask chỉ mã hóa **tập action**. Nó không mã hóa resource ID hoặc user ID. ACL vẫn cần row xác định subject và resource:
+> [!IMPORTANT]
+> Nếu schema “mỗi permission một row” đã đủ nhanh và dễ quản trị, không bắt buộc dùng bitmask. Chỉ dùng bitmask khi tập permission nhỏ, ổn định và lợi ích giảm số row thực sự đáng kể.
+
+**Vì sao không chỉ dùng ACL với mỗi permission một row?**
+
+Giả sử Alice có ba quyền trên document `42`: `READ`, `WRITE`, `DELETE`.
+
+Cách ACL mỗi permission một row:
 
 ```text
-(INVOICE, 42, USER, alice, allowMask=19, denyMask=0)
+resource  resource_id  subject  permission
+DOCUMENT  42           alice    READ
+DOCUMENT  42           alice    WRITE
+DOCUMENT  42           alice    DELETE
 ```
 
-**Định nghĩa permission trong Java**
+Cách ACL dùng bitmask:
 
-Dùng vị trí bit cố định, không dùng `enum.ordinal()`:
+```text
+resource  resource_id  subject  permission_mask
+DOCUMENT  42           alice    7
+```
+
+Cả hai đều là ACL. Khác biệt chỉ nằm ở cách lưu tập permission:
+
+| Tiêu chí | Mỗi permission một row | Bitmask trong một row |
+|---|---|---|
+| Dễ đọc trực tiếp trong DB | tốt | phải decode số |
+| Thêm permission động | dễ | bị giới hạn số bit |
+| Số row | nhiều hơn | ít hơn |
+| Kiểm tra permission | tìm row | phép toán bit rất nhanh |
+| Audit từng lần grant | tự nhiên | cần audit table riêng |
+| Migration permission | đơn giản | phải giữ bit ổn định |
+
+Bitmask phù hợp khi một resource-subject có nhiều permission và permission ít thay đổi. Row-per-permission phù hợp khi cần tính linh hoạt và khả năng quan sát cao hơn.
+
+**Bước 1 — gán mỗi permission vào một bit**
+
+Dùng ví dụ chỉ có bốn permission:
+
+| Permission | Binary | Decimal |
+|---|---:|---:|
+| `READ` | `0001` | 1 |
+| `WRITE` | `0010` | 2 |
+| `DELETE` | `0100` | 4 |
+| `SHARE` | `1000` | 8 |
+
+Mỗi permission phải là một lũy thừa của hai. Nhờ vậy mỗi giá trị chỉ bật đúng một bit.
 
 ```java
 public enum Permission {
-    READ(0),
-    WRITE(1),
-    CREATE(2),
-    DELETE(3),
-    APPROVE(4),
-    ADMINISTER(5);
+    READ(1L << 0),    // 0001 = 1
+    WRITE(1L << 1),   // 0010 = 2
+    DELETE(1L << 2),  // 0100 = 4
+    SHARE(1L << 3);   // 1000 = 8
 
-    private final int bit;
     private final long mask;
 
-    Permission(int bit) {
-        if (bit < 0 || bit > 62) {
-            throw new IllegalArgumentException("Permission bit must be between 0 and 62");
-        }
-        this.bit = bit;
-        this.mask = 1L << bit;
-    }
-
-    public int bit() {
-        return bit;
+    Permission(long mask) {
+        this.mask = mask;
     }
 
     public long mask() {
         return mask;
     }
-
-    public static long maskOf(Permission... permissions) {
-        long result = 0L;
-        for (Permission permission : permissions) {
-            result |= permission.mask;
-        }
-        return result;
-    }
-
-    public static long allKnownMask() {
-        long result = 0L;
-        for (Permission permission : values()) {
-            result |= permission.mask;
-        }
-        return result;
-    }
 }
 ```
 
-Dùng `long` tương ứng với `BIGINT`. Chỉ dùng bit `0..62` để giá trị luôn không âm và dễ xử lý giữa Java, SQL, JSON và công cụ vận hành.
-
 > [!WARNING]
-> Không dùng `ordinal()` làm bit index. Khi chèn hoặc sắp xếp lại enum, toàn bộ mask đã lưu trong database sẽ đổi nghĩa. Bit number là schema dữ liệu và phải ổn định vĩnh viễn.
+> Không dùng `1L << ordinal()`. Nếu đổi thứ tự enum, dữ liệu cũ trong database sẽ mang nghĩa khác. Giá trị bit là một phần của database schema và phải được khai báo cố định.
 
-**Các phép toán cốt lõi**
+**Bước 2 — gộp nhiều permission bằng phép OR**
+
+Alice có `READ` và `WRITE`:
+
+```text
+READ       0001
+WRITE      0010
+           ---- OR
+Kết quả    0011 = 3
+```
+
+Java:
 
 ```java
-public final class PermissionMasks {
-    private PermissionMasks() {
+long alicePermissions = Permission.READ.mask()
+        | Permission.WRITE.mask();
+
+System.out.println(alicePermissions); // 3
+```
+
+Có thể đóng gói phép toán vào utility:
+
+```java
+public final class PermissionMask {
+    private PermissionMask() {
+    }
+
+    public static long of(Permission... permissions) {
+        long result = 0L;
+        for (Permission permission : permissions) {
+            result |= permission.mask();
+        }
+        return result;
     }
 
     public static long add(long current, Permission permission) {
@@ -836,297 +867,404 @@ public final class PermissionMasks {
         return current & ~permission.mask();
     }
 
-    public static boolean contains(long granted, Permission required) {
+    public static boolean has(long granted, Permission required) {
         return (granted & required.mask()) == required.mask();
     }
 
-    public static boolean containsAll(long granted, long required) {
-        requireValidRequiredMask(required);
-        return (granted & required) == required;
+    public static boolean hasAll(long granted, Permission... required) {
+        long requiredMask = of(required);
+        if (requiredMask == 0L) {
+            return false;
+        }
+        return (granted & requiredMask) == requiredMask;
     }
 
-    public static boolean containsAny(long granted, long required) {
-        requireValidRequiredMask(required);
-        return (granted & required) != 0L;
-    }
-
-    public static void requireValidRequiredMask(long required) {
-        if (required == 0L) {
-            throw new IllegalArgumentException("Required permission mask must not be empty");
+    public static boolean hasAny(long granted, Permission... required) {
+        long requiredMask = of(required);
+        if (requiredMask == 0L) {
+            return false;
         }
-
-        long unknownBits = required & ~Permission.allKnownMask();
-        if (unknownBits != 0L) {
-            throw new IllegalArgumentException(
-                    "Required mask contains unknown permission bits: " + unknownBits);
-        }
+        return (granted & requiredMask) != 0L;
     }
 }
 ```
 
-Ba công thức cần nhớ:
+Ba công thức quan trọng:
 
 ```text
-Thêm permission:       current | permission
-Xóa permission:        current & ~permission
-Có đủ mọi permission: (granted & required) == required
-Có ít nhất một quyền: (granted & required) != 0
+Grant:      current | permission
+Revoke:     current & ~permission
+Check:     (granted & required) == required
 ```
 
-`containsAll` và `containsAny` có semantics khác nhau. Với `required = READ | WRITE`:
+**Bước 3 — kiểm tra một permission**
+
+Alice đang có mask `3`, tức binary `0011`:
+
+```java
+long granted = 3L;
+
+PermissionMask.has(granted, Permission.READ);   // true
+PermissionMask.has(granted, Permission.WRITE);  // true
+PermissionMask.has(granted, Permission.DELETE); // false
+```
+
+Tại sao check `READ` trả về `true`?
 
 ```text
-Granted chỉ READ
-containsAll → false
-containsAny → true
+Granted    0011
+READ       0001
+           ---- AND
+Kết quả    0001  == READ → có quyền
 ```
 
-Authorization API phải nói rõ đang yêu cầu **tất cả** hay **bất kỳ** permission nào. Không đặt một method mơ hồ tên `checkPermission`.
+Tại sao check `DELETE` trả về `false`?
 
-**Lưu allow và deny mask**
+```text
+Granted    0011
+DELETE     0100
+           ---- AND
+Kết quả    0000  != DELETE → không có quyền
+```
 
-Nếu ACL cần explicit deny, nên lưu hai cột riêng:
+**Kiểm tra tất cả và kiểm tra bất kỳ**
+
+Hai yêu cầu này khác nhau:
+
+```java
+long granted = PermissionMask.of(Permission.READ, Permission.WRITE);
+
+PermissionMask.hasAll(
+        granted,
+        Permission.READ,
+        Permission.WRITE); // true: có đủ cả hai
+
+PermissionMask.hasAll(
+        granted,
+        Permission.READ,
+        Permission.DELETE); // false: thiếu DELETE
+
+PermissionMask.hasAny(
+        granted,
+        Permission.READ,
+        Permission.DELETE); // true: có ít nhất READ
+```
+
+Tên method phải nói rõ `hasAll` hay `hasAny`. Một method chung chung như `checkPermissions` rất dễ bị gọi sai semantics.
+
+**Bước 4 — lưu ACL bitmask trong database**
+
+Schema tối giản, không đưa scope khác vào để tập trung vào cơ chế bitmask:
 
 ```sql
-CREATE TABLE resource_acl_mask (
+CREATE TABLE resource_acl (
     id              BIGSERIAL PRIMARY KEY,
-    tenant_id       BIGINT NOT NULL,
     resource_type   VARCHAR(80) NOT NULL,
     resource_id     VARCHAR(100) NOT NULL,
     subject_type    VARCHAR(20) NOT NULL,
     subject_id      VARCHAR(120) NOT NULL,
-    allow_mask      BIGINT NOT NULL DEFAULT 0,
-    deny_mask       BIGINT NOT NULL DEFAULT 0,
+    permission_mask BIGINT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uk_resource_acl_mask UNIQUE
-        (tenant_id, resource_type, resource_id, subject_type, subject_id),
-    CONSTRAINT ck_acl_masks_non_negative
-        CHECK (allow_mask >= 0 AND deny_mask >= 0),
-    CONSTRAINT ck_acl_masks_no_overlap
-        CHECK ((allow_mask & deny_mask) = 0)
+    CONSTRAINT ck_acl_subject_type
+        CHECK (subject_type IN ('USER', 'ROLE')),
+    CONSTRAINT ck_permission_mask_non_negative
+        CHECK (permission_mask >= 0),
+    CONSTRAINT uk_resource_acl UNIQUE
+        (resource_type, resource_id, subject_type, subject_id)
 );
 
-CREATE INDEX idx_acl_mask_resource
-    ON resource_acl_mask
-       (tenant_id, resource_type, resource_id, subject_type, subject_id);
+CREATE INDEX idx_resource_acl_lookup
+    ON resource_acl
+       (resource_type, resource_id, subject_type, subject_id);
 ```
 
-Một permission không nên đồng thời nằm trong `allow_mask` và `deny_mask` của cùng ACE. Constraint `ck_acl_masks_no_overlap` bảo vệ invariant này.
+Một row ví dụ:
 
-Đây là một lựa chọn thay thế cho schema “mỗi permission một row” ở phần sau:
+```text
+resource_type = DOCUMENT
+resource_id = 42
+subject_type = USER
+subject_id = alice
+permission_mask = 3
+```
 
-| Thiết kế | Ưu điểm | Nhược điểm |
-|---|---|---|
-| một permission mỗi row | dễ query/audit, không giới hạn số permission | nhiều row hơn |
-| một ACE chứa bitmask | compact, check nhanh | tối đa số bit cố định, migration khó hơn |
+Mask `3` tương ứng `READ + WRITE`.
 
-Không nên lưu cả hai kiểu cùng lúc nếu không có một source of truth rõ ràng.
+**Bước 5 — đọc mask và kiểm tra trong Spring Boot**
 
-**Evaluator với deny-overrides**
-
-Một user có thể khớp nhiều ACE: ACE trực tiếp của user và các ACE từ role. Ta OR tất cả allow mask và deny mask, sau đó áp dụng policy rõ ràng:
+Repository chỉ cần lấy mask của Alice trên document:
 
 ```java
-public record AclMaskEntry(long allowMask, long denyMask) {
+@Repository
+@RequiredArgsConstructor
+public class ResourceAclRepository {
+    private final JdbcTemplate jdbc;
+
+    public OptionalLong findUserMask(
+            String resourceType,
+            String resourceId,
+            String username) {
+
+        List<Long> masks = jdbc.query(
+                """
+                SELECT permission_mask
+                FROM resource_acl
+                WHERE resource_type = ?
+                  AND resource_id = ?
+                  AND subject_type = 'USER'
+                  AND subject_id = ?
+                """,
+                (rs, rowNum) -> rs.getLong("permission_mask"),
+                resourceType,
+                resourceId,
+                username);
+
+        return masks.isEmpty()
+                ? OptionalLong.empty()
+                : OptionalLong.of(masks.get(0));
+    }
 }
 ```
 
+Authorization service áp dụng **default deny**: không tìm thấy ACL entry thì từ chối.
+
 ```java
-@Component
-public class BitmaskPermissionEvaluator {
+@Component("documentPermission")
+@RequiredArgsConstructor
+public class DocumentPermissionService {
+    private final ResourceAclRepository aclRepository;
 
-    public boolean hasAllPermissions(
-            Collection<AclMaskEntry> entries,
-            Permission... requiredPermissions) {
+    public boolean canRead(Authentication authentication, UUID documentId) {
+        return hasPermission(authentication, documentId, Permission.READ);
+    }
 
-        long required = Permission.maskOf(requiredPermissions);
-        PermissionMasks.requireValidRequiredMask(required);
+    public boolean canWrite(Authentication authentication, UUID documentId) {
+        return hasPermission(authentication, documentId, Permission.WRITE);
+    }
 
-        long aggregatedAllow = 0L;
-        long aggregatedDeny = 0L;
+    private boolean hasPermission(
+            Authentication authentication,
+            UUID documentId,
+            Permission required) {
 
-        for (AclMaskEntry entry : entries) {
-            aggregatedAllow |= entry.allowMask();
-            aggregatedDeny |= entry.denyMask();
-        }
-
-        // Policy 1: một DENY khớp action sẽ thắng mọi ALLOW.
-        if ((aggregatedDeny & required) != 0L) {
+        if (authentication == null || !authentication.isAuthenticated()) {
             return false;
         }
 
-        // Policy 2: ADMINISTER cho phép mọi action nếu chính bit
-        // ADMINISTER không bị deny.
-        boolean administerGranted =
-                (aggregatedAllow & Permission.ADMINISTER.mask()) != 0L
-                && (aggregatedDeny & Permission.ADMINISTER.mask()) == 0L;
+        OptionalLong mask = aclRepository.findUserMask(
+                "DOCUMENT",
+                documentId.toString(),
+                authentication.getName());
 
-        if (administerGranted) {
-            return true;
-        }
-
-        // Policy 3: mặc định phải có đủ tất cả bit được yêu cầu.
-        return PermissionMasks.containsAll(aggregatedAllow, required);
+        return mask.isPresent()
+                && PermissionMask.has(mask.getAsLong(), required);
     }
 }
 ```
 
-Ví dụ:
+Dùng tại service layer:
+
+```java
+@Service
+public class DocumentService {
+
+    @PreAuthorize("@documentPermission.canRead(authentication, #documentId)")
+    public DocumentDto get(UUID documentId) {
+        // Chỉ chạy khi bit READ được bật.
+        return loadDocument(documentId);
+    }
+
+    @PreAuthorize("@documentPermission.canWrite(authentication, #documentId)")
+    public void update(UUID documentId, UpdateDocumentCommand command) {
+        // Chỉ chạy khi bit WRITE được bật.
+    }
+}
+```
+
+Luồng kiểm tra hoàn chỉnh:
 
 ```text
-USER:alice  → allow READ
-ROLE:EDITOR → allow WRITE
-ROLE:GUEST  → deny DELETE
-
-READ + WRITE → ALLOW
-DELETE       → DENY
-READ + DELETE→ DENY
+Alice gọi get(documentId=42)
+    ↓
+Tìm ACL của (DOCUMENT, 42, USER, alice)
+    ↓
+Đọc permission_mask = 3 (0011)
+    ↓
+Check READ: 0011 & 0001 = 0001
+    ↓
+ALLOW
 ```
 
-Policy trên là **deny-overrides giữa mọi subject**. Điều đó có nghĩa một deny từ role sẽ thắng direct allow của user. Nếu business muốn direct-user rule ưu tiên role rule, evaluator phải tách từng loại subject và định nghĩa precedence khác. Đừng để precedence phụ thuộc vào thứ tự row trả về từ database.
+Nếu không có row hoặc bit `READ` không bật, method bị từ chối.
 
-**Permission check trực tiếp trong SQL**
+**Grant và revoke permission**
 
-Kiểm tra một ACE có đủ mask:
+Grant `DELETE` cho mask hiện tại `3`:
 
-```sql
-SELECT EXISTS (
-    SELECT 1
-    FROM resource_acl_mask
-    WHERE tenant_id = :tenantId
-      AND resource_type = :resourceType
-      AND resource_id = :resourceId
-      AND subject_type = :subjectType
-      AND subject_id = :subjectId
-      AND (deny_mask & :requiredMask) = 0
-      AND (
-            (allow_mask & :requiredMask) = :requiredMask
-         OR (allow_mask & :administerMask) = :administerMask
-      )
-);
+```text
+Current     0011 = READ + WRITE
+DELETE      0100
+            ---- OR
+New mask    0111 = READ + WRITE + DELETE = 7
 ```
-
-Query này đúng cho **một ACE**. Nếu permission được cộng dồn từ nhiều ACE, ví dụ `READ` từ user và `WRITE` từ role, phải aggregate mask của tất cả ACE trước khi gọi `containsAll`. Có thể đọc vài ACE liên quan rồi aggregate trong Java; cách này thường portable hơn việc dùng aggregate bitwise khác nhau giữa các database.
-
-**Grant, revoke và deny nguyên tử**
-
-Bitwise update tránh read-modify-write race giữa hai request:
-
-```sql
--- Grant: thêm bit vào allow và xóa cùng bit khỏi deny.
-UPDATE resource_acl_mask
-SET allow_mask = allow_mask | :mask,
-    deny_mask = deny_mask & ~:mask,
-    updated_at = now()
-WHERE id = :aclId;
-
--- Revoke: xóa bit khỏi allow; kết quả quay về default deny.
-UPDATE resource_acl_mask
-SET allow_mask = allow_mask & ~:mask,
-    updated_at = now()
-WHERE id = :aclId;
-
--- Explicit deny: thêm bit vào deny và xóa cùng bit khỏi allow.
-UPDATE resource_acl_mask
-SET deny_mask = deny_mask | :mask,
-    allow_mask = allow_mask & ~:mask,
-    updated_at = now()
-WHERE id = :aclId;
-```
-
-`revoke` và `deny` không giống nhau:
-
-- **Revoke** xóa grant; nếu một role khác vẫn grant thì user vẫn có thể được phép.
-- **Deny** tạo rule phủ định; với deny-overrides, nó chặn cả grant từ role khác.
-
-Nếu row chưa tồn tại, dùng database upsert trong cùng statement. Không `SELECT` rồi `INSERT`, vì hai request đồng thời có thể cùng thấy row chưa tồn tại.
-
-**Tích hợp với method security**
-
-Không truyền raw numeric mask từ controller. Controller nhận tên permission, server map qua enum, rồi evaluator dùng mask nội bộ:
 
 ```java
-@Component("invoiceMaskAuth")
-@RequiredArgsConstructor
-public class InvoiceMaskAuthorization {
-    private final AclMaskRepository repository;
-    private final BitmaskPermissionEvaluator evaluator;
+long newMask = PermissionMask.add(3L, Permission.DELETE); // 7
+```
 
-    public boolean canRead(
-            Authentication authentication,
-            long tenantId,
-            UUID invoiceId) {
+Revoke `WRITE` khỏi mask `7`:
 
-        List<AclMaskEntry> entries = repository.findEffectiveEntries(
-                authentication, tenantId, "INVOICE", invoiceId.toString());
+```text
+Current     0111
+~WRITE      1101
+            ---- AND
+New mask    0101 = READ + DELETE = 5
+```
 
-        return evaluator.hasAllPermissions(entries, Permission.READ);
+```java
+long newMask = PermissionMask.remove(7L, Permission.WRITE); // 5
+```
+
+Nên update trực tiếp bằng SQL để tránh hai request cùng đọc mask cũ rồi ghi đè lên nhau:
+
+```sql
+-- Grant một permission.
+UPDATE resource_acl
+SET permission_mask = permission_mask | :permissionMask,
+    updated_at = now()
+WHERE id = :aclId;
+
+-- Revoke một permission.
+UPDATE resource_acl
+SET permission_mask = permission_mask & ~:permissionMask,
+    updated_at = now()
+WHERE id = :aclId;
+```
+
+Nếu ACL row chưa tồn tại, dùng database upsert. Tránh flow `SELECT → không thấy → INSERT`, vì hai request đồng thời có thể cùng insert.
+
+**Nếu user nhận quyền từ nhiều role**
+
+Bitmask của nhiều ACL entry có thể được gộp bằng OR:
+
+```text
+USER:alice  có READ       → 0001
+ROLE:EDITOR có WRITE      → 0010
+                            ---- OR
+Quyền hiệu lực             0011 = READ + WRITE
+```
+
+```java
+long effectiveMask = entries.stream()
+        .mapToLong(AclEntry::permissionMask)
+        .reduce(0L, (left, right) -> left | right);
+```
+
+Sau khi aggregate, dùng cùng một phép check:
+
+```java
+PermissionMask.has(effectiveMask, Permission.WRITE);
+```
+
+Đây vẫn là ACL. Bitmask chỉ giúp mỗi ACE chứa nhiều action và giúp việc hợp nhất permission bằng phép OR đơn giản.
+
+**Có cần explicit deny không?**
+
+Không nên thêm deny nếu business không yêu cầu. Mô hình đơn giản nhất là:
+
+```text
+Có bit  → ALLOW
+Không có bit hoặc không có ACL entry → DENY
+```
+
+Nếu thật sự cần explicit deny, lưu hai mask:
+
+```text
+allow_mask = các quyền được cấp
+ deny_mask = các quyền bị từ chối rõ ràng
+```
+
+Check theo policy deny-overrides:
+
+```java
+public static boolean isAllowed(
+        long allowMask,
+        long denyMask,
+        Permission required) {
+
+    if ((denyMask & required.mask()) != 0L) {
+        return false;
     }
+
+    return (allowMask & required.mask()) == required.mask();
 }
 ```
 
-```java
-@PreAuthorize("hasAuthority('invoice:read') and " +
-              "@invoiceMaskAuth.canRead(authentication, #tenantId, #invoiceId)")
-public InvoiceDto get(long tenantId, UUID invoiceId) {
-    // business logic
-}
-```
+Ví dụ `READ` xuất hiện trong cả allow và deny thì kết quả là deny. Policy này phải được viết rõ và kiểm thử; không phụ thuộc thứ tự các row trong database.
 
-RBAC gate vẫn dùng authority dễ đọc. Bitmask là chi tiết lưu trữ và evaluate object-level ACL.
-
-**Kiểm thử bitmask**
+**Unit test phần cốt lõi**
 
 ```java
-class PermissionMasksTest {
+class PermissionMaskTest {
 
     @Test
-    void combinesAndChecksPermissions() {
-        long granted = Permission.maskOf(
+    void combinesPermissions() {
+        long mask = PermissionMask.of(
                 Permission.READ,
-                Permission.WRITE,
-                Permission.APPROVE);
+                Permission.WRITE);
 
-        assertThat(granted).isEqualTo(19L);
-        assertThat(PermissionMasks.contains(granted, Permission.READ)).isTrue();
-        assertThat(PermissionMasks.contains(granted, Permission.DELETE)).isFalse();
-
-        long readAndWrite = Permission.maskOf(Permission.READ, Permission.WRITE);
-        assertThat(PermissionMasks.containsAll(granted, readAndWrite)).isTrue();
+        assertThat(mask).isEqualTo(3L);
     }
 
     @Test
-    void removesOnlyRequestedPermission() {
-        long original = Permission.maskOf(Permission.READ, Permission.WRITE);
-        long result = PermissionMasks.remove(original, Permission.WRITE);
+    void checksPermission() {
+        long mask = PermissionMask.of(
+                Permission.READ,
+                Permission.WRITE);
 
-        assertThat(result).isEqualTo(Permission.READ.mask());
+        assertThat(PermissionMask.has(mask, Permission.READ)).isTrue();
+        assertThat(PermissionMask.has(mask, Permission.DELETE)).isFalse();
     }
 
     @Test
-    void denyOverridesAllow() {
-        var evaluator = new BitmaskPermissionEvaluator();
-        var entries = List.of(
-                new AclMaskEntry(Permission.READ.mask(), 0L),
-                new AclMaskEntry(0L, Permission.READ.mask()));
+    void addsAndRemovesPermission() {
+        long mask = PermissionMask.of(Permission.READ);
 
-        assertThat(evaluator.hasAllPermissions(entries, Permission.READ)).isFalse();
+        mask = PermissionMask.add(mask, Permission.WRITE);
+        assertThat(mask).isEqualTo(3L);
+
+        mask = PermissionMask.remove(mask, Permission.READ);
+        assertThat(mask).isEqualTo(Permission.WRITE.mask());
     }
 }
 ```
 
-**Quy tắc migration và vận hành**
+**Khi nào nên và không nên dùng bitmask?**
 
-- Không bao giờ tái sử dụng bit của permission đã xóa.
-- Rename permission được, nhưng bit number phải giữ nguyên.
-- Permission đã bỏ nên để bit ở trạng thái reserved.
-- Khi thêm permission mới, code cũ sẽ không biết bit mới; validate unknown bit và rollout theo thứ tự có chủ ý.
-- API và audit log nên hiển thị tên permission, không chỉ số `19`.
-- Với hơn 63 permission hoặc permission thay đổi thường xuyên, dùng row-per-permission hoặc `BitSet`/binary type thay vì `long`.
-- Bitmask tối ưu storage và phép check; nó không thay thế tenant check, ownership, relationship hoặc context policy.
+Nên dùng khi:
 
+- Tập permission nhỏ và ít thay đổi.
+- Một subject thường có nhiều permission trên cùng resource.
+- Muốn giảm số ACL row.
+- Cần kiểm tra và hợp nhất permission nhanh.
+
+Không nên dùng khi:
+
+- Permission được tạo động bởi người dùng.
+- Có nhiều hơn khoảng 63 permission.
+- Cần query, báo cáo và audit từng permission thường xuyên.
+- Team ưu tiên schema dễ đọc hơn tối ưu số row.
+- Permission thay đổi liên tục và migration bit khó kiểm soát.
+
+Các quy tắc vận hành quan trọng:
+
+- Không tái sử dụng bit của permission đã xóa.
+- Đổi tên permission được, nhưng giữ nguyên giá trị bit.
+- API và audit log nên trả tên như `READ`, `WRITE`, không chỉ trả số `3`.
+- Dùng `long`/`BIGINT` và chỉ dùng bit `0..62` để tránh vấn đề signed integer.
+- Bitmask chỉ tối ưu cách lưu permission; nó không thay thế ownership, scope hoặc các policy nghiệp vụ khác.
 ## 6. Cách 1 — tự triển khai domain ACL
 
 Custom domain ACL thường dễ hiểu hơn Spring Security ACL module khi:
