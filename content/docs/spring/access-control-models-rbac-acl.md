@@ -710,7 +710,7 @@ flowchart TD
 
 ## 6. Tự triển khai ACL trong Spring Boot
 
-Phần này xây dựng một ACL đơn giản cho chức năng chia sẻ document. Ta không bắt đầu từ phép toán bit. Trước hết cần thấy bài toán dữ liệu, điểm yếu của cách lưu trực tiếp, rồi mới chọn cách biểu diễn phù hợp.
+Phần này xây dựng một ACL đơn giản cho chức năng chia sẻ document. Trước hết, hãy xác định dữ liệu cần lưu và luồng kiểm tra quyền từ đầu đến cuối.
 
 Mục tiêu nghiệp vụ:
 
