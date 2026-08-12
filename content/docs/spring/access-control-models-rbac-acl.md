@@ -37,7 +37,7 @@ Authorization trả lời câu hỏi: **một principal đã được xác thự
   - [Cache và thay đổi quyền thời gian thực](#48-cache-và-thay-đổi-quyền-thời-gian-thực)
 - [5. ACL chuyên sâu](#5-acl-chuyên-sâu)
   - [ACL giải quyết bài toán nào](#51-acl-giải-quyết-bài-toán-nào)
-  - [Cấu trúc một ACE](#52-cấu-trúc-một-ace)
+  - [ACL và ACE khác nhau thế nào](#52-acl-và-ace-khác-nhau-thế-nào)
   - [Thứ tự đánh giá allow và deny](#53-thứ-tự-đánh-giá-allow-và-deny)
   - [RBAC và ACL phối hợp](#54-rbac-và-acl-phối-hợp)
 - [6. Tự triển khai ACL trong Spring Boot](#6-tự-triển-khai-acl-trong-spring-boot)
@@ -651,23 +651,61 @@ Các use case điển hình:
 - Project private chỉ cho member cụ thể.
 - Support engineer chỉ được mở ticket đã assign.
 
-### 5.2. Cấu trúc một ACE
+### 5.2. ACL và ACE khác nhau thế nào
 
-Một ACE nên chứa ít nhất:
+**ACL — Access Control List** là toàn bộ danh sách quyền gắn với một resource. **ACE — Access Control Entry** là một rule riêng lẻ nằm trong danh sách đó.
+
+Có thể hình dung ACL như một bảng, còn mỗi ACE là một dòng:
+
+```text
+ACL của Invoice 42
+├── ACE 1: Alice được READ
+├── ACE 2: Role AUDITOR được READ
+└── ACE 3: Eve bị từ chối DELETE
+```
+
+Mỗi ACE trả lời ba câu hỏi:
+
+1. **Ai nhận rule?** — user hoặc role.
+2. **Rule áp dụng permission nào?** — `READ`, `WRITE`, `DELETE`...
+3. **Kết quả là gì?** — `ALLOW` hoặc `DENY`.
+
+Resource cũng phải được lưu để biết ACE thuộc ACL nào. Một ACE đầy đủ có thể biểu diễn bằng tuple:
 
 ```text
 (resource_type, resource_id, subject_type, subject_id, permission, effect)
 ```
 
-Ví dụ:
+Ý nghĩa từng trường:
+
+| Trường | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `resource_type` | Loại resource | `INVOICE` |
+| `resource_id` | Resource cụ thể | `42` |
+| `subject_type` | Rule cấp cho user hay role | `USER` |
+| `subject_id` | Subject nhận rule | `alice` |
+| `permission` | Hành động được kiểm tra | `READ` |
+| `effect` | Cho phép hay từ chối | `ALLOW` |
+
+Ví dụ ba ACE:
 
 ```text
 (INVOICE, 42, USER, alice, READ, ALLOW)
 (INVOICE, 42, ROLE, AUDITOR, READ, ALLOW)
-(INVOICE, 42, USER, eve, READ, DENY)
+(INVOICE, 42, USER, eve, DELETE, DENY)
 ```
 
-Có thể thêm thời hạn, người cấp, lý do và audit timestamp.
+Ba row có cùng `(INVOICE, 42)` nên cùng thuộc **ACL của Invoice 42**. Mỗi row là một **ACE** khác nhau.
+
+Khi triển khai bằng database:
+
+```text
+Một resource  → một ACL về mặt khái niệm
+Một ACL       → nhiều ACE
+Một ACE       → một row hoặc một rule được lưu trữ
+```
+
+ACE có thể bổ sung thời hạn, người cấp quyền, lý do và audit timestamp. Những trường này không thay đổi ý nghĩa cốt lõi: ACE vẫn là một quyết định quyền cho một subject trên một resource.
 
 ### 5.3. Thứ tự đánh giá allow và deny
 
