@@ -230,49 +230,139 @@ flowchart LR
 
 ## 5. Ba thuật toán nền tảng: Mark-Sweep, Copying, Mark-Compact
 
-### 5.1. Mark-Sweep
+Cả ba thuật toán giải quyết **cùng một bài toán**: thu hồi memory của object chết, nhưng làm sao cho phần memory còn lại **vẫn cấp phát nhanh được**. Không thuật toán nào làm trọn vẹn cả hai — mỗi cái phải trả giá bằng một thứ khác nhau. Nắm được sự đánh đổi này thì mọi collector phía sau (CMS, G1, ZGC) đều chỉ là biến thể của chính ba thuật toán nền này.
 
-```
-Phase 1 — Mark: duyệt từ GC Roots, đánh dấu object sống
-Phase 2 — Sweep: quét toàn bộ heap, giải phóng object không đánh dấu
+### 5.1. Bài toán thật sự: cấp phát object cần vùng nhớ LIỀN MẠCH
 
-Trước:  [A][B][C][D][E][F]   (B,D,F không reachable)
-Mark:   [A*][ ][C*][ ][E*][ ]
-Sweep:  [A][ ̻][C][ ̻][E][ ̻]   ← các "lỗ hổng" = fragmentation
-```
+Điểm mấu chốt dễ bị bỏ qua: khi code gọi `new byte[1_000_000]`, JVM cần **một khối 1MB nằm liền nhau** trong heap. Không thể gom 1MB rải rác từ nhiều hốc nhỏ ở các vị trí khác nhau.
 
-**Ưu điểm**: không di chuyển object → pointer không đổi.
-**Nhược điểm**: **fragmentation** — nhiều mảnh nhớ rời rạc, không allocate được object lớn dù tổng free đủ.
+Nhờ yêu cầu "liền mạch" đó, khi heap còn một vùng trống lớn, cấp phát cực nhanh. JVM chỉ giữ một con trỏ `ptr` trỏ tới đầu vùng trống:
 
-### 5.2. Copying (Young Gen dùng)
+```text
+Heap trống:  [ptr...............................]
 
-```
-Chia heap thành 2 nửa: From-space / To-space
-Copy object sống từ From → To (liên tục, không fragmentation)
-Swap 2 nửa
-
-From:  [A][B][C][D][E]   (B,D chết)
-To:    [A][C][E][  ][  ]  ← compact, liên tục, nhanh
+new A() → đặt A ngay tại ptr, đẩy ptr lên:  [A][ptr........]
+new B() → đặt B ngay tại ptr, đẩy ptr lên:  [A][B][ptr.....]
 ```
 
-**Ưu điểm**: không fragmentation, allocate nhanh (bump pointer), chi phí tỉ lệ với **object sống** (không phải tổng heap).
-**Nhược điểm**: tốn **50% space** cho To-space. Nhưng vì 95% object trong Young Gen chết → copy rất ít → cực nhanh.
+Mỗi lần `new` chỉ tốn vài lệnh CPU — kỹ thuật này gọi là **bump-the-pointer** (tăng con trỏ). Đây là lý do `new` trong Java nhanh gần bằng cấp phát trên stack.
+
+Nhưng mọi thứ đổ vỡ khi vùng trống **bị chia nhỏ thành nhiều hốc** — gọi là **fragmentation** (phân mảnh):
+
+```text
+Heap 10MB sau một thời gian chạy:
+
+[A][ trống 0.5MB ][B][ trống 0.3MB ][C][ trống 0.2MB ][D]...
+
+Tổng chỗ trống:    1MB  ✓
+Hố trống lớn nhất: 0.5MB ✗
+→ new byte[1MB] → OutOfMemoryError, dù "heap còn 1MB trống"!
+```
+
+> [!WARNING]
+> **OutOfMemoryError dù heap vẫn còn chỗ trống** không phải lý thuyết suông. Collector CMS (mục 8) dùng Mark-Sweep nên không bao giờ dồn object — chạy càng lâu càng phân mảnh, đến một lúc không còn hố đủ lớn, CMS phải fallback về collector single-threaded kèm pause dài hàng giây. Fragmentation là một trong những lý do CMS bị deprecated từ JDK 9.
+
+Vậy "dọn rác" thôi là chưa đủ — GC còn phải giữ cho vùng trống **liền mạch**. Ba thuật toán dưới đây là ba cách trả giá khác nhau cho yêu cầu đó.
+
+### 5.2. Mark-Sweep — dọn rác, nhưng không dọn nhà
+
+Hình dung một căn phòng: Mark-Sweep chỉ **nhặt rác đi**, đồ còn dùng vẫn đứng **ngay vị trí cũ**. Sàn nhà sạch — nhưng giữa các món đồ chừa lại những khoảng trống lổn nhổn.
+
+Chạy làm 2 phase:
+
+```text
+Phase 1 — MARK: duyệt từ GC Roots, đánh dấu object sống
+
+[A][B][C][D][E][F]
+     ✗     ✗      ✗        ✗ = không reachable → coi như rác
+
+Phase 2 — SWEEP: quét lần lượt từng ô, ô nào không đánh dấu thì trả về heap
+
+[A][··][C][··][E][··]      ·· = ô trống rời rạc → fragmentation
+```
+
+**Ưu điểm**: không di chuyển object. Mọi reference vẫn trỏ đúng địa chỉ cũ — GC không phải sửa gì cả. Đây cũng là thuật toán đơn giản nhất.
+
+**Nhược điểm**: phân mảnh đúng như ví dụ ở 5.1. Object chết nằm xen kẽ object sống nên sau khi sweep, chỗ trống cũng nằm xen kẽ — càng chạy lâu càng nhiều hốc nhỏ, đến lúc không hố nào đủ lớn cho một object lớn.
+
+### 5.3. Copying — chuyển đồ sống sang nhà bên (Young Gen dùng)
+
+Cách khác hẳn: thay vì dọn rác trong nhà, **chuyển toàn bộ đồ còn dùng sang nhà bên cạnh** và xếp liền vào từ đầu nhà. Nhà cũ bỏ luôn — rác tự biến mất mà không cần quét từng món.
+
+Vùng nhớ được chia thành 2 nửa: **From-space** (đang chứa object) và **To-space** (luôn giữ trống):
+
+```text
+FROM: [A][B][C][D][E]        (B, D chết)
+TO:   [ ................ ]   (trống)
+
+Bước 1 — copy object SỐNG từ FROM sang TO, xếp liền tù tì từ đầu:
+
+TO:   [A][C][E][ .......... ]
+
+Bước 2 — FROM giờ toàn rác → xóa sổ cả nửa, rồi hoán đổi vai trò:
+
+FROM mới (đã xóa): [ ........ ]
+TO cũ:              [A][C][E][ ........ ]  ← liền mạch, dùng bump-the-pointer luôn
+```
+
+Điểm tài tình: chi phí **tỉ lệ với số object sống**, không tỉ lệ với kích thước vùng nhớ. GC không hề "đụng" tới rác — rác tự mất khi cả nửa FROM bị bỏ. Càng nhiều rác, Copying càng **rẻ** (việc gì phải copy thứ đã chết?).
+
+Young Gen vì vậy là nơi lý tưởng cho Copying: ~95% object **chết trẻ**, mỗi Minor GC chỉ phải copy ~5% object sống sót — gần như miễn phí, đổi lại một vùng Survivor sạch bong để bump-the-pointer.
+
+**Cái giá**: phải dành sẵn 50% không gian cho To-space mà không được dùng để đặt object. Với vùng rác nhiều thì cái giá này rẻ; nhưng với vùng mà object gần như sống hết thì Copying trở thành thảm họa (xem 5.4).
 
 > [!TIP]
-> Đây là lý do Eden:S0:S1 = 8:1:1 — Survivor nhỏ vì rất ít object sống qua mỗi Minor GC. JVM chỉ cần copy ~5% từ Eden sang Survivor.
+> Đây chính là lý do tỉ lệ Eden:S0:S1 = 8:1:1. Hai Survivor đóng vai From/To — nhưng mỗi vòng chỉ ~5% object sống sót nên Survivor không cần to. Eden chiếm 8/10 để việc cấp phát (bump-the-pointer) diễn ra suôn sẻ nhất có thể.
 
-### 5.3. Mark-Compact (Old Gen dùng)
+### 5.4. Mark-Compact — dồn đồ về đầu nhà (Old Gen dùng)
 
+Cách thứ ba giống việc **dọn kho**: đánh dấu đồ còn dùng, rồi **dồn tất cả về một phía** — mọi khoảng trống tự gom lại thành một mảng lớn, liền mạch ở phía còn lại.
+
+```text
+Phase 1 — MARK: giống Mark-Sweep, đánh dấu object sống
+
+[A][··][C][··][E][··]
+
+Phase 2 — COMPACT: dồn object sống về đầu heap, chỗ trống gom hết về phía cuối
+
+[A][C][E][ .................... ]
+          ↑ một mảng trống LIỀN MẠCH duy nhất
 ```
-Phase 1 — Mark: đánh dấu object sống
-Phase 2 — Compact: dồn object sống về đầu heap
 
-Trước:  [A][ ][C][ ][E][ ]
-Compact: [A][C][E][     free     ]   ← liên tục, không fragmentation
-```
+**Ưu điểm**: hết fragmentation mà **không** phải hi sinh 50% không gian như Copying.
 
-**Ưu điểm**: không fragmentation + không tốn 50% space.
-**Nhược điểm**: phải **di chuyển** object + **cập nhật** mọi pointer trỏ vào chúng → chậm hơn, cần STW lâu.
+**Nhược điểm**: phải **di chuyển object** — và khi object di chuyển, mọi reference trỏ vào nó đều phải được **sửa lại địa chỉ**. Việc sửa phải làm lúc mọi application thread đang dừng (STW, mục 6): nếu app chạy giữa chừng mà đọc địa chỉ cũ thì crash ngay. Vì vậy Mark-Compact cho STW pause dài nhất trong ba thuật toán.
+
+Vì sao Old Gen lại chọn cách chậm nhất này? Vì hai phương án kia còn tệ hơn với vùng "gần như ai cũng sống, mà heap lại to":
+
+- Dùng **Copying**: object Old sống rất lâu, chết rất ít → phải copy gần như **toàn bộ** Old Gen mỗi lần GC. Chưa kể mất 50% của một vùng vài GB — quá đắt.
+- Dùng **Mark-Sweep**: không tốn gì nhưng phân mảnh dần dần → premature OOM như ví dụ 5.1.
+- Còn **Mark-Compact**: chậm, nhưng chạy thỉnh thoảng (Old ít khi cần GC) và kết quả luôn sạch sẽ → phương án duy nhất chấp nhận được.
+
+### 5.5. Vì sao cần đủ cả 3 thuật toán?
+
+Bảng so sánh toàn bộ sự đánh đổi:
+
+|  | Mark-Sweep | Copying | Mark-Compact |
+|---|---|---|---|
+| Di chuyển object? | Không | Có (copy sang nửa kia) | Có (dồn tại chỗ) |
+| Fragmentation? | ⚠️ **Có** | Không | Không |
+| Mất thêm không gian? | Không | **50%** cho To-space | Không |
+| Chi phí GC ∝ | Toàn bộ vùng (phải sweep hết) | **Chỉ object sống** | Object sống + sửa mọi reference |
+| Pause / độ phức tạp | Thấp nhất | Nhanh nhất khi rác nhiều | STW dài nhất |
+
+Không cái nào "thắng tuyệt đối" — nên JVM **ghép chúng theo đặc điểm rác của từng vùng**:
+
+- **Nơi rác nhiều (Young Gen)** → **Copying**: chi phí chỉ tính theo object sống, mà số object sống thì ít → cực nhanh.
+- **Nơi rác ít + heap lớn (Old Gen)** → **Mark-Compact**: chấp nhận STW dài đổi lấy không phân mảnh và không lãng phí 50%.
+- **Nơi cần tránh di chuyển** → **Mark-Sweep**: đổi "không phá vỡ reference" lấy fragmentation — CMS đã đánh cuộc này và trả giá bằng nó.
+
+> [!NOTE]
+> Việc dồn object sống lại gần nhau (mà Copying và Mark-Compact đều làm) còn kèm hai lợi ích phụ:
+> 1. **Vùng trống liền mạch** → cấp phát trở về bump-the-pointer, và các allocation lớn (`byte[10MB]`) luôn tìm được chỗ.
+> 2. **CPU cache locality**: object được tạo cùng lúc thường được *truy cập* cùng lúc (object và field của nó, array và phần tử). Nằm gần nhau trong memory → nằm chung cache line → ít cache miss hơn heap phân mảnh.
+
+Nói gọn một câu: **GC không chỉ cần "giải phóng chỗ trống" — nó cần giải phóng một vùng trống liền mạch, đủ lớn.** Ba thuật toán tồn tại vì không cái nào vừa nhanh, vừa không lãng phí, vừa không phân mảnh.
 
 ---
 
