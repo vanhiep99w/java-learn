@@ -11,7 +11,18 @@ Garbage Collection tự động thu hồi vùng nhớ của object không còn r
 - [GC Roots & Reachability — ai sống, ai chết?](#2-gc-roots--reachability--ai-sống-ai-chết)
 - [Generational Hypothesis — vì sao chia Young/Old](#3-generational-hypothesis--vì-sao-chia-youngold)
 - [Heap Layout: Eden, Survivor, Old, Metaspace](#4-heap-layout-eden-survivor-old-metaspace)
+  - [Mô hình generational cổ điển — Young và Old](#41-mô-hình-generational-cổ-điển--young-và-old)
+  - [Từ new đến Eden — TLAB và đường cấp phát](#42-từ-new-đến-eden--tlab-và-đường-cấp-phát)
+  - [Minor GC và hai Survivor](#43-minor-gc-và-hai-survivor)
+  - [Promotion vào Old Gen](#44-promotion-vào-old-gen)
+  - [Metaspace — vùng native ngoài Heap](#45-metaspace--vùng-native-ngoài-heap)
+  - [Layout phụ thuộc vào collector](#46-layout-phụ-thuộc-vào-collector)
 - [Ba thuật toán nền tảng: Mark-Sweep, Copying, Mark-Compact](#5-ba-thuật-toán-nền-tảng-mark-sweep-copying-mark-compact)
+  - [Vấn đề cần giải quyết: thu hồi và phân mảnh](#51-vấn-đề-cần-giải-quyết-thu-hồi-và-phân-mảnh)
+  - [Mark-Sweep — đánh dấu rồi thu hồi](#52-mark-sweep--đánh-dấu-rồi-thu-hồi)
+  - [Copying — copy object sống sang vùng trống](#53-copying--copy-object-sống-sang-vùng-trống)
+  - [Mark-Compact — dồn object sống về một chỗ](#54-mark-compact--dồn-object-sống-về-một-chỗ)
+  - [So sánh và chọn thuật toán](#55-so-sánh-và-chọn-thuật-toán)
 - [Stop-the-World — tại sao GC phải dừng ứng dụng](#6-stop-the-world--tại-sao-gc-phải-dừng-ứng-dụng)
 - [Serial & Parallel Collector — thế hệ đầu](#7-serial--parallel-collector--thế-hệ-đầu)
 - [CMS — Concurrent Mark Sweep (deprecated)](#8-cms--concurrent-mark-sweep-deprecated)
@@ -169,7 +180,7 @@ Quan sát thực nghiệm trên hầu hết ứng dụng:
 ```text
 Object lifetime distribution (typical web app):
 ╠══════════════════════════════╗
-║  ~95% chết trong < 1 GC     ║ ← Young Generation
+║  ~95% chết trong < 1 GC      ║ ← Young Generation
 ╠══════════════════════════════╝
 ╠═════╗
 ║ ~5% ║ sống lâu (cache, pool, singleton) ← Old Generation
@@ -180,189 +191,383 @@ Từ đó, JVM chia heap thành **generations**:
 - **Young Gen**: object mới tạo → GC thường xuyên, nhanh (chỉ scan vùng nhỏ)
 - **Old Gen**: object sống qua nhiều GC cycle → GC ít thường xuyên hơn, nhưng đắt hơn
 
-**Lợi ích**: thay vì scan **toàn bộ** heap mỗi lần, Minor GC chỉ scan Young Gen (thường < 10% heap) → pause **mili-giây** thay vì **giây**.
+**Lợi ích**: thay vì xử lý **toàn bộ** heap mỗi lần, Young/Minor GC tập trung evacuation vào Young Gen (thường < 10% heap). GC vẫn phải xử lý GC Roots và các reference Old → Young qua remembered set hoặc card table, nhưng không cần quét toàn bộ Old → pause thường ở mức **mili-giây** thay vì **giây**.
 
 ---
 
 ## 4. Heap Layout: Eden, Survivor, Old, Metaspace
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          JVM Heap                               │
-├────────────────────────────────────┬────────────────────────────┤
-│          Young Generation          │       Old Generation       │
-├───────────────┬────────┬───────────┤                            │
-│     Eden      │  S0    │    S1     │          Tenured           │
-│  (new objects)│(from)  │  (to)     │    (long-lived objects)    │
-│    ~80%       │ ~10%   │  ~10%     │                            │
-├───────────────┴────────┴───────────┴────────────────────────────┤
-│                        Metaspace (off-heap)                     │
-│              Class metadata, method bytecode, constant pool     │
-└─────────────────────────────────────────────────────────────────┘
+Có hai lớp khái niệm cần tách riêng:
+
+- **Java Heap** chứa object và array. Trong mô hình generational, heap được chia logic thành Young Generation và Old Generation.
+- **Metaspace** chứa metadata của class và nằm ngoài Java Heap, trong native memory. Nó không có Eden, Survivor hay Old Gen.
+
+Sơ đồ dưới đây là **mô hình generational cổ điển** thường dùng để giải thích Serial và Parallel Collector. Đây không phải layout cố định cho mọi JVM. G1 chia heap thành regions, còn ZGC dùng cơ chế relocation và barrier khác; phần 4.6 sẽ so sánh.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ Java Heap (object/array; giới hạn bởi Xms và Xmx)                      │
+├────────────────────────────────┬───────────────────────────────────────┤
+│ Young Generation               │ Old / Tenured Generation              │
+│                                │                                       │
+│  ┌─────────┬────────┬───────┐  │  Object sống lâu hoặc được promote    │
+│  │  Eden   │  S0    │  S1   │  │                                       │
+│  │ allocate│ From/To│To/From│  │                                       │
+│  └─────────┴────────┴───────┘  │                                       │
+└────────────────────────────────┴───────────────────────────────────────┘
+
+Metaspace: vùng native memory riêng, không nằm trong Java Heap
 ```
 
-| Vùng | Kích thước mặc định | Vai trò |
-|------|---------------------|---------|
-| Eden | ~80% Young Gen | Object mới được allocate ở đây |
-| Survivor 0, 1 | ~10% mỗi cái | Object sống qua Minor GC được copy qua lại |
-| Old (Tenured) | ~⅔ total heap | Object sống qua `MaxTenuringThreshold` lần GC |
-| Metaspace | Không giới hạn (native) | Class metadata — thay PermGen từ JDK 8 |
+| Vùng | Chứa gì | Điều gì thường xảy ra ở đây? |
+|------|---------|------------------------------|
+| **Eden** | Object mới được cấp phát | TLAB cấp phát object; Young GC thường làm Eden gần như trống lại |
+| **Survivor S0/S1** | Object sống sót qua Young GC | Một vùng là **From**, vùng kia là **To**; object sống được copy qua lại và tăng age |
+| **Old / Tenured** | Object sống lâu hoặc bị promote sớm | Old/Mixed/Full GC xử lý theo collector; object có thể được compact hoặc evacuate |
+| **Metaspace** | Metadata của class, thông tin method và runtime constant pool theo implementation | Class unloading có thể trả native memory khi ClassLoader không còn reachable |
 
-### 4.1. Object lifecycle flow
+### 4.1. Mô hình generational cổ điển — Young và Old
 
-```mermaid
-flowchart LR
-    NEW["new Object()"] -->|alloc| EDEN["Eden"]
-    EDEN -->|"Minor GC: sống"| S0["Survivor 0"]
-    S0 -->|"Minor GC: sống, age+1"| S1["Survivor 1"]
-    S1 -->|"Minor GC: sống, age+1"| S0
-    S0 -->|"age >= threshold"| OLD["Old Gen"]
-    S1 -->|"age >= threshold"| OLD
-    EDEN -->|"object quá lớn"| OLD
-    OLD -->|"Full GC / Mixed GC"| FREE["Freed"]
-    EDEN -->|"Minor GC: chết"| FREE
+Trong layout classic, Young Gen thường gồm Eden và hai Survivor. Eden lớn vì phần lớn object chết trước lần Young GC tiếp theo. Hai Survivor cung cấp một vùng nguồn và một vùng đích để copy object sống mà không ghi đè lên nhau.
+
+Tỉ lệ **Eden:S0:S1 ≈ 8:1:1** và Old Gen khoảng **2/3 heap** chỉ là cách minh họa phổ biến, không phải giá trị bắt buộc của JVM:
+
+- Tỉ lệ thực tế phụ thuộc collector, heap size và các flag như `-XX:NewRatio`.
+- Với `-XX:NewRatio=2` trong một số collector classic, Old:Young có thể xấp xỉ 2:1. Đây không có nghĩa mọi JVM đều dùng đúng 1/3 heap cho Young.
+- JVM có thể tự điều chỉnh kích thước dựa trên allocation rate, pause target và tình trạng Survivor space.
+- G1 không giữ Eden/S0/S1 bằng các vùng địa chỉ liền nhau hay theo tỉ lệ 8:1:1; nó gán vai trò cho các region tự do.
+
+> [!IMPORTANT]
+> Không nên đọc sơ đồ như một cam kết về địa chỉ hoặc kích thước. `Eden`, `Survivor` và `Old` là logical roles; cách chúng được hiện thực phụ thuộc collector.
+
+### 4.2. Từ new đến Eden — TLAB và đường cấp phát
+
+Với object nhỏ trong collector generational thông thường, đường đi của một lệnh `new` thường như sau:
+
+```text
+new Order()
+    │
+    ├── object nhỏ, TLAB còn chỗ
+    │       └── cấp phát trong TLAB thuộc Eden bằng bump-the-pointer
+    │
+    └── TLAB đầy hoặc object đặc biệt/lớn
+            └── slow path → đường cấp phát riêng của collector
+                              (Old hoặc Humongous region tùy collector)
 ```
+
+**TLAB (Thread-Local Allocation Buffer)** là một lát nhỏ của Eden được dành riêng cho từng thread. Khi thread gọi `new`, nó thường chỉ cần tăng một con trỏ trong TLAB. Các thread không phải tranh chấp một allocation pointer dùng chung, nên cấp phát object nhỏ rất nhanh.
+
+Một allocation thông thường gồm các bước:
+
+1. JVM biết layout và kích thước của object từ class metadata.
+2. Thread lấy một khoảng trong TLAB; nếu TLAB hết chỗ, JVM xin TLAB mới hoặc đi qua slow path.
+3. JVM ghi object header, gán default value cho field và trả reference về cho code Java.
+4. Constructor chạy. Object có thể trở thành reachable từ local variable, field hoặc collection sau khi reference được lưu lại.
+
+Object **lớn** hoặc allocation không phù hợp TLAB có thể đi theo đường khác. Với collector classic, một số flag như `PretenureSizeThreshold` có thể khiến object đi thẳng Old Gen. Với G1, object có kích thước ít nhất khoảng một nửa region thường được xử lý như **Humongous allocation** và chiếm một hoặc nhiều Humongous regions. Không có một ngưỡng “object lớn” chung cho mọi collector.
 
 > [!NOTE]
-> `MaxTenuringThreshold` mặc định là **15** (G1) hoặc **6** (CMS). JVM có thể **tự động giảm** threshold nếu Survivor space quá chật (dynamic age computation). Object rất lớn (> `PretenureSizeThreshold`) vào thẳng Old Gen — tránh copy chi phí cao.
+> `new` không đồng nghĩa tuyệt đối với “object luôn nằm trong Eden”. Eden là đường mặc định cho object nhỏ, nhưng collector và kích thước object có thể thay đổi đường cấp phát.
+
+### 4.3. Minor GC và hai Survivor
+
+Trong cách gọi truyền thống, **Minor GC** là lần thu gom Young Generation. GC log hiện đại, đặc biệt với G1, thường dùng tên **Young GC** hoặc **Pause Young**. Với Serial, Parallel và G1, young evacuation thường có một khoảng Stop-the-World; collector khác có thể dùng cơ chế concurrent khác.
+
+Giả sử trước GC, S0 đang là **From** và S1 đang trống để làm **To**:
+
+```text
+TRƯỚC YOUNG GC
+  Eden: [A chết] [B sống]
+  S0 (From): [C sống, age=1]
+  S1 (To):   [trống]
+
+SAU KHI COPY OBJECT SỐNG
+  Eden: [trống]
+  S0 (To mới): [trống]
+  S1 (From mới): [B age=1] [C age=2]
+```
+
+Điểm quan trọng: `S0` và `S1` không phải hai cấp độ tuổi, cũng không phải nơi mỗi vùng chỉ chứa một object. Mỗi vùng là một buffer chứa nhiều object và hai buffer luân phiên vai trò:
+
+- **From:** vùng đang chứa các object Survivor hiện tại.
+- **To:** vùng đang trống để nhận object sống từ Eden và From.
+
+Sau mỗi Young GC, To chứa các object sống mới và trở thành From. From cũ đã được dọn trở thành To cho lần GC tiếp theo.
+
+Tại sao cần hai vùng? Giả sử chỉ có một Survivor:
+
+```text
+S0 trước GC: [B chết][C sống]
+Eden:        [D sống]
+
+Kết quả cần có: [C sống][D sống]
+```
+
+Nếu ghi kết quả ngay vào `S0`, JVM phải di chuyển `C` để lấp chỗ của `B`, đồng thời cập nhật các reference tới `C`. Đó chính là compact ngay trong cùng vùng và phức tạp hơn. Với `S1` đang trống, JVM chỉ cần copy `C` và `D` sang `S1`, rồi bỏ toàn bộ `S0` cũ:
+
+```text
+S1 (To): [C sống][D sống]
+```
+
+Hai Survivor giúp JVM luôn có một vùng đích sạch để copy object sống mà không ghi đè object khác. Nếu không dùng hai vùng, JVM phải compact tại chỗ, dùng một vùng tạm khác hoặc promote object lên Old sớm.
+
+Quy trình gồm bốn bước:
+
+1. **Tìm nguồn sống:** GC duyệt GC Roots và các reference từ Old vào Young. Remembered Set hoặc card table giúp ghi nhận đường Old → Young để không phải scan toàn bộ Old Gen mỗi lần.
+2. **Copy object sống:** object sống trong Eden và From được copy sang To. Reference trỏ tới object được cập nhật theo vị trí mới.
+3. **Tăng age:** object sống thêm một Young GC được tăng age, tức số lần sống sót qua collection; age không phải thời gian tính bằng giây.
+4. **Hoán đổi Survivor:** To chứa object sống trở thành From cho vòng sau. From cũ đã được dọn trở thành To và phải trống để nhận object ở lần tiếp theo.
+
+Object chết trong Eden hoặc From không cần được copy. Cả vùng cũ có thể được thu hồi sau khi evacuation hoàn tất. Đây là lý do Young GC thường nhanh khi allocation rate cao nhưng phần lớn object ngắn hạn.
+
+> [!WARNING]
+> Young GC không phải lúc nào cũng chỉ đọc “Eden”. Một local reference trên stack, static reference và reference từ Old Gen sang Young đều có thể giữ object sống. Bỏ qua các nguồn này sẽ khiến GC thu hồi nhầm object còn được dùng.
+
+### 4.4. Promotion vào Old Gen
+
+Object được **promote** từ Survivor vào Old Gen khi đạt effective tenuring threshold hoặc khi Survivor To không còn đủ chỗ. `-XX:MaxTenuringThreshold` là giới hạn age, không phải lời hứa rằng mọi object sẽ sống đúng số vòng đó. JVM có thể hạ threshold động nếu nhiều object cùng age làm Survivor bị đầy.
+
+```text
+Eden ── Young GC, còn sống ──→ Survivor (age + 1)
+                                  │
+                  age đạt ngưỡng hoặc To đầy
+                                  │
+                                  ▼
+                              Old Gen
+```
+
+Có ba tình huống làm Old Gen tăng nhanh:
+
+- **Object thật sự sống lâu:** cache, connection pool, session hoặc singleton giữ reference lâu.
+- **Premature promotion:** object chỉ sống lâu hơn vài Young GC nhưng bị đẩy vào Old vì Survivor quá nhỏ.
+- **Allocation/promotion pressure:** tốc độ tạo object hoặc kích thước object lớn khiến Young GC không còn đủ chỗ evacuation.
+
+Old GC phụ thuộc collector:
+
+| Collector | Cách xử lý Old thường gặp |
+|-----------|---------------------------|
+| Serial / Parallel | Mark-Compact hoặc biến thể compact, thường có STW dài hơn Young GC |
+| CMS (lịch sử, đã removed) | Mark-Sweep concurrent; không compact nên có fragmentation |
+| G1 | Mixed GC evacuate Young và các Old regions được chọn theo garbage density |
+| ZGC | Relocation concurrent với barrier; Generational ZGC có Young/Old logic nhưng không dùng S0/S1 classic theo cùng cách |
+
+Vì vậy `Full GC` không nên được hiểu máy móc là “Eden đầy”. Tùy collector, nó có thể xử lý Old, các vùng liên quan và class metadata. Khi Old đầy hoặc promotion không tìm được đích, application có thể gặp `promotion failed`, `to-space exhausted`, Full GC dài hoặc `OutOfMemoryError: Java heap space`.
+
+> [!TIP]
+> Muốn biết object được promote sớm hay không, xem GC log theo tuổi Survivor và kích thước Old sau Young GC. Đừng chỉ nhìn tổng heap; hãy nhìn allocation rate, survivor occupancy và promotion rate.
+
+### 4.5. Metaspace — vùng native ngoài Heap
+
+Metaspace thay PermGen từ Java 8 và **không nằm trong vùng heap mà `-Xmx` giới hạn**. Nó lưu class metadata và các cấu trúc liên quan tới method, field, constant pool theo implementation của JVM. Instance như `new User()` vẫn nằm trên Java Heap; Metaspace không phải nơi chứa object ứng dụng.
+
+Một số điểm cần nhớ:
+
+- `-Xmx` giới hạn Java Heap, không tự động giới hạn Metaspace. Container vẫn phải đủ memory cho cả heap, Metaspace, thread stack, code cache và native library.
+- `-XX:MetaspaceSize` là ngưỡng ban đầu có thể kích hoạt GC để thử class unloading; nó không phải hard limit đơn giản như `-Xmx`.
+- `-XX:MaxMetaspaceSize` đặt giới hạn trên. Nếu metadata vượt giới hạn, JVM có thể ném `OutOfMemoryError: Metaspace`.
+- Class chỉ được unload khi ClassLoader tương ứng không còn reachable và JVM có cơ hội thực hiện class unloading. Một static reference, thread context ClassLoader hoặc registry giữ ClassLoader có thể ngăn việc này.
+- String object và String pool hiện đại nằm trên Java Heap. Không nên suy ra mọi “constant” đều nằm trong Metaspace.
+
+Nguyên nhân thường gặp của Metaspace OOM là hot reload/redeploy tạo ClassLoader mới nhưng còn reference tới ClassLoader cũ, hoặc framework sinh quá nhiều proxy/class động. Có thể kiểm tra native memory bằng:
+
+```bash
+java -XX:NativeMemoryTracking=summary -jar app.jar
+jcmd <pid> VM.native_memory summary
+```
+
+> [!IMPORTANT]
+> Heap OOM và Metaspace OOM là hai vấn đề khác nhau. Tăng `-Xmx` không giải quyết được Metaspace OOM; trước hết cần xác định vùng nào đang tăng bằng GC log, heap dump hoặc Native Memory Tracking.
+
+### 4.6. Layout phụ thuộc vào collector
+
+Cùng tên “Young/Old” nhưng layout vật lý khác nhau đáng kể:
+
+| Collector | Layout dễ hình dung | Hệ quả khi đọc log |
+|-----------|----------------------|--------------------|
+| Serial / Parallel | Young và Old là các vùng tương đối liền mạch; Eden và hai Survivor có vai trò rõ | Mô hình Eden → S0/S1 → Old phù hợp nhất |
+| CMS (lịch sử) | Generational classic; Old mark-sweep và không compact | Có thể gặp fragmentation và Full GC fallback |
+| G1 | Heap gồm nhiều region có cùng kích thước; mỗi region được gán Eden, Survivor, Old, Humongous hoặc Free | Không có một Eden/S0/S1 cố định; region đổi vai trò theo nhu cầu |
+| ZGC | Heap/relocation được quản lý concurrent bằng barrier; Generational ZGC thêm Young/Old logic | Không nên suy ra pause hoặc layout từ mô hình classic |
+
+G1 vẫn có Young GC và Mixed GC, nhưng Eden/Survivor/Old là **vai trò của region**. Một region Free hôm nay có thể trở thành Eden, rồi sau đó được dùng làm Old. Object Humongous có thể chiếm nhiều region liên tiếp, nên cần đọc thêm các dòng `Humongous allocation` trong log.
+
+> [!NOTE]
+> Dùng sơ đồ ở đầu section để hiểu vòng đời object. Khi tuning production, luôn kết hợp sơ đồ đó với collector đang bật (`-XX:+UseG1GC`, `-XX:+UseZGC`...) và GC log thực tế. Cùng một flag hoặc cùng một con số không có cùng ý nghĩa trên mọi collector.
 
 ---
 
 ## 5. Ba thuật toán nền tảng: Mark-Sweep, Copying, Mark-Compact
 
-Cả ba thuật toán giải quyết **cùng một bài toán**: thu hồi memory của object chết, nhưng làm sao cho phần memory còn lại **vẫn cấp phát nhanh được**. Không thuật toán nào làm trọn vẹn cả hai — mỗi cái phải trả giá bằng một thứ khác nhau. Nắm được sự đánh đổi này thì mọi collector phía sau (CMS, G1, ZGC) đều chỉ là biến thể của chính ba thuật toán nền này.
+Ba thuật toán này đều giải quyết một việc: xác định object nào không còn được dùng và trả vùng nhớ của chúng về cho heap. Điểm khác nhau là cách chúng xử lý những object còn sống.
 
-### 5.1. Bài toán thật sự: cấp phát object cần vùng nhớ LIỀN MẠCH
+Trong phần này:
 
-Điểm mấu chốt dễ bị bỏ qua: khi code gọi `new byte[1_000_000]`, JVM cần **một khối 1MB nằm liền nhau** trong heap. Không thể gom 1MB rải rác từ nhiều hốc nhỏ ở các vị trí khác nhau.
+- **Object sống** là object còn đường đi từ một GC Root.
+- **Object rác** là object không còn đường đi từ bất kỳ GC Root nào.
+- **Vùng trống liền mạch** là một block memory liên tục đủ lớn để cấp phát object mới.
 
-Nhờ yêu cầu "liền mạch" đó, khi heap còn một vùng trống lớn, cấp phát cực nhanh. JVM chỉ giữ một con trỏ `ptr` trỏ tới đầu vùng trống:
+Ba câu hỏi dùng để so sánh các thuật toán:
 
-```text
-Heap trống:  [ptr...............................]
+1. Object sống có bị di chuyển không?
+2. Sau GC, vùng trống có liền mạch không?
+3. GC phải trả giá bằng thêm memory, thời gian pause hay công sức cập nhật reference?
 
-new A() → đặt A ngay tại ptr, đẩy ptr lên:  [A][ptr........]
-new B() → đặt B ngay tại ptr, đẩy ptr lên:  [A][B][ptr.....]
-```
+### 5.1. Vấn đề cần giải quyết: thu hồi và phân mảnh
 
-Mỗi lần `new` chỉ tốn vài lệnh CPU — kỹ thuật này gọi là **bump-the-pointer** (tăng con trỏ). Đây là lý do `new` trong Java nhanh gần bằng cấp phát trên stack.
-
-Nhưng mọi thứ đổ vỡ khi vùng trống **bị chia nhỏ thành nhiều hốc** — gọi là **fragmentation** (phân mảnh):
-
-```text
-Heap 10MB sau một thời gian chạy:
-
-[A][ trống 0.5MB ][B][ trống 0.3MB ][C][ trống 0.2MB ][D]...
-
-Tổng chỗ trống:    1MB  ✓
-Hố trống lớn nhất: 0.5MB ✗
-→ new byte[1MB] → OutOfMemoryError, dù "heap còn 1MB trống"!
-```
-
-> [!WARNING]
-> **OutOfMemoryError dù heap vẫn còn chỗ trống** không phải lý thuyết suông. Collector CMS (mục 8) dùng Mark-Sweep nên không bao giờ dồn object — chạy càng lâu càng phân mảnh, đến một lúc không còn hố đủ lớn, CMS phải fallback về collector single-threaded kèm pause dài hàng giây. Fragmentation là một trong những lý do CMS bị deprecated từ JDK 9.
-
-Vậy "dọn rác" thôi là chưa đủ — GC còn phải giữ cho vùng trống **liền mạch**. Ba thuật toán dưới đây là ba cách trả giá khác nhau cho yêu cầu đó.
-
-### 5.2. Mark-Sweep — dọn rác, nhưng không dọn nhà
-
-Hình dung một căn phòng: Mark-Sweep chỉ **nhặt rác đi**, đồ còn dùng vẫn đứng **ngay vị trí cũ**. Sàn nhà sạch — nhưng giữa các món đồ chừa lại những khoảng trống lổn nhổn.
-
-Chạy làm 2 phase:
+Giả sử heap đang có các object sau:
 
 ```text
-Phase 1 — MARK: duyệt từ GC Roots, đánh dấu object sống
-
-[A][B][C][D][E][F]
-     ✗     ✗      ✗        ✗ = không reachable → coi như rác
-
-Phase 2 — SWEEP: quét lần lượt từng ô, ô nào không đánh dấu thì trả về heap
-
-[A][··][C][··][E][··]      ·· = ô trống rời rạc → fragmentation
+[A sống][B rác][C sống][D rác][E sống]
 ```
 
-**Ưu điểm**: không di chuyển object. Mọi reference vẫn trỏ đúng địa chỉ cũ — GC không phải sửa gì cả. Đây cũng là thuật toán đơn giản nhất.
-
-**Nhược điểm**: phân mảnh đúng như ví dụ ở 5.1. Object chết nằm xen kẽ object sống nên sau khi sweep, chỗ trống cũng nằm xen kẽ — càng chạy lâu càng nhiều hốc nhỏ, đến lúc không hố nào đủ lớn cho một object lớn.
-
-### 5.3. Copying — chuyển đồ sống sang nhà bên (Young Gen dùng)
-
-Cách khác hẳn: thay vì dọn rác trong nhà, **chuyển toàn bộ đồ còn dùng sang nhà bên cạnh** và xếp liền vào từ đầu nhà. Nhà cũ bỏ luôn — rác tự biến mất mà không cần quét từng món.
-
-Vùng nhớ được chia thành 2 nửa: **From-space** (đang chứa object) và **To-space** (luôn giữ trống):
+GC có thể thu hồi `B` và `D`. Nhưng nếu chỉ xóa chúng tại chỗ, heap sẽ thành:
 
 ```text
-FROM: [A][B][C][D][E]        (B, D chết)
-TO:   [ ................ ]   (trống)
-
-Bước 1 — copy object SỐNG từ FROM sang TO, xếp liền tù tì từ đầu:
-
-TO:   [A][C][E][ .......... ]
-
-Bước 2 — FROM giờ toàn rác → xóa sổ cả nửa, rồi hoán đổi vai trò:
-
-FROM mới (đã xóa): [ ........ ]
-TO cũ:              [A][C][E][ ........ ]  ← liền mạch, dùng bump-the-pointer luôn
+[A sống][  trống  ][C sống][  trống  ][E sống]
 ```
 
-Điểm tài tình: chi phí **tỉ lệ với số object sống**, không tỉ lệ với kích thước vùng nhớ. GC không hề "đụng" tới rác — rác tự mất khi cả nửa FROM bị bỏ. Càng nhiều rác, Copying càng **rẻ** (việc gì phải copy thứ đã chết?).
+Tổng vùng trống có thể đủ lớn, nhưng bị chia thành nhiều block nhỏ. Đây là **fragmentation** — phân mảnh heap.
 
-Young Gen vì vậy là nơi lý tưởng cho Copying: ~95% object **chết trẻ**, mỗi Minor GC chỉ phải copy ~5% object sống sót — gần như miễn phí, đổi lại một vùng Survivor sạch bong để bump-the-pointer.
-
-**Cái giá**: phải dành sẵn 50% không gian cho To-space mà không được dùng để đặt object. Với vùng rác nhiều thì cái giá này rẻ; nhưng với vùng mà object gần như sống hết thì Copying trở thành thảm họa (xem 5.4).
-
-> [!TIP]
-> Đây chính là lý do tỉ lệ Eden:S0:S1 = 8:1:1. Hai Survivor đóng vai From/To — nhưng mỗi vòng chỉ ~5% object sống sót nên Survivor không cần to. Eden chiếm 8/10 để việc cấp phát (bump-the-pointer) diễn ra suôn sẻ nhất có thể.
-
-### 5.4. Mark-Compact — dồn đồ về đầu nhà (Old Gen dùng)
-
-Cách thứ ba giống việc **dọn kho**: đánh dấu đồ còn dùng, rồi **dồn tất cả về một phía** — mọi khoảng trống tự gom lại thành một mảng lớn, liền mạch ở phía còn lại.
+Phân mảnh gây vấn đề khi JVM cần một block liên tục cho object lớn:
 
 ```text
-Phase 1 — MARK: giống Mark-Sweep, đánh dấu object sống
+Heap còn 1MB tổng cộng:
+[A][trống 0.5MB][C][trống 0.3MB][E][trống 0.2MB]
 
-[A][··][C][··][E][··]
-
-Phase 2 — COMPACT: dồn object sống về đầu heap, chỗ trống gom hết về phía cuối
-
-[A][C][E][ .................... ]
-          ↑ một mảng trống LIỀN MẠCH duy nhất
+new byte[1MB]  →  không có block 1MB liền nhau
 ```
 
-**Ưu điểm**: hết fragmentation mà **không** phải hi sinh 50% không gian như Copying.
+Khi vùng trống nằm liền nhau, JVM có thể cấp phát bằng cách tăng một free pointer. Cách này thường được gọi là **bump-the-pointer**:
 
-**Nhược điểm**: phải **di chuyển object** — và khi object di chuyển, mọi reference trỏ vào nó đều phải được **sửa lại địa chỉ**. Việc sửa phải làm lúc mọi application thread đang dừng (STW, mục 6): nếu app chạy giữa chừng mà đọc địa chỉ cũ thì crash ngay. Vì vậy Mark-Compact cho STW pause dài nhất trong ba thuật toán.
+```text
+Trước: [A][C][E][free................]
+new X: [A][C][E][X][free.............]
+```
 
-Vì sao Old Gen lại chọn cách chậm nhất này? Vì hai phương án kia còn tệ hơn với vùng "gần như ai cũng sống, mà heap lại to":
-
-- Dùng **Copying**: object Old sống rất lâu, chết rất ít → phải copy gần như **toàn bộ** Old Gen mỗi lần GC. Chưa kể mất 50% của một vùng vài GB — quá đắt.
-- Dùng **Mark-Sweep**: không tốn gì nhưng phân mảnh dần dần → premature OOM như ví dụ 5.1.
-- Còn **Mark-Compact**: chậm, nhưng chạy thỉnh thoảng (Old ít khi cần GC) và kết quả luôn sạch sẽ → phương án duy nhất chấp nhận được.
-
-### 5.5. Vì sao cần đủ cả 3 thuật toán?
-
-Bảng so sánh toàn bộ sự đánh đổi:
-
-|  | Mark-Sweep | Copying | Mark-Compact |
-|---|---|---|---|
-| Di chuyển object? | Không | Có (copy sang nửa kia) | Có (dồn tại chỗ) |
-| Fragmentation? | ⚠️ **Có** | Không | Không |
-| Mất thêm không gian? | Không | **50%** cho To-space | Không |
-| Chi phí GC ∝ | Toàn bộ vùng (phải sweep hết) | **Chỉ object sống** | Object sống + sửa mọi reference |
-| Pause / độ phức tạp | Thấp nhất | Nhanh nhất khi rác nhiều | STW dài nhất |
-
-Không cái nào "thắng tuyệt đối" — nên JVM **ghép chúng theo đặc điểm rác của từng vùng**:
-
-- **Nơi rác nhiều (Young Gen)** → **Copying**: chi phí chỉ tính theo object sống, mà số object sống thì ít → cực nhanh.
-- **Nơi rác ít + heap lớn (Old Gen)** → **Mark-Compact**: chấp nhận STW dài đổi lấy không phân mảnh và không lãng phí 50%.
-- **Nơi cần tránh di chuyển** → **Mark-Sweep**: đổi "không phá vỡ reference" lấy fragmentation — CMS đã đánh cuộc này và trả giá bằng nó.
+Vì vậy GC không chỉ cần “xóa object rác”. Nó còn phải quyết định có nên sắp xếp lại object sống để tạo vùng trống liền mạch hay không.
 
 > [!NOTE]
-> Việc dồn object sống lại gần nhau (mà Copying và Mark-Compact đều làm) còn kèm hai lợi ích phụ:
-> 1. **Vùng trống liền mạch** → cấp phát trở về bump-the-pointer, và các allocation lớn (`byte[10MB]`) luôn tìm được chỗ.
-> 2. **CPU cache locality**: object được tạo cùng lúc thường được *truy cập* cùng lúc (object và field của nó, array và phần tử). Nằm gần nhau trong memory → nằm chung cache line → ít cache miss hơn heap phân mảnh.
+> Đây là ví dụ mô hình hóa. G1 và ZGC quản lý heap bằng region và có cơ chế riêng, nhưng bài toán cơ bản — object sống, object rác và vùng trống — vẫn giống nhau.
 
-Nói gọn một câu: **GC không chỉ cần "giải phóng chỗ trống" — nó cần giải phóng một vùng trống liền mạch, đủ lớn.** Ba thuật toán tồn tại vì không cái nào vừa nhanh, vừa không lãng phí, vừa không phân mảnh.
+### 5.2. Mark-Sweep — đánh dấu rồi thu hồi
+
+Mark-Sweep có hai bước rõ ràng:
+
+1. **Mark:** đi từ GC Roots và đánh dấu tất cả object còn sống.
+2. **Sweep:** quét vùng nhớ và trả lại các vị trí của object không được đánh dấu.
+
+Áp dụng vào ví dụ trên:
+
+```text
+Trước GC:
+[A sống][B rác][C sống][D rác][E sống]
+
+Sau MARK:
+[A ✓    ][B ✗   ][C ✓    ][D ✗   ][E ✓    ]
+
+Sau SWEEP:
+[A sống][  trống  ][C sống][  trống  ][E sống]
+```
+
+Mark-Sweep **không di chuyển object sống**. Vì thế các reference tới `A`, `C` và `E` vẫn dùng địa chỉ cũ.
+
+Ưu điểm:
+
+- Không cần di chuyển object.
+- Không cần dành riêng một vùng trống lớn để làm vùng đích.
+- Có thể phù hợp khi việc di chuyển object là điều không mong muốn.
+
+Nhược điểm chính là fragmentation. Nếu heap chạy lâu và object sống/rác xen kẽ, các block trống nhỏ sẽ xuất hiện ngày càng nhiều. Tổng memory còn trống có thể lớn nhưng không có block đủ lớn cho allocation tiếp theo.
+
+CMS là ví dụ lịch sử dùng Mark-Sweep cho Old Gen. Vì CMS không compact Old Gen, nó có thể phải fallback sang Full GC khi fragmentation quá cao. CMS đã bị remove từ JDK 14.
+
+### 5.3. Copying — copy object sống sang vùng trống
+
+Copying chia vùng nhớ thành **vùng nguồn** và **vùng đích**. GC chỉ copy object sống từ nguồn sang đích, sau đó bỏ toàn bộ vùng nguồn.
+
+```text
+Vùng nguồn (From): [A sống][B rác][C sống][D rác][E sống]
+Vùng đích (To):   [                         trống                         ]
+
+Copy object sống:
+Vùng đích (To):   [A sống][C sống][E sống][             trống             ]
+
+Sau đó:
+- bỏ toàn bộ vùng From cũ;
+- đổi vai trò From và To cho lần GC tiếp theo.
+```
+
+Vì object sống được xếp liên tiếp ở vùng đích, vùng trống sau GC cũng liền mạch. GC không cần xử lý từng object rác; nó chỉ copy những object còn sống.
+
+Ưu điểm:
+
+- Không tạo fragmentation trong vùng đích.
+- Chi phí chủ yếu phụ thuộc số object sống.
+- Rất phù hợp với Young Generation, nơi phần lớn object thường chết sau một hoặc vài lần collection.
+
+Nhược điểm:
+
+- Object sống phải được di chuyển và các reference tới chúng phải được cập nhật.
+- Cần có vùng đích trống.
+- Nếu hầu hết object đều sống, phải copy rất nhiều object và vùng đích có thể không đủ.
+
+Trong mô hình Young Gen, Eden và Survivor From là nguồn; Survivor To là đích. Đây không phải lúc nào cũng là mô hình “chia đôi 50/50” của thuật toán copying nguyên bản. Survivor To thường nhỏ hơn Eden, nên object sống quá nhiều có thể bị promote sớm vào Old Gen.
+
+### 5.4. Mark-Compact — dồn object sống về một chỗ
+
+Mark-Compact thực hiện ba việc:
+
+1. Mark object sống.
+2. Tính vị trí mới để dồn các object sống về một phía.
+3. Di chuyển object và cập nhật các reference tới vị trí mới.
+
+```text
+Trước:
+[A sống][  trống  ][C sống][  trống  ][E sống]
+
+Sau COMPACT:
+[A sống][C sống][E sống][             trống             ]
+```
+
+Mark-Compact tạo được một vùng trống liền mạch mà không cần dành riêng 50% heap làm vùng To như mô hình Copying đầy đủ.
+
+Cái giá là object sống bị di chuyển. JVM phải cập nhật các reference liên quan, vì vậy thao tác này thường tốn nhiều thời gian và có thể tạo pause dài nếu nhiều object cần di chuyển. Mức pause thực tế còn phụ thuộc collector, heap size, số thread GC và việc collector có làm việc concurrent hay không.
+
+Mark-Compact thường phù hợp với Old Gen của Serial và Parallel Collector. Old Gen có ít object chết hơn Young Gen, nhưng vùng nhớ lớn hơn; dùng Copying toàn vùng sẽ tốn quá nhiều memory. G1 và ZGC dùng các chiến lược evacuation/relocation hiện đại hơn, không nên đồng nhất chúng với một lần Mark-Compact STW đơn giản.
+
+### 5.5. So sánh và chọn thuật toán
+
+| Đặc điểm | Mark-Sweep | Copying | Mark-Compact |
+|----------|------------|---------|--------------|
+| Di chuyển object sống? | Không | Có, sang vùng To | Có, dồn trong vùng hiện tại |
+| Vùng trống sau GC | Có thể bị phân mảnh | Liền mạch | Liền mạch |
+| Memory phụ thêm | Thấp | Cần vùng To | Cần workspace/metadata, thường ít hơn Copying |
+| Chi phí nổi bật | Fragmentation | Copy object sống | Di chuyển object và cập nhật reference |
+| Nơi thường gặp | CMS lịch sử | Young Gen / evacuation | Old Gen classic |
+
+Có thể nhớ theo quy tắc đơn giản:
+
+- **Nhiều object chết, ít object sống:** dùng Copying/evacuation sẽ hiệu quả vì chỉ phải copy phần sống.
+- **Không muốn di chuyển object:** Mark-Sweep tránh được việc cập nhật reference nhưng chấp nhận fragmentation.
+- **Cần vùng trống liền mạch và không muốn dành nửa vùng nhớ:** Mark-Compact di chuyển object trong cùng vùng, đổi lại tốn thời gian hơn.
+
+Các collector hiện đại thường kết hợp nhiều ý tưởng:
+
+- Serial/Parallel thường copy Young Gen và compact Old Gen.
+- G1 copy object từ các region được chọn trong Young GC hoặc Mixed GC.
+- CMS lịch sử dùng concurrent Mark-Sweep cho Old Gen.
+- ZGC relocation object concurrent bằng barrier, nên không thể suy ra pause chỉ từ ba thuật toán cơ bản này.
+
+> [!TIP]
+> Khi đọc GC log, hãy hỏi ba câu: collection đang xử lý vùng nào, object sống có bị copy/di chuyển không, và sau collection vùng trống được tạo ra như thế nào. Ba câu này hữu ích hơn việc chỉ ghi nhớ tên thuật toán.
+
+Tóm tắt ngắn:
+
+```text
+Mark-Sweep   = đánh dấu object sống → thu hồi chỗ của object rác
+Copying      = copy object sống sang vùng trống → bỏ vùng nguồn
+Mark-Compact = đánh dấu → dồn object sống → gom vùng trống thành một block
+```
 
 ---
 
