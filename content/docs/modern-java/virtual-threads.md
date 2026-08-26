@@ -1,537 +1,616 @@
 ---
 title: "Virtual Threads (Project Loom)"
-description: "Mổ xẻ Virtual Threads JDK 21+: từ platform thread OS-level sang virtual thread JVM-managed, continuation & scheduling, carrier thread, pinning problem, structured concurrency, và migration strategy. Kèm benchmark throughput, memory footprint, và anti-patterns."
+description: "Hướng dẫn thực hành Virtual Threads từ JDK 21: cơ chế hoạt động, giới hạn, pinning theo từng phiên bản JDK, kiểm soát downstream và chiến lược migration an toàn."
 ---
 
-Virtual thread là thread nhẹ do JVM quản lý, được thiết kế để chạy số lượng lớn tác vụ chủ yếu chờ I/O. Nó giữ mô hình lập trình tuần tự quen thuộc trong khi giảm chi phí gắn một request với một platform thread riêng.
+<Callout type="info" title="Phạm vi phiên bản">
+  Virtual Threads là tính năng chính thức từ <strong>JDK 21</strong>. Tài liệu phân biệt rõ JDK 21–23 với JDK 24+ vì JDK 24 đã loại bỏ pinning do <code>synchronized</code>. <code>ScopedValue</code> là API chính thức từ JDK 25; Structured Concurrency vẫn là preview và API thay đổi giữa các bản JDK.
+</Callout>
+
+Virtual thread là một `java.lang.Thread` nhẹ do JVM quản lý. Nó phù hợp khi một ứng dụng cần xử lý rất nhiều tác vụ đồng thời mà phần lớn thời gian của mỗi tác vụ là **chờ I/O**: chờ database, HTTP API, Redis, message broker, socket hoặc lock.
+
+Điểm cần nhớ ngay từ đầu: Virtual Threads giúp **tăng throughput khi có nhiều việc chờ**, chứ không làm CPU chạy nhanh hơn và không xoá các giới hạn của database, network hay memory.
 
 ## Mục lục
 
-- [Tổng quan](#1-tổng-quan)
-- [Platform Thread vs Virtual Thread — kiến trúc cơ bản](#2-platform-thread-vs-virtual-thread--kiến-trúc-cơ-bản)
-- [Continuation — trái tim của Virtual Thread](#3-continuation--trái-tim-của-virtual-thread)
-- [Scheduler — ForkJoinPool và work-stealing](#4-scheduler--forkjoinpool-và-work-stealing)
-- [Mount/Unmount — virtual thread nhảy giữa carrier](#5-mountunmount--virtual-thread-nhảy-giữa-carrier)
-- [Pinning — khi virtual thread bị ghim vào carrier](#6-pinning--khi-virtual-thread-bị-ghim-vào-carrier)
-- [Memory footprint — từ 1MB xuống 1KB](#7-memory-footprint--từ-1mb-xuống-1kb)
-- [API thực hành — tạo và quản lý virtual thread](#8-api-thực-hành--tạo-và-quản-lý-virtual-thread)
-- [Structured Concurrency (JDK 21 Preview)](#9-structured-concurrency-jdk-21-preview)
-- [Scoped Values — thay thế ThreadLocal](#10-scoped-values--thay-thế-threadlocal)
-- [Migration: thread pool → virtual thread](#11-migration-thread-pool--virtual-thread)
-- [So sánh: Virtual Thread vs Platform Thread vs Reactive](#12-so-sánh-virtual-thread-vs-platform-thread-vs-reactive)
-- [Anti-patterns & production pitfalls](#13-anti-patterns--production-pitfalls)
-- [Tóm tắt — Cheat sheet & 5 nguyên tắc](#14-tóm-tắt--cheat-sheet--5-nguyên-tắc)
+- [Kết luận nhanh: có thay thế hoàn toàn thread thường không?](#kết-luận-nhanh-có-thay-thế-hoàn-toàn-thread-thường-không)
+- [Bài toán mà Virtual Threads giải quyết](#bài-toán-mà-virtual-threads-giải-quyết)
+- [Mô hình hoạt động: virtual thread, carrier và blocking I/O](#mô-hình-hoạt-động-virtual-thread-carrier-và-blocking-io)
+  - [Platform thread và virtual thread khác nhau ở đâu?](#platform-thread-và-virtual-thread-khác-nhau-ở-đâu)
+  - [Mount, unmount và resume](#mount-unmount-và-resume)
+  - [Blocking nào được hưởng lợi?](#blocking-nào-được-hưởng-lợi)
+- [Khi nào nên chọn Virtual Thread, Platform Thread hoặc Reactive?](#khi-nào-nên-chọn-virtual-thread-platform-thread-hoặc-reactive)
+- [API cơ bản trong JDK 21](#api-cơ-bản-trong-jdk-21)
+  - [Tạo một virtual thread](#tạo-một-virtual-thread)
+  - [Một virtual thread cho mỗi task](#một-virtual-thread-cho-mỗi-task)
+  - [Fan-out các I/O call độc lập](#fan-out-các-io-call-độc-lập)
+- [Không pool virtual thread, nhưng phải giới hạn tài nguyên](#không-pool-virtual-thread-nhưng-phải-giới-hạn-tài-nguyên)
+  - [Vì sao fixed thread pool từng là giới hạn concurrency?](#vì-sao-fixed-thread-pool-từng-là-giới-hạn-concurrency)
+  - [Bulkhead bằng Semaphore](#bulkhead-bằng-semaphore)
+  - [Timeout và cancellation vẫn là trách nhiệm của ứng dụng](#timeout-và-cancellation-vẫn-là-trách-nhiệm-của-ứng-dụng)
+- [CPU-bound work và blocking không hợp tác](#cpu-bound-work-và-blocking-không-hợp-tác)
+- [Pinning: điều gì còn đúng theo từng JDK?](#pinning-điều-gì-còn-đúng-theo-từng-jdk)
+  - [JDK 21–23: synchronized có thể pin](#jdk-21-23-synchronized-có-thể-pin)
+  - [JDK 24+: synchronized không còn pin](#jdk-24-synchronized-không-còn-pin)
+  - [Native và foreign function vẫn cần kiểm tra](#native-và-foreign-function-vẫn-cần-kiểm-tra)
+- [ThreadLocal, ScopedValue và context request](#threadlocal-scopedvalue-và-context-request)
+- [Structured Concurrency: dùng khi một request tách thành nhiều subtask](#structured-concurrency-dùng-khi-một-request-tách-thành-nhiều-subtask)
+- [Migration từ thread pool sang Virtual Threads](#migration-từ-thread-pool-sang-virtual-threads)
+  - [Những migration an toàn nhất](#những-migration-an-toàn-nhất)
+  - [Những thứ không nên đổi máy móc](#những-thứ-không-nên-đổi-máy-móc)
+  - [Spring Boot](#spring-boot)
+- [Quan sát và chẩn đoán production](#quan-sát-và-chẩn-đoán-production)
+- [Anti-patterns thường gặp](#anti-patterns-thường-gặp)
+- [Checklist trước khi rollout](#checklist-trước-khi-rollout)
+- [Cheat sheet](#cheat-sheet)
 
 ---
 
-## 1. Tổng quan
+## Kết luận nhanh: có thay thế hoàn toàn thread thường không?
 
-Nhiều virtual thread được JVM lập lịch lên một số platform thread carrier. Khi gặp blocking operation được hỗ trợ, virtual thread có thể unmount để carrier chạy công việc khác; một số trường hợp pinning làm giảm lợi ích này.
+**Không.** Virtual thread là lựa chọn mặc định tốt cho mô hình *thread-per-request* hoặc *thread-per-task* có nhiều blocking I/O. Nhưng platform thread vẫn cần thiết, và thực tế chính các platform thread đang đóng vai trò **carrier** để chạy virtual thread.
 
-Virtual thread cải thiện khả năng mở rộng concurrency chứ không làm CPU mạnh hơn. Giới hạn database connection, rate limit và các tài nguyên phía sau vẫn cần được kiểm soát.
+| Tình huống | Lựa chọn phù hợp | Lý do |
+|---|---|---|
+| API service gọi JDBC, HTTP, Redis hoặc message broker | **Virtual thread** | Một request có thể block theo kiểu đồng bộ mà không giữ cứng một OS thread trong lúc chờ. |
+| Xử lý ảnh, nén, mã hoá, ML, tính toán số học | **Platform-thread pool có giới hạn** | Công việc dùng CPU liên tục; tạo nhiều VT không tạo thêm CPU core. |
+| Gọi JNI, foreign function hoặc thư viện native blocking | Cần benchmark; thường tách riêng | VT có thể bị pin vào carrier trong lúc chạy native code. |
+| Streaming dài, xử lý luồng dữ liệu và backpressure end-to-end | Reactive có thể phù hợp hơn | VT không tự cung cấp backpressure hay cơ chế điều phối demand. |
+| Hệ thống reactive đã ổn định | Không cần đổi chỉ vì Loom | Lợi ích migration có thể không bù chi phí thay đổi và rủi ro vận hành. |
 
-## 2. Platform Thread vs Virtual Thread — kiến trúc cơ bản
+<Callout type="idea" title="Quy tắc chọn nhanh">
+  Nếu mỗi task chủ yếu là “gọi I/O rồi chờ kết quả”, hãy ưu tiên Virtual Threads. Nếu task chủ yếu là “tính liên tục trên CPU”, hãy giới hạn độ song song theo số core thay vì tăng số thread.
+</Callout>
 
-### 2.1. Platform Thread (trước JDK 21)
+## Bài toán mà Virtual Threads giải quyết
 
-```
-Java Platform Thread = thin wrapper quanh OS thread (1:1 mapping)
+Trước JDK 21, một Java `Thread` thông thường tương ứng gần như 1:1 với một OS thread. Khi request gọi JDBC và chờ database trong 100 ms, OS thread đó cũng bị giữ trong 100 ms. Để phục vụ thêm request, server phải có thêm OS thread.
 
-┌──────────────┐     ┌──────────────┐
-│ Java Thread  │ ──► │  OS Thread   │ ──► scheduled by OS kernel
-│  (1MB stack) │     │ (kernel obj) │
-└──────────────┘     └──────────────┘
-```
+Ví dụ một service có 200 request đồng thời. Mỗi request mất 5 ms CPU nhưng chờ database 95 ms:
 
-- Tạo/destroy đắt (~1ms + syscall)
-- Stack cố định ~1MB (hoặc `-Xss`)
-- OS scheduler quản lý → context switch ~1-10μs
-- Giới hạn thực tế: **vài nghìn** thread/JVM
+```text
+Mỗi request: [CPU 5 ms] ── [chờ DB 95 ms] ── [CPU 5 ms]
 
-### 2.2. Virtual Thread (JDK 21+)
+Platform thread pool 200 threads:
+- 200 OS threads phần lớn đang chờ DB.
+- Muốn nhận thêm request thường phải tăng pool và tăng OS resources.
 
-```
-Virtual Thread = lightweight, JVM-managed, multiplexed trên carrier threads
-
-┌──────────┐  ┌──────────┐  ┌──────────┐       ┌──────────┐
-│  VT #1   │  │  VT #2   │  │  VT #3   │  ...  │ VT #1M   │
-└────┬─────┘  └────┬─────┘  └────┬─────┘       └────┬─────┘
-     │             │             │                  │
-     └─────────────┼─────────────┘                  │
-                   ▼                                │
-         ┌───────────────────┐                      │
-         │  Carrier Thread   │ (= platform thread)  │
-         │  (ForkJoinPool)   │ ◄────────────────────┘
-         └───────────────────┘
-         ~N carriers (N ≈ CPU cores)
+Virtual thread:
+- Request chờ DB → virtual thread được tạm dừng.
+- Carrier thread được rảnh để chạy request khác.
+- Có thể giữ nhiều request đang chờ hơn với ít OS thread hơn.
 ```
 
-- Tạo cực rẻ (~1μs, no syscall)
-- Stack **grows/shrinks** dynamically (bắt đầu ~1KB)
-- JVM scheduler quản lý (ForkJoinPool)
-- Giới hạn: **hàng triệu** virtual threads/JVM
+Virtual Threads không rút thời gian DB trả lời từ 95 ms xuống 10 ms. Chúng giảm số OS thread bị lãng phí khi chờ. Vì thế lợi ích chính thường là **throughput cao hơn ở mức concurrency lớn**, không phải mỗi request tự nhiên có latency thấp hơn.
 
----
+## Mô hình hoạt động: virtual thread, carrier và blocking I/O
 
-## 3. Continuation — trái tim của Virtual Thread
+### Platform thread và virtual thread khác nhau ở đâu?
 
-**Continuation** = khả năng **tạm dừng** execution tại một điểm và **resume** lại sau đó, giữ nguyên toàn bộ call stack.
+| Thuộc tính | Platform thread | Virtual thread |
+|---|---|---|
+| Kiểu Java | `java.lang.Thread` | Cũng là `java.lang.Thread` |
+| Quan hệ với OS thread | Gần 1:1 trong toàn bộ vòng đời | Nhiều VT được multiplex trên ít carrier threads |
+| Stack | OS-managed, chi phí tương đối lớn | JVM-managed, tăng dần theo nhu cầu và nằm trên heap |
+| Hợp với | Mọi loại task, nhất là CPU-bound/affinity | Nhiều task I/O-bound, blocking |
+| Có cần pool? | Thường cần vì OS thread là tài nguyên hiếm | Không pool VT; tạo một VT cho mỗi concurrent task |
 
-```mermaid
-sequenceDiagram
-    participant VT as Virtual Thread
-    participant C as Continuation
-    participant CT as Carrier Thread
+```text
+Nhiều virtual thread dùng chung một nhóm platform thread carrier:
 
-    VT->>CT: mounted, đang chạy code
-    VT->>VT: gọi socket.read() (blocking I/O)
-    VT->>C: yield() — lưu stack vào heap
-    Note over CT: Carrier thread FREED — chạy VT khác
-    Note over C: VT suspended, stack trên heap
-    Note over VT: ...chờ I/O complete...
-    C->>CT: resume() — mount lại VT lên carrier
-    VT->>VT: socket.read() return, tiếp tục
+ VT request A ──┐
+ VT request B ──┼──► JVM scheduler ──► Carrier 1 ──► OS thread
+ VT request C ──┤                        Carrier 2 ──► OS thread
+ VT request D ──┘                        Carrier 3 ──► OS thread
+
+Khi VT request A chờ socket/JDBC I/O được JVM hỗ trợ:
+VT A unmount khỏi Carrier 1 → Carrier 1 chạy VT request D.
 ```
 
-**Cơ chế**:
-1. VT gặp blocking operation (I/O, sleep, lock)
-2. JVM **yield** continuation: copy stack frame từ **carrier thread stack** lên **heap** (object array)
-3. Carrier thread **freed** — nhận VT khác để chạy
-4. Khi I/O sẵn sàng → JVM **resume** continuation: copy stack từ heap về carrier thread stack mới
-5. VT tiếp tục chạy — **không biết** đã bị unmount
+Carrier là platform thread thật. Hệ điều hành vẫn chỉ schedule platform thread; JVM quyết định virtual thread nào được mount lên carrier nào. Một virtual thread không có “OS thread riêng” cố định.
 
-### 3.1. Continuation internals — stack copy chi tiết
+### Mount, unmount và resume
 
-```
-TRƯỚC yield (VT đang chạy trên carrier thread):
+Một VT ở một thời điểm có thể đang chạy, đang chờ, hoặc đã kết thúc:
 
-Carrier Thread Stack (OS):
-┌────────────────────────┐ ← Stack top
-│ frame: socket.read()   │  ← blocking point
-├────────────────────────┤
-│ frame: processData()   │
-├────────────────────────┤
-│ frame: handleRequest() │
-├────────────────────────┤
-│ frame: Continuation.run│  ← entry point
-└────────────────────────┘
-
-SAU yield (VT unmounted):
-
-Heap (Java Objects):                    Carrier Thread Stack:
-┌──────────────────────────┐              ┌──────────────────────┐
-│ StackChunk object        │              │ (rảnh — chạy VT khác)│
-│ ├─ frame: socket.read()  │              └──────────────────────┘
-│ ├─ frame: processData()  │
-│ ├─ frame: handleRequest()│
-│ └─ metadata (PC, locals) │
-└──────────────────────────┘
-
-KHI resume (mount lại — có thể carrier KHÁC):
-
-Carrier Thread Stack (có thể carrier #2):
-┌────────────────────────┐ ← restore từ heap
-│ frame: socket.read()   │  ← tiếp tục tại đây
-├────────────────────────┤
-│ frame: processData()   │
-├────────────────────────┤
-│ frame: handleRequest() │
-└────────────────────────┘
+```text
+1. VT được mount lên carrier và chạy Java code.
+2. VT gọi blocking operation, ví dụ socket read hoặc Semaphore.acquire().
+3. JVM suspend VT; trạng thái call stack của VT được giữ để tiếp tục sau.
+4. VT unmount; carrier được trả về scheduler để chạy VT khác.
+5. Khi I/O/permit sẵn sàng, JVM mount lại VT lên một carrier bất kỳ.
+6. VT tiếp tục ngay sau lệnh blocking, như thể chưa từng bị tạm dừng.
 ```
 
-**StackChunk** (JDK 21 internal):
-- Là Java object trên heap chứa **frozen stack frames**
-- Mỗi frame = compiled code metadata + local variables + operand stack
-- Copy nguyên block memory (memcpy) — **rất nhanh** (~100ns cho stack nông)
-- Stack chunk có thể chain (linked list) cho deep stacks
+```text
+Thời gian ─────────────────────────────────────────────────────────►
 
-### 3.2. Yield points — JVM biết unmount ở đâu
+Carrier 1:  [VT-A xử lý] [VT-B xử lý] [VT-C xử lý] [VT-A tiếp tục]
+Carrier 2:  [VT-D xử lý] [VT-E xử lý] [VT-F xử lý]
 
-JVM **không** unmount ở mọi điểm. Chỉ yield tại **safe points** đã được instrumented:
+VT-A:       [run] ── socket.read() ── [waiting, unmounted] ── [run]
+```
 
-| Yield point | Ví dụ |
-|------------|-------|
-| `java.net.*` blocking I/O | `Socket.read()`, `ServerSocket.accept()` |
-| `java.nio.*` channel ops | `SocketChannel.read()` |
-| `Thread.sleep()` | Tự yield |
-| `LockSupport.park()` | `ReentrantLock.lock()`, `Condition.await()` |
-| `Object.wait()` | Legacy wait/notify |
-| `BlockingQueue` operations | `take()`, `poll(timeout)` |
+Code ứng dụng vẫn là code tuần tự, blocking và dễ đọc. Việc suspend/resume là chi tiết của JVM; không nên dựa vào carrier cụ thể nào đang chạy VT.
 
-> [!IMPORTANT]
-> Từ góc nhìn code, blocking call vẫn "block" (API không đổi). Nhưng bên dưới, chỉ **virtual thread** bị suspend — **carrier thread** (OS thread thật) được giải phóng để chạy task khác. Đây là "blocking without wasting OS thread".
+### Blocking nào được hưởng lợi?
 
----
+Các blocking API chuẩn của JDK được thiết kế để làm việc tốt với virtual threads, ví dụ:
 
-## 4. Scheduler — ForkJoinPool và work-stealing
+- `Thread.sleep(...)`, `LockSupport.park(...)`.
+- `Object.wait(...)`, `ReentrantLock`, `Condition`, `Semaphore` và `BlockingQueue`.
+- Nhiều thao tác socket/network trong `java.net` và `java.nio`.
+- Các driver JDBC thuần Java thường hưởng lợi vì request chờ I/O của database.
 
-Virtual threads được schedule bởi **dedicated ForkJoinPool** (không phải `commonPool()`):
+Tuy nhiên, **không được suy diễn rằng mọi hàm “có vẻ blocking” đều unmount được**. JNI, foreign function, thư viện native, driver đặc thù và một số thao tác file/system có thể có hành vi khác theo OS và JDK. Hãy đo bằng load test/JFR với dependency thật của ứng dụng.
+
+<Callout type="warn" title="Blocking rẻ không đồng nghĩa tài nguyên rẻ">
+  Một virtual thread đang chờ `Semaphore.acquire()` không chiếm carrier, nhưng nó vẫn là object sống trong heap. Một virtual thread đang chờ JDBC không dùng carrier, nhưng vẫn có thể đang giữ transaction, socket và database connection. Đừng tạo concurrency vô hạn.
+</Callout>
+
+## Khi nào nên chọn Virtual Thread, Platform Thread hoặc Reactive?
+
+```text
+Task có phần lớn thời gian chờ I/O?
+│
+├─ Có
+│  ├─ Request/response thông thường, API blocking? ──► Virtual Threads
+│  └─ Cần stream liên tục + backpressure xuyên pipeline? ──► Cân nhắc Reactive
+│
+└─ Không, chủ yếu chạy CPU
+   └─ Giới hạn parallelism theo số core ──► Platform-thread pool / ForkJoinPool phù hợp
+```
+
+Reactive và Virtual Threads không đối nghịch về mặt kỹ thuật. Reactive có giá trị khi cần một protocol backpressure hoặc pipeline streaming phức tạp. Virtual Threads đặc biệt hữu ích khi reactive trước đây chỉ được dùng để tránh việc blocking làm cạn servlet thread pool.
+
+## API cơ bản trong JDK 21
+
+### Tạo một virtual thread
+
+Dùng `Thread.startVirtualThread` cho một tác vụ đơn lẻ, hoặc builder khi cần đặt tên.
 
 ```java
-// Mặc định: N carrier threads = Runtime.getRuntime().availableProcessors()
-// Có thể set: -Djdk.virtualThreadScheduler.parallelism=32
-```
-
-```
-ForkJoinPool (Virtual Thread Scheduler):
-┌─────────────────────────────────────────────────┐
-│  Worker 0: [VT-5] [VT-12] [VT-100]  ← queue     │
-│  Worker 1: [VT-3] [VT-7]                        │
-│  Worker 2: [VT-1] [VT-8] [VT-50] [VT-200]       │
-│  Worker 3: []  ← rảnh → steal từ Worker 2       │
-└─────────────────────────────────────────────────┘
-```
-
-**Work-stealing**: worker thread rảnh **lấy task** từ queue của worker bận → đảm bảo CPU utilization đều. Khi VT yield (blocking I/O) → carrier check queue → chạy VT tiếp theo **ngay lập tức** — không cần context switch OS.
-
----
-
-## 5. Mount/Unmount — virtual thread nhảy giữa carrier
-
-```
-Timeline (2 carriers, 5 virtual threads):
-
-Carrier-0:  [VT-1 ████|yield]  [VT-3 ██|yield]  [VT-1 resume ███]
-Carrier-1:  [VT-2 █████|yield]  [VT-4 █|yield]  [VT-5 ████████]
-
-VT-1: mount C0 → run → I/O → unmount C0 → (waiting) → mount C0 → run → done
-VT-2: mount C1 → run → I/O → unmount C1 → (waiting) → ???
-```
-
-**Mount**: VT gắn vào carrier, continuation stack load lên thread stack, VT chạy.
-**Unmount**: VT yield, stack lưu vào heap, carrier freed.
-
-Một VT có thể mount lên **carrier khác** mỗi lần resume — không cố định. Điều này giống goroutine/coroutine trong Go/Kotlin.
-
----
-
-## 6. Pinning — khi virtual thread bị ghim vào carrier
-
-**Pinning** = VT **không thể unmount** khỏi carrier, ghim cứng carrier thread → carrier không phục vụ VT khác → giảm throughput.
-
-### 6.1. Khi nào pinning xảy ra?
-
-| Tình huống | Lý do |
-|-----------|-------|
-| **`synchronized` block/method** đang hold lock | JVM không thể unmount khi frame có monitor — object monitor gắn với OS thread |
-| **Native method** (JNI) đang chạy | JNI frame không thể copy lên heap |
-| **Class initializer** (`<clinit>`) | Spec yêu cầu hold initialization lock |
-
-### 6.2. Tại sao synchronized gây pinning?
-
-`synchronized` sử dụng **object monitor** — gắn chặt với OS thread (vì monitor owner = OS thread ID). Khi VT trong synchronized block gặp I/O:
-
-```java
-synchronized (lock) {          // VT acquire monitor → pinned to carrier
-    var data = socket.read();  // I/O block — nhưng không thể unmount!
-    process(data);             // carrier bị ghim suốt thời gian I/O
-}                              // release monitor → unpin
-```
-
-Carrier bị ghim → 1 carrier ít hơn cho scheduler → throughput giảm nếu nhiều VT bị pin cùng lúc.
-
-### 6.3. Giải pháp
-
-```java
-// ❌ Pinning:
-synchronized (lock) { blockingIO(); }
-
-// ✅ Không pinning — dùng ReentrantLock:
-private final ReentrantLock lock = new ReentrantLock();
-lock.lock();
-try { blockingIO(); }
-finally { lock.unlock(); }
-```
-
-`ReentrantLock` được **cập nhật** trong JDK 21 để hỗ trợ VT unmount khi chờ `lock()` — không ghim carrier.
-
-> [!TIP]
-> Phát hiện pinning: `-Djdk.tracePinnedThreads=full` in stack trace mỗi khi VT bị pin. Hoặc dùng JFR event `jdk.VirtualThreadPinned`.
-
----
-
-## 7. Memory footprint — từ 1MB xuống 1KB
-
-| Metric | Platform Thread | Virtual Thread |
-|--------|----------------|----------------|
-| Initial stack | **1MB** (fixed, `-Xss`) | **~1KB** (grows on demand) |
-| Max stack | 1MB | Heap-bounded |
-| OS resources | Kernel thread object | **Không** |
-| Create time | ~1ms (syscall) | ~1μs (heap alloc) |
-| 10.000 threads memory | **~10GB** | **~10-50MB** |
-| 1.000.000 threads memory | **Bất khả** (OS limit) | **~1-5GB** |
-
-Virtual thread stack **grow dynamically**: mỗi frame method = 1 object trên heap. Stack chỉ lớn bằng **call depth thực tế** — method nông = stack nhỏ.
-
-```java
-// Test: tạo 1 triệu virtual threads
-long start = System.nanoTime();
-List<Thread> threads = new ArrayList<>();
-for (int i = 0; i < 1_000_000; i++) {
-    threads.add(Thread.ofVirtual().start(() -> {
-        try { Thread.sleep(Duration.ofSeconds(10)); }
-        catch (InterruptedException e) {}
-    }));
-}
-// ~2 giây tạo 1M threads, ~2GB heap
-```
-
-> [!NOTE]
-> Vì stack trên heap → stack frames chịu GC pressure. Deep call stack (100+ frames) trên triệu VT sẽ tạo nhiều object → GC overhead. Trong thực tế, I/O-heavy code hiếm khi có stack quá deep.
-
----
-
-## 8. API thực hành — tạo và quản lý virtual thread
-
-### 8.1. Tạo virtual thread
-
-```java
-// Cách 1: Thread.ofVirtual()
-Thread vt = Thread.ofVirtual()
-    .name("worker-", 0)         // prefix + counter: worker-0, worker-1, ...
-    .start(() -> doWork());
-
-// Cách 2: Executors (recommended cho production)
-try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-    Future<String> f = executor.submit(() -> fetchData());
-    // mỗi submit() tạo 1 virtual thread mới — KHÔNG pooling
-}
-
-// Cách 3: Thread.startVirtualThread (simple)
-Thread.startVirtualThread(() -> doWork());
-```
-
-### 8.2. Nhận diện virtual thread
-
-```java
-Thread.currentThread().isVirtual();     // true nếu đang chạy trên VT
-Thread.currentThread().threadId();       // unique ID (long)
-```
-
-### 8.3. Không cần pooling!
-
-```java
-// ❌ SAI: pool virtual threads (vô nghĩa)
-ExecutorService pool = Executors.newFixedThreadPool(100, Thread.ofVirtual().factory());
-
-// ✅ ĐÚNG: tạo mới mỗi task — rẻ, không cần pool
-ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor();
-```
-
-> [!IMPORTANT]
-> Virtual thread **không cần pool**. Tạo mới cực rẻ (~1μs). Pooling VT chỉ **giới hạn concurrency** mà không mang lại lợi ích — ngược lại mục đích. Tạo thoải mái, để JVM quản lý.
-
----
-
-## 9. Structured Concurrency (JDK 21 Preview)
-
-### 9.1. Vấn đề: "fire and forget" concurrency
-
-```java
-// Unstructured: task con chạy độc lập, khó cancel, khó propagate error
-ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor();
-Future<User> user = exec.submit(() -> fetchUser(id));
-Future<Order> order = exec.submit(() -> fetchOrder(id));
-// Nếu fetchUser fail → fetchOrder vẫn chạy lãng phí
-// Nếu parent bị cancel → con không tự cancel
-```
-
-### 9.2. StructuredTaskScope
-
-```java
-try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-    Subtask<User> user = scope.fork(() -> fetchUser(id));
-    Subtask<Order> order = scope.fork(() -> fetchOrder(id));
-
-    scope.join();              // chờ tất cả hoàn thành
-    scope.throwIfFailed();     // nếu bất kỳ task fail → throw
-
-    return new Response(user.get(), order.get());
-}
-// Khi 1 task fail → ShutdownOnFailure cancel tất cả task còn lại
-// Khi scope close → mọi subtask CHẮC CHẮN đã kết thúc
-```
-
-### 9.3. Policies
-
-| Policy | Hành vi |
-|--------|---------|
-| `ShutdownOnFailure` | Bất kỳ task fail → cancel tất cả, throw first exception |
-| `ShutdownOnSuccess` | Task đầu tiên thành công → cancel còn lại, dùng kết quả đó |
-
-```java
-// Race: dùng kết quả từ server nhanh nhất
-try (var scope = new StructuredTaskScope.ShutdownOnSuccess<String>()) {
-    scope.fork(() -> fetchFromServerA());
-    scope.fork(() -> fetchFromServerB());
-    scope.fork(() -> fetchFromServerC());
-
-    scope.join();
-    return scope.result();    // kết quả từ server trả về đầu tiên
-}
-```
-
-> [!TIP]
-> Structured Concurrency đảm bảo: **(1)** lifetime subtask ≤ lifetime scope (không leak thread), **(2)** error propagation tự động, **(3)** cancellation cascading. Giống try-with-resources cho concurrency.
-
----
-
-## 10. Scoped Values — thay thế ThreadLocal
-
-### 10.1. Vấn đề với ThreadLocal + Virtual Threads
-
-```java
-static final ThreadLocal<User> CURRENT_USER = new ThreadLocal<>();
-
-// Platform thread: 200 threads × 1 ThreadLocal = 200 entries → OK
-// Virtual thread: 1M threads × 1 ThreadLocal = 1M entries → memory explosion!
-```
-
-`ThreadLocal` mutable, inherit bằng copy (`InheritableThreadLocal`) → triệu VT = triệu copy.
-
-### 10.2. ScopedValue (JDK 21 Preview)
-
-```java
-static final ScopedValue<User> CURRENT_USER = ScopedValue.newInstance();
-
-ScopedValue.where(CURRENT_USER, authenticatedUser).run(() -> {
-    // trong scope này: CURRENT_USER.get() = authenticatedUser
-    handleRequest();
-    // child virtual threads (structured concurrency) cũng thấy giá trị này
+// Tạo và start ngay.
+Thread thread = Thread.startVirtualThread(() -> {
+    System.out.println("running on virtual thread = "
+        + Thread.currentThread().isVirtual());
 });
-// ngoài scope: CURRENT_USER.get() → NoSuchElementException
+
+thread.join();
 ```
-
-| Tiêu chí | `ThreadLocal` | `ScopedValue` |
-|----------|--------------|---------------|
-| Mutability | Mutable (`set()` bất kỳ lúc nào) | **Immutable** trong scope |
-| Inheritance | Copy toàn bộ giá trị | **Zero-copy** (shared reference) |
-| Lifetime | Tồn tại vĩnh viễn (nếu thread sống) | **Bounded** bởi scope |
-| Memory (1M VTs) | 1M copies | **1 shared reference** |
-
----
-
-## 11. Migration: thread pool → virtual thread
-
-### 11.1. Spring Boot (3.2+)
-
-```properties
-# application.properties
-spring.threads.virtual.enabled=true
-```
-
-Spring Boot tự chuyển Tomcat/Jetty handler threads sang virtual threads — **mỗi request 1 VT**, không pool cố định.
-
-### 11.2. Checklist migration
-
-| Step | Hành động |
-|------|----------|
-| 1 | Upgrade JDK ≥ 21 |
-| 2 | Thay `synchronized` + I/O bên trong → `ReentrantLock` (tránh pinning) |
-| 3 | Audit `ThreadLocal` → chuyển sang `ScopedValue` nếu có thể |
-| 4 | Thay `Executors.newFixedThreadPool(N)` → `newVirtualThreadPerTaskExecutor()` |
-| 5 | Xoá bỏ reactive/async callback code nếu chỉ dùng cho concurrency (WebFlux → MVC + VT) |
-| 6 | Test với `-Djdk.tracePinnedThreads=full` để phát hiện pinning |
-| 7 | Monitor: JFR events `jdk.VirtualThread*` |
-
-### 11.3. Không migrate cái gì?
-
-- **CPU-bound computation** — VT không giúp ích (chỉ N carrier = N cores)
-- **Code đã reactive** ổn định — nếu đang dùng WebFlux/R2DBC tốt rồi thì không cần đổi
-- **Library dùng `synchronized` nội bộ** (JDBC driver cũ, OkHttp < 5) — chờ library update
-
----
-
-## 12. So sánh: Virtual Thread vs Platform Thread vs Reactive
-
-| Tiêu chí | Platform Thread | Virtual Thread | Reactive (WebFlux) |
-|----------|----------------|----------------|-------------------|
-| Concurrency model | 1 thread/task | 1 VT/task (**M:N**) | Event loop + callback |
-| Max concurrent tasks | ~5.000 (RAM limit) | **~1.000.000+** | ~1.000.000+ |
-| Code style | **Blocking** (simple) | **Blocking** (simple) | Non-blocking (complex) |
-| Debugging | Easy (stack trace) | Easy (stack trace) | **Khó** (callback chain) |
-| I/O wait cost | **1 OS thread blocked** | ~1KB heap | ~0 (non-blocking I/O) |
-| CPU-bound | Full utilization | = platform thread | Tốt (nhưng phức tạp) |
-| Learning curve | Thấp | **Thấp** | Cao (Mono/Flux/backpressure) |
-| Throughput overhead | Thread creation | ~0 | Callback/allocation |
-
-```mermaid
-flowchart TD
-    Q["Workload type?"]
-    Q -->|"I/O heavy, cần scale concurrent"| VT["Virtual Threads"]
-    Q -->|"CPU-bound (ML, crypto)"| PT["Platform Thread pool (= cores)"]
-    Q -->|"Đã dùng Reactive stack ổn"| RX["Giữ Reactive"]
-    Q -->|"Streaming + backpressure"| RX
-```
-
-> [!TIP]
-> Virtual Threads = "viết code blocking đơn giản, được throughput của reactive". Đây là lý do Java community gọi nó là **"the end of reactive for I/O concurrency"** — không cần callback hell nữa.
-
----
-
-## 13. Anti-patterns & production pitfalls
-
-| Anti-pattern | Vì sao sai | Giải pháp |
-|--------------|-----------|-----------|
-| Pool virtual threads (FixedThreadPool + VT factory) | Giới hạn vô nghĩa, mất ý nghĩa scalability | `newVirtualThreadPerTaskExecutor()` |
-| `synchronized` + blocking I/O bên trong | Pinning carrier thread | `ReentrantLock` |
-| ThreadLocal với triệu VT | Memory explosion (1 copy/VT) | `ScopedValue` |
-| CPU-bound loop trên VT | Carrier bị chiếm, VT khác starve | Dùng platform thread cho CPU work |
-| Dùng VT cho `Thread.sleep()` thay cho scheduling | Tạo VT chỉ để sleep → lãng phí | `ScheduledExecutorService` |
-| Assume thread count = concurrency limit | VT count không nên dùng để rate-limit | Dùng `Semaphore` cho rate limit |
-
-**Rate limiting đúng cách:**
 
 ```java
-// ❌ Sai: dựa vào thread pool size để limit concurrent calls
-ExecutorService pool = Executors.newFixedThreadPool(100); // ← giới hạn nhân tạo
+// Builder hữu ích khi cần tên dễ đọc trong log, JFR và thread dump.
+Thread.Builder.OfVirtual worker = Thread.ofVirtual().name("payment-", 0);
 
-// ✅ Đúng: Semaphore cho explicit rate limit
-Semaphore permits = new Semaphore(100); // max 100 concurrent DB calls
+Thread first = worker.start(() -> processPayment()); // payment-0
+Thread second = worker.start(() -> processPayment()); // payment-1
+```
 
-try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
-    for (var req : requests) {
-        exec.submit(() -> {
-            permits.acquire();       // VT-friendly — unmount khi chờ
-            try { return callDB(req); }
-            finally { permits.release(); }
-        });
+Không cần viết scheduler hoặc continuation riêng. Virtual thread dùng cùng `Thread`, interruption, `join`, stack trace và hầu hết API concurrency quen thuộc.
+
+### Một virtual thread cho mỗi task
+
+Khi có nhiều task, dùng `Executors.newVirtualThreadPerTaskExecutor()`:
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+String loadCustomer(String id) throws Exception {
+    try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        Future<String> result = executor.submit(() -> customerClient.get(id));
+        return result.get();
     }
 }
 ```
 
-> [!WARNING]
-> Virtual Threads scale concurrency **không giới hạn** — nhưng downstream systems (DB, API) có limit. PHẢI dùng `Semaphore` hoặc bulkhead pattern để bảo vệ downstream, không dựa vào thread pool size.
+Tên method có chữ `Executor`, nhưng đối tượng này **không phải thread pool**: mỗi `submit` tạo một virtual thread mới. `try-with-resources` giúp scope vòng đời các task; khi đóng executor, nó shutdown và chờ task đã submit kết thúc.
 
----
+Trong service dài hạn, executor có thể được tạo một lần và đóng lúc application shutdown. Với fan-out cục bộ trong một request, tạo executor trong `try-with-resources` cũng hợp lý vì executor này nhẹ.
 
-## 14. Tóm tắt — Cheat sheet & 5 nguyên tắc
+### Fan-out các I/O call độc lập
 
-**Cỗ máy trong 6 dòng:**
+Hai lời gọi độc lập có thể chạy song song. Ví dụ dưới dùng API ổn định từ JDK 21:
 
+```java
+record Dashboard(Customer customer, List<Order> orders) {}
+
+Dashboard loadDashboard(String customerId) throws Exception {
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        Future<Customer> customer = executor.submit(
+            () -> customerClient.get(customerId));
+        Future<List<Order>> orders = executor.submit(
+            () -> orderClient.findByCustomer(customerId));
+
+        // get() block virtual thread hiện tại nếu nó cũng là VT.
+        // Không cần CompletableFuture chỉ để tránh blocking.
+        return new Dashboard(customer.get(), orders.get());
+    }
+}
 ```
-1. Virtual Thread = lightweight thread, stack trên heap (~1KB), JVM-scheduled
-2. Blocking I/O → VT unmount khỏi carrier → carrier freed → chạy VT khác
-3. Carrier thread = ForkJoinPool (≈ CPU cores), work-stealing
-4. Pinning: synchronized + I/O → VT ghim carrier. Fix: dùng ReentrantLock
-5. Structured Concurrency: scope đảm bảo lifetime + cancellation + error propagation
-6. Không pool VT. Tạo mới mỗi task. Rate-limit bằng Semaphore.
+
+Ví dụ này đơn giản nhưng có một điểm cần biết: nếu `customer.get()` thất bại, task `orders` có thể vẫn chạy cho đến khi executor bị đóng. Với fan-out phức tạp, cancellation/timeout chung và lifecycle con-cha, xem phần [Structured Concurrency](#structured-concurrency-dùng-khi-một-request-tách-thành-nhiều-subtask).
+
+## Không pool virtual thread, nhưng phải giới hạn tài nguyên
+
+### Vì sao fixed thread pool từng là giới hạn concurrency?
+
+Với platform threads, đoạn code sau vừa là executor vừa vô tình là cơ chế giới hạn số gọi DB đồng thời:
+
+```java
+ExecutorService dbWorkers = Executors.newFixedThreadPool(50);
 ```
 
-| Khi nào dùng | Chọn |
-|-------------|------|
-| I/O-heavy service (web, API, microservice) | **Virtual Thread** |
-| CPU-bound computation (ML, encoding) | Platform Thread pool (= cores) |
-| Streaming + backpressure cần thiết | Reactive (WebFlux) |
-| Đã có reactive stack ổn định | Giữ reactive |
+Cách này có lý vì mỗi worker là OS thread đắt. Nhưng khi đổi factory sang virtual thread mà vẫn giữ `50`, bạn chỉ tạo **50 VT đồng thời**. Lợi ích của VT bị mất, trong khi ý định thật thường là “DB chỉ chịu được 50 query đồng thời”.
 
-**5 nguyên tắc khắc cốt:**
+Hãy diễn đạt ý định đó trực tiếp bằng một giới hạn tài nguyên.
 
-1. **1 VT / task** — đừng pool, đừng giới hạn. Để JVM schedule.
-2. **Blocking is OK** — VT biến blocking thành cheap. Viết code đồng bộ đơn giản.
-3. **synchronized → ReentrantLock** — tránh pinning, đặc biệt quanh I/O.
-4. **Semaphore cho rate-limit** — VT scale vô hạn, downstream thì không.
-5. **ThreadLocal → ScopedValue** — immutable, zero-copy, bounded lifetime.
+### Bulkhead bằng Semaphore
 
-> [!TIP]
-> Một câu để nhớ: *Virtual Thread cho bạn viết code blocking đơn giản như single-thread, nhưng scale như reactive — bằng cách biến mỗi blocking I/O thành "unmount & yield" thay vì "chiếm cứng OS thread". Triệu task, vài carrier.*
+`Semaphore` là một bulkhead: nó giới hạn số task được phép đi vào một tài nguyên hiếm cùng lúc. Task chờ permit có thể là virtual thread; nó không cần giữ carrier.
+
+```java
+import java.util.concurrent.Semaphore;
+
+final class DatabaseGateway {
+    // Chọn theo connection pool, DB capacity và load test; không theo số CPU core.
+    private final Semaphore databasePermits = new Semaphore(40);
+
+    Order loadOrder(String id) throws Exception {
+        databasePermits.acquire();
+        try {
+            return jdbcOrderRepository.findById(id);
+        } finally {
+            databasePermits.release();
+        }
+    }
+}
+```
+
+Ở biên nhận request, vẫn cần có admission control hoặc queue có giới hạn nếu traffic có thể bùng nổ. `Semaphore` bảo vệ downstream, nhưng nếu bạn tạo hàng triệu VT chỉ để chờ semaphore thì heap và latency queue vẫn sẽ tăng.
+
+Các giới hạn thường phải độc lập:
+
+| Tài nguyên | Cơ chế giới hạn thường dùng |
+|---|---|
+| JDBC connections | Connection pool size và/hoặc `Semaphore` theo use case |
+| HTTP call tới một vendor | `Semaphore`, rate limiter, timeout, circuit breaker |
+| CPU transform | Fixed-size executor hoặc `ForkJoinPool` có parallelism rõ ràng |
+| Incoming requests | Gateway/load balancer/server queue/admission control |
+| Memory queue | Bounded queue, backpressure hoặc reject policy |
+
+### Timeout và cancellation vẫn là trách nhiệm của ứng dụng
+
+Virtual thread không tự biết một HTTP call đã quá hạn, không tự đóng JDBC transaction, và không tự hủy API phía xa. Đặt timeout gần nơi gọi I/O và bảo đảm cleanup trong `finally`/try-with-resources.
+
+```java
+HttpRequest request = HttpRequest.newBuilder(uri)
+    .timeout(Duration.ofSeconds(2))
+    .GET()
+    .build();
+
+HttpResponse<String> response = httpClient.send(
+    request,
+    HttpResponse.BodyHandlers.ofString()
+);
+```
+
+Interruption cũng cần được tôn trọng. Nếu bắt `InterruptedException`, hoặc propagate nó, hoặc restore interrupt flag rồi thoát khỏi task. Đừng nuốt exception rồi tiếp tục chạy như chưa có chuyện gì xảy ra.
+
+```java
+try {
+    permits.acquire();
+    // do work
+} catch (InterruptedException e) {
+    Thread.currentThread().interrupt();
+    throw new IllegalStateException("Request was cancelled", e);
+}
+```
+
+## CPU-bound work và blocking không hợp tác
+
+Một virtual thread chỉ nhường carrier hiệu quả khi đi vào điểm blocking/yield hợp tác. Vòng lặp CPU dài không tự nhiên trở nên rẻ hơn.
+
+```java
+// Không có I/O, không có park; task này có thể chiếm một carrier trong thời gian dài.
+Thread.startVirtualThread(() -> {
+    for (long i = 0; i < Long.MAX_VALUE; i++) {
+        digest.update(data);
+    }
+});
+```
+
+Nếu hàng nghìn task kiểu này chạy trên VT, chúng cạnh tranh một số carrier xấp xỉ số processor. Kết quả thường là scheduler contention và latency xấu hơn, không phải throughput tốt hơn.
+
+Dành một executor có parallelism rõ ràng cho CPU work:
+
+```java
+int parallelism = Runtime.getRuntime().availableProcessors();
+ExecutorService cpuExecutor = Executors.newFixedThreadPool(parallelism);
+
+Future<Image> resized = cpuExecutor.submit(() -> resizeAndEncode(image));
+```
+
+Con số thực tế có thể thấp hơn số core nếu workload còn cần CPU cho GC, network và các service khác. Chọn bằng benchmark thay vì coi `availableProcessors()` là đáp án tuyệt đối.
+
+## Pinning: điều gì còn đúng theo từng JDK?
+
+**Pinning** xảy ra khi VT đang block nhưng không thể unmount khỏi carrier. Pinning không làm sai kết quả chương trình; nó làm giảm khả năng scale vì carrier bị giữ trong lúc đáng lẽ có thể chạy VT khác.
+
+### JDK 21–23: synchronized có thể pin
+
+Trong JDK 21–23, một VT đang giữ monitor của `synchronized` sẽ bị pin nếu nó thực hiện blocking operation bên trong vùng đó:
+
+```java
+// JDK 21–23: socket.read() có thể pin carrier trong lúc chờ.
+synchronized (lock) {
+    byte[] response = socket.getInputStream().readAllBytes();
+    updateCache(response);
+}
+```
+
+Với các JDK này, tránh giữ `synchronized` quanh I/O. Có thể thay bằng `ReentrantLock` nếu thật sự cần lock, hoặc tốt hơn là thu nhỏ critical section để không gọi I/O trong khi đang giữ bất kỳ lock nào.
+
+```java
+// JDK 21–23: ReentrantLock không pin theo cơ chế monitor cũ.
+lock.lock();
+try {
+    updateSharedState(); // critical section ngắn, không gọi I/O
+} finally {
+    lock.unlock();
+}
+
+byte[] response = socket.getInputStream().readAllBytes();
+```
+
+### JDK 24+: synchronized không còn pin
+
+JDK 24 đưa vào JEP 491. JVM theo dõi monitor ownership theo virtual thread thay vì carrier, nên VT có thể unmount trong `synchronized` hoặc `Object.wait()`.
+
+Vì vậy trên **JDK 24+**, không cần thay toàn bộ `synchronized` thành `ReentrantLock` chỉ để né pinning. Hãy chọn `ReentrantLock` khi cần tính năng của nó như `tryLock`, timeout, lock interruptible hoặc nhiều condition; không phải vì `synchronized` bị coi là lỗi thời.
+
+Dù vậy, gọi I/O khi đang giữ lock vẫn là thiết kế xấu trong nhiều trường hợp. Nó làm các task khác chờ lock lâu, gây contention và có thể giữ state không nhất quán quá lâu. JDK 24 giải quyết pinning, không giải quyết contention logic của ứng dụng.
+
+### Native và foreign function vẫn cần kiểm tra
+
+Trong JDK hiện đại, trường hợp pinning quan trọng còn lại là VT chạy:
+
+- `native` method qua JNI.
+- Foreign function từ Foreign Function & Memory API.
+- Một số integration/thư viện có native layer hoặc hành vi OS-specific.
+
+Nếu native call block lâu, carrier có thể không được giải phóng. Không đoán từ tên thư viện; dùng JFR và load test với workload thực tế.
+
+<Callout type="warn" title="Đừng áp dụng lời khuyên pinning cũ cho mọi JDK">
+  “Không được dùng <code>synchronized</code> với virtual thread” là lời khuyên dành cho JDK 21–23. Với JDK 24+, nó không còn đúng như một quy tắc về pinning. Tài liệu và checklist phải luôn ghi rõ phiên bản JDK.
+</Callout>
+
+## ThreadLocal, ScopedValue và context request
+
+`ThreadLocal` vẫn hoạt động trên virtual thread. Không cần xoá nó chỉ để chạy Loom. Nhưng virtual threads rất nhiều và mỗi VT có lifecycle ngắn, nên context per-thread phải được dùng có chủ đích.
+
+Ví dụ `ThreadLocal` hợp với state mutable cục bộ của thread, nhưng dễ gây khó đọc vì dependency bị ẩn:
+
+```java
+static final ThreadLocal<String> TRACE_ID = new ThreadLocal<>();
+
+void handle(Request request) {
+    TRACE_ID.set(request.traceId());
+    try {
+        service.process(request);
+    } finally {
+        TRACE_ID.remove(); // bắt buộc khi lifecycle không tự kết thúc ngay
+    }
+}
+```
+
+Với context **bất biến**, truyền từ request xuống các hàm con, `ScopedValue` rõ ràng hơn. `ScopedValue` là API chính thức từ **JDK 25**:
+
+```java
+static final ScopedValue<RequestContext> REQUEST_CONTEXT = ScopedValue.newInstance();
+
+void handle(Request request) {
+    var context = new RequestContext(request.traceId(), request.userId());
+
+    ScopedValue.where(REQUEST_CONTEXT, context).run(() -> {
+        service.process(request);
+    });
+}
+
+void audit() {
+    String traceId = REQUEST_CONTEXT.get().traceId();
+    logger.info("traceId={}", traceId);
+}
+```
+
+`ScopedValue` không phải bản thay thế 1:1 cho mọi `ThreadLocal`:
+
+| Nhu cầu | Phù hợp hơn |
+|---|---|
+| Context bất biến trong một request/task scope | `ScopedValue` (JDK 25+) hoặc tham số tường minh |
+| State mutable riêng của một task | Local variable/đối tượng state truyền tường minh |
+| Thư viện cũ yêu cầu `ThreadLocal` | Giữ `ThreadLocal`, audit memory và cleanup |
+| Cache/object reuse toàn cục | Cân nhắc cache/pool chuyên dụng, không lạm dụng thread-local |
+
+Trên JDK 21–24, `ScopedValue` còn là preview và cần `--enable-preview`; không nên đưa API preview vào core production mà không chấp nhận chi phí upgrade giữa các JDK.
+
+## Structured Concurrency: dùng khi một request tách thành nhiều subtask
+
+Virtual threads làm việc tạo task rẻ. Structured Concurrency giải quyết vòng đời của các task liên quan: task cha tạo task con, đợi chúng, truyền lỗi/cancellation và không để task con chạy “mồ côi” sau khi scope cha kết thúc.
+
+Ví dụ nghiệp vụ: một request dashboard cần gọi user service và order service song song. Nếu user service fail, thường không có lý do để order service tiếp tục chạy.
+
+```text
+handleDashboard request
+├── fetchUser
+└── fetchOrders
+
+Nếu request cha timeout/cancel hoặc một subtask fail:
+→ các subtask cùng scope phải được cancel và được join trước khi cha rời scope.
+```
+
+`StructuredTaskScope` là **preview API**. JDK 21 dùng constructor và `ShutdownOnFailure`; JDK 25 đã đổi sang factory `StructuredTaskScope.open(...)` và joiner. Vì API preview không ổn định, chỉ copy code đúng với JDK đang chạy và bật preview ở compile lẫn runtime.
+
+Ví dụ cho **JDK 25**:
+
+```java
+// Compile + run với --enable-preview trên JDK 25.
+Response handle(String id) throws InterruptedException {
+    try (var scope = StructuredTaskScope.open()) {
+        Subtask<User> user = scope.fork(() -> userClient.get(id));
+        Subtask<List<Order>> orders = scope.fork(() -> orderClient.findByUser(id));
+
+        scope.join(); // mặc định: fail nếu một subtask fail
+        return new Response(user.get(), orders.get());
+    }
+}
+```
+
+Nếu team chưa dùng preview API, vẫn dùng được virtual thread executor. Khi đó cần thiết kế rõ timeout, cancellation và cleanup của các `Future`; đừng cho rằng virtual threads tự xử lý quan hệ cha-con.
+
+## Migration từ thread pool sang Virtual Threads
+
+Migration tốt không phải là thay mọi `newFixedThreadPool` thành virtual thread factory. Trước hết cần nhận diện **pool đó đang đại diện cho điều gì**: OS-thread scarcity, giới hạn CPU, giới hạn DB, hay queue/rejection policy.
+
+### Những migration an toàn nhất
+
+Các candidate tốt:
+
+1. Web/API service xử lý request đồng bộ và gọi I/O blocking.
+2. Client gọi nhiều HTTP/JDBC/Redis request đồng thời.
+3. Consumer có nhiều message độc lập và phần lớn thời gian chờ I/O.
+4. Scheduled task fan-out I/O, với concurrency downstream đã được giới hạn riêng.
+
+Quy trình tối thiểu:
+
+1. Nâng lên JDK 21+; nếu có thể ưu tiên JDK 24+ để không còn monitor pinning.
+2. Chọn một endpoint I/O-heavy, không đổi toàn hệ thống cùng lúc.
+3. Đổi executor thành `newVirtualThreadPerTaskExecutor()` hoặc bật support của framework.
+4. Tách giới hạn DB/API/rate limit khỏi thread pool bằng semaphore, pool hoặc gateway rule.
+5. Đặt timeout và cancellation cho outbound call.
+6. Load test với concurrency cao hơn mức thread pool cũ.
+7. Quan sát JFR, connection pool, file descriptor, heap, queue latency và error rate.
+
+### Những thứ không nên đổi máy móc
+
+| Mẫu cũ | Có nên đổi trực tiếp? | Cách suy nghĩ đúng |
+|---|---|---|
+| `newFixedThreadPool(cpuCount)` để xử lý CPU | **Không** | Đây là CPU concurrency limit hợp lý; giữ/tune nó. |
+| Pool 30 threads để bảo vệ DB | **Không trực tiếp** | Giữ giới hạn 30 dưới dạng DB pool/semaphore/bulkhead, sau đó mới dùng VT cho request. |
+| `CompletableFuture`/Reactive chỉ để tránh blocking servlet thread | Có thể cân nhắc | Đoạn code blocking tuần tự trên VT thường dễ đọc hơn. |
+| Reactive streaming đã có backpressure | Chưa chắc | VT không thay thế demand propagation. |
+| Code gọi JNI/native SDK | Cần kiểm tra | Benchmark và xem JFR pinned event trước khi rollout. |
+| `ThreadLocal` context | Không cần bỏ ngay | Phân loại immutable/mutable, kiểm tra propagation và memory. |
+
+### Spring Boot
+
+Với Spring Boot 3.2+ và JDK 21+, có thể bật virtual threads:
+
+```properties
+spring.threads.virtual.enabled=true
+```
+
+Đây là điểm bắt đầu thuận tiện cho MVC/servlet style request handling. Nó không tự tăng DB connection pool, không tạo rate limiter, không sửa timeout và không làm JDBC query nhanh hơn. Sau khi bật, các bottleneck thường lộ ra ở database connection pool, downstream API hoặc queue thay vì servlet thread pool.
+
+## Quan sát và chẩn đoán production
+
+Virtual thread có stack trace và debugger support như thread thường. Tuy nhiên, đừng chỉ nhìn số thread: một JVM có nhiều VT chờ I/O là bình thường. Hãy đo latency, throughput, heap, queue time, connection pool và downstream saturation.
+
+### JFR events
+
+JFR có các event hữu ích:
+
+| Event | Ý nghĩa |
+|---|---|
+| `jdk.VirtualThreadPinned` | VT bị pin quá ngưỡng; cần xem stack trace và dependency liên quan. |
+| `jdk.VirtualThreadSubmitFailed` | JVM không thể start/unpark VT, thường báo áp lực tài nguyên. |
+| `jdk.VirtualThreadStart` / `jdk.VirtualThreadEnd` | Quan sát lifecycle; thường phải enable riêng vì tạo nhiều event. |
+
+In các event từ một recording:
+
+```bash
+jfr print \
+  --events jdk.VirtualThreadPinned,jdk.VirtualThreadSubmitFailed \
+  recording.jfr
+```
+
+JDK 21–23 cũng có thể bật log pinning khi phát triển:
+
+```bash
+java -Djdk.tracePinnedThreads=full -jar application.jar
+```
+
+Trên JDK 24+, flag này vẫn có thể giúp phát hiện pinning native, nhưng sẽ không còn báo monitor pinning như JDK cũ.
+
+### Thread dump
+
+Dùng `jcmd` để lấy dump có virtual threads:
+
+```bash
+jcmd <PID> Thread.dump_to_file -format=text threads.txt
+jcmd <PID> Thread.dump_to_file -format=json threads.json
+```
+
+Khi điều tra sự cố, trả lời các câu hỏi theo thứ tự:
+
+1. Request đang chờ đâu: DB, HTTP, lock hay queue?
+2. Có bao nhiêu connection/socket/permit đang bị giữ?
+3. Có pinned event hoặc native stack nào không?
+4. Có CPU saturation/GC pressure không?
+5. Timeout/retry có tạo retry storm không?
+
+## Anti-patterns thường gặp
+
+| Anti-pattern | Vì sao có vấn đề | Thay bằng |
+|---|---|---|
+| Dùng `newFixedThreadPool(100, Thread.ofVirtual().factory())` cho mọi việc | Vẫn giới hạn số task 100 mà không thể hiện lý do business/resource. | Một VT/task; giới hạn riêng DB/API/CPU. |
+| “VT rẻ nên nhận vô hạn request” | Heap, queue latency, file descriptors và downstream vẫn hữu hạn. | Admission control, bounded queue, rate limit, bulkhead. |
+| Dùng VT cho CPU loop dài | Chiếm carrier, không tăng số core. | CPU executor có parallelism giới hạn. |
+| Đổi hết `synchronized` thành `ReentrantLock` trên JDK 24+ | Tăng độ phức tạp mà không còn giải quyết monitor pinning. | Giữ `synchronized` nếu đủ; tránh I/O khi giữ lock vì contention. |
+| Giữ lock trong lúc gọi DB/HTTP | Task khác bị chờ lock, state bị giữ lâu. | Tách I/O ra ngoài critical section; thiết kế state/transaction rõ ràng. |
+| Đặt ThreadLocal mutable khắp code | Dependency ẩn; bộ nhớ tăng theo số VT sống; khó propagate đúng. | Tham số tường minh hoặc `ScopedValue` cho context bất biến. |
+| Nuốt `InterruptedException` | Cancellation/shutdown không hoạt động đúng. | Propagate hoặc restore interrupt rồi thoát. |
+| Bỏ Reactive stack chỉ vì “VT là end of reactive” | Mất backpressure/streaming semantics cần thiết. | Chỉ migrate nơi reactive dùng để né blocking thread. |
+
+## Checklist trước khi rollout
+
+- [ ] Runtime là JDK 21+; biết rõ JDK 21–23 khác JDK 24+ ở monitor pinning.
+- [ ] Workload mục tiêu là I/O-bound và có nhu cầu concurrency thực tế.
+- [ ] CPU-heavy task được tách sang executor có parallelism giới hạn.
+- [ ] DB pool, HTTP client pool, rate limit và file descriptor limit đã được kiểm tra.
+- [ ] Có timeout, retry budget và cancellation cho outbound call.
+- [ ] Concurrency limit được biểu diễn bằng semaphore/bulkhead/admission control, không chỉ bằng size của thread pool.
+- [ ] `ThreadLocal`, JNI/native dependency và library cũ đã được audit.
+- [ ] Đã load test ở mức concurrency cao hơn cấu hình platform thread cũ.
+- [ ] JFR dashboard/recording có `jdk.VirtualThreadPinned` và `jdk.VirtualThreadSubmitFailed`.
+- [ ] Có metric cho heap, GC, queue time, connection pool saturation, downstream latency và error rate.
+
+## Cheat sheet
+
+```text
+Virtual Thread = cheap thread for a concurrent task, especially one waiting for I/O.
+
+Dùng VT khi:       request/task I/O-bound, code blocking tuần tự.
+Không kỳ vọng:     CPU nhanh hơn, DB nhanh hơn, hết rate limit, hết memory limit.
+Không pool VT:     tạo một VT cho mỗi task.
+Phải giới hạn:     DB/API/CPU/incoming requests bằng cơ chế phù hợp.
+JDK 21–23:         synchronized + blocking I/O có thể pin carrier.
+JDK 24+:            synchronized không còn gây monitor pinning.
+Mọi JDK:            native/foreign call cần quan sát vì vẫn có thể pin.
+JDK 25:             ScopedValue chính thức cho context bất biến có scope.
+Structured scope:   hữu ích cho fan-out; hiện vẫn là preview API.
+```
+
+<Callout type="idea" title="Một câu để nhớ">
+  Virtual Threads cho phép viết code blocking, tuần tự và dễ debug ở quy mô concurrency lớn. Chúng thay thế nhu cầu pool OS thread cho I/O, không thay thế việc thiết kế giới hạn tài nguyên và kiểm soát tải.
+</Callout>
+
+## Tham khảo
+
+- [JEP 444 — Virtual Threads](https://openjdk.org/jeps/444)
+- [Oracle JDK 25 — Virtual Threads](https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html)
+- [JEP 491 — Synchronize Virtual Threads without Pinning](https://openjdk.org/jeps/491)
+- [JEP 506 — Scoped Values](https://openjdk.org/jeps/506)
+- [JEP 505 — Structured Concurrency (Fifth Preview)](https://openjdk.org/jeps/505)
