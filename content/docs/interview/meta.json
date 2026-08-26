@@ -5,6 +5,7 @@
     "more-threads-not-faster",
     "transactional-self-invocation",
     "async-cacheable-not-working",
-    "transactional-readonly"
+    "transactional-readonly",
+    "long-transaction-external-api-rollback"
   ]
 }
