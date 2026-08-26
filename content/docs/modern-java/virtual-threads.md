@@ -18,6 +18,7 @@ Virtual thread là một `java.lang.Thread` nhẹ do JVM quản lý. Nó phù h�
 - [Mô hình hoạt động: virtual thread, carrier và blocking I/O](#mô-hình-hoạt-động-virtual-thread-carrier-và-blocking-io)
   - [Platform thread và virtual thread khác nhau ở đâu?](#platform-thread-và-virtual-thread-khác-nhau-ở-đâu)
   - [Mount, unmount và resume](#mount-unmount-và-resume)
+  - [Một carrier chạy nhiều VT bằng cách nào?](#một-carrier-chạy-nhiều-vt-bằng-cách-nào)
   - [Blocking nào được hưởng lợi?](#blocking-nào-được-hưởng-lợi)
 - [Khi nào nên chọn Virtual Thread, Platform Thread hoặc Reactive?](#khi-nào-nên-chọn-virtual-thread-platform-thread-hoặc-reactive)
 - [API cơ bản trong JDK 21](#api-cơ-bản-trong-jdk-21)
@@ -132,6 +133,49 @@ VT-A:       [run] ── socket.read() ── [waiting, unmounted] ── [run]
 ```
 
 Code ứng dụng vẫn là code tuần tự, blocking và dễ đọc. Việc suspend/resume là chi tiết của JVM; không nên dựa vào carrier cụ thể nào đang chạy VT.
+
+### Một carrier chạy nhiều VT bằng cách nào?
+
+Nói chính xác, một carrier **không chạy nhiều VT cùng lúc**. Tại một thời điểm nó chỉ thực thi một VT, giống như một CPU core chỉ thực thi một luồng lệnh tại một thời điểm. JVM tạo cảm giác một carrier “phục vụ nhiều VT” bằng cách chuyển carrier sang VT khác ngay khi VT hiện tại không còn làm việc hữu ích mà đang chờ.
+
+```text
+Carrier 1:
+[ chạy VT-A ] [ VT-A chờ I/O ] [ chạy VT-B ] [ chạy VT-C ] [ chạy lại VT-A ]
+
+VT-A:
+[ parse request ] ── socket.read() ── [ waiting ] ── [ xử lý response ]
+```
+
+Ví dụ, khi VT gọi `httpClient.send(...)`, nó đi qua chuỗi sau:
+
+1. VT đang **mount** trên một carrier và chạy Java code.
+2. Lời gọi HTTP phải chờ network response.
+3. JVM suspend VT, giữ trạng thái cần để tiếp tục — vị trí đang chạy, local variables và call stack — trong heap.
+4. VT được **unmount**. Carrier không còn bị gắn với VT này nên scheduler có thể mount một VT runnable khác lên carrier đó.
+5. Khi response đến, scheduler đưa VT cũ vào hàng đợi runnable.
+6. Một carrier rảnh mount lại VT. Carrier này có thể khác carrier ban đầu.
+
+```java
+void process() throws Exception {
+    String token = loadToken();
+    String data = callApi(token); // VT có thể unmount khi chờ network
+    save(data);                   // resume xong tiếp tục chính xác tại đây
+}
+```
+
+Biến `token` và vị trí thực thi sau `callApi(...)` không mất đi khi VT chờ. JVM khôi phục trạng thái đó trước khi chạy `save(data)`. Đây là lý do application code vẫn có thể viết theo kiểu blocking tuần tự, thay vì phải tự chia code thành callback/state machine.
+
+Cơ chế chuyển này chỉ có lợi khi VT đi vào một điểm blocking mà JVM có thể unmount. Nếu VT chạy CPU liên tục thì carrier không được nhường:
+
+```java
+Thread.startVirtualThread(() -> {
+    while (true) {
+        calculateHash(); // CPU-bound: giữ một carrier trong lúc chạy
+    }
+});
+```
+
+Tạo 100.000 VT kiểu CPU-bound không tạo thêm CPU core. Chúng vẫn cạnh tranh một nhóm carrier có kích thước gần với số processor. Native/JNI hoặc foreign-function call cũng có thể khiến VT bị pin, nghĩa là VT block nhưng carrier chưa được giải phóng.
 
 ### Blocking nào được hưởng lợi?
 
