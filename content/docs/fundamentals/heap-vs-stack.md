@@ -13,6 +13,10 @@ Heap và stack phục vụ các vai trò khác nhau trong bộ nhớ runtime c�
 - [Heap — object layout, header và reference](#4-heap--object-layout-header-và-reference)
 - [Giá trị nằm ở đâu — primitive vs object vs reference](#5-giá-trị-nằm-ở-đâu--primitive-vs-object-vs-reference)
 - ["Java truyền tham chiếu" — hiểu lầm kinh điển](#6-java-truyền-tham-chiếu--hiểu-lầm-kinh-điển)
+  - [Ví von: photocopy địa chỉ nhà](#ví-von-photocopy-địa-chỉ-nhà)
+  - [Chạy thật: in địa chỉ object](#chạy-thật-in-địa-chỉ-object)
+  - [Từng bước trong bộ nhớ](#từng-bước-trong-bộ-nhớ)
+  - [Bài test phát hiện pass-by-reference thật](#bài-test-phát-hiện-pass-by-reference-thật)
 - [Escape Analysis — khi object không cần lên heap](#7-escape-analysis--khi-object-không-cần-lên-heap)
 - [TLAB — vì sao cấp phát heap gần như miễn phí](#8-tlab--vì-sao-cấp-phát-heap-gần-như-miễn-phí)
 - [StackOverflowError vs OutOfMemoryError](#9-stackoverflowerror-vs-outofmemoryerror)
@@ -161,29 +165,117 @@ void demo() {
 
 ## 6. "Java truyền tham chiếu" — hiểu lầm kinh điển
 
-Java **luôn truyền theo giá trị (pass-by-value)**. Với object, **giá trị được copy chính là reference** — không phải object. Hệ quả:
+Nhiều người tin "Java truyền tham chiếu" vì họ từng viết method sửa nội dung object, và người gọi *thấy* thay đổi — nhìn cứ như tham chiếu được truyền vào. Phát biểu đó **sai**. Chỉ cần nắm được một câu là giải thích được mọi hành vi:
+
+> Biến `a` **không chứa object** — nó chỉ chứa **địa chỉ** trỏ tới object trên heap. Gọi method, Java **copy đúng cái địa chỉ đó** vào tham số: copy **địa chỉ**, không copy object — và tham số cũng không "trở thành" biến gốc.
+
+Nói chuẩn thuật ngữ: Java **luôn truyền theo giá trị (pass-by-value)**. Với primitive, giá trị được copy là con số. Với object, giá trị được copy **chính là reference** (cái địa chỉ). Điểm mấu chốt: **bản sao địa chỉ vẫn trỏ về đúng object gốc**.
+
+### Ví von: photocopy địa chỉ nhà
+
+Tưởng tượng `a` là tờ giấy ghi địa chỉ **số nhà 123**; object thật trên heap là căn nhà tại số 123. Gọi `mutate(a)` tức là **photocopy** tờ giấy rồi đưa bản photo cho method:
+
+- `sb.append(" world")` = cầm bản photo, đi tới **ngôi nhà**, sơn lại tường. Tờ gốc và bản photo cùng chỉ một căn nhà → nhà bị sửa thật → `a` **thấy**.
+- `sb = new StringBuilder("new")` = **tẩy số 123 trên bản photo**, ghi lên đó số 999. Tờ giấy gốc `a` của người gọi không ai đụng tới → `a` **không thấy**.
+- `swap(x, y)` = hoán đổi nội dung **hai tờ photo** cho nhau. Tờ gốc ngoài kia y nguyên → **không thấy**.
+
+| Method làm gì | Điều gì xảy ra | Người gọi thấy? |
+|---|---|---|
+| `sb.append(...)` — sửa **object được trỏ tới** | Bản sao và reference gốc cùng trỏ **một object** → object bị sửa thật | ✅ Thấy |
+| `sb = new ...` — **gán lại tham số** | Chỉ đổi bản sao cục bộ; reference gốc không ai đụng tới | ❌ Không thấy |
+| `swap(x, y)` — hoán đổi **hai tham số** | Hoán đổi hai bản sao; biến gốc y nguyên | ❌ Không thấy |
+
+### Chạy thật: in địa chỉ object
+
+In "địa chỉ" của object ra màn hình bằng `System.identityHashCode` — mã định danh duy nhất cho mỗi object. JVM giấu địa chỉ heap thật, nhưng mã này đủ để biết hai reference có đang trỏ cùng một object hay không:
 
 ```java
-void mutate(StringBuilder sb) { sb.append(" world"); }   // sửa object được TRỎ TỚI → thấy
-void reassign(StringBuilder sb) { sb = new StringBuilder("new"); } // gán lại COPY reference → KHÔNG thấy
+class PassByValueDemo {
+    static String addr(Object o) {  // mã định danh ~ "địa chỉ" của object
+        return "@" + Integer.toHexString(System.identityHashCode(o));
+    }
 
-StringBuilder a = new StringBuilder("hello");
-mutate(a);    System.out.println(a);  // "hello world"  ← sửa cùng object
-reassign(a);  System.out.println(a);  // "hello world"  ← reassign chỉ đổi copy cục bộ
+    static void mutate(StringBuilder sb) {               // (1) sửa object được trỏ tới
+        System.out.println("  mutate nhận ref:  " + addr(sb));
+        sb.append(" world");
+    }
+
+    static void reassign(StringBuilder sb) {             // (2) gán lại tham số
+        sb = new StringBuilder("new");
+        System.out.println("  reassign sau gán: " + addr(sb));
+    }
+
+    static void swap(StringBuilder x, StringBuilder y) { // (3) hoán đổi 2 tham số
+        StringBuilder t = x; x = y; y = t;
+    }
+
+    public static void main(String[] args) {
+        StringBuilder a = new StringBuilder("hello");
+        System.out.println("a ban đầu:          " + addr(a));
+
+        mutate(a);
+        System.out.println("sau mutate:         " + a);
+
+        reassign(a);
+        System.out.println("sau reassign:       " + a);
+
+        StringBuilder b = new StringBuilder("B");
+        swap(a, b);
+        System.out.println("sau swap:           " + a + " | " + b);
+    }
+}
 ```
 
-```
-Trước gọi:   a (stack) ─ref─▶ [object "hello"] (heap)
+Output:
 
-mutate(sb):  sb là COPY của ref a, cùng trỏ object
-             sb.append → SỬA object trên heap → a cũng thấy ✓
-
-reassign(sb): sb = new... → COPY sb trỏ object MỚI
-              a vẫn trỏ object cũ → KHÔNG đổi ✗
+```text
+a ban đầu:          @6646153
+  mutate nhận ref:  @6646153      ← CÙNG địa chỉ với a: sb là bản sao của ref a
+sau mutate:         hello world
+  reassign sau gán: @21507a04     ← sb trỏ object mới, nhưng a không hề biết
+sau reassign:       hello world   ← a vẫn giữ địa chỉ cũ, giá trị y nguyên
+sau swap:           hello world | B
 ```
+
+Ba dòng đáng chép nhớ: `mutate` nhận **đúng địa chỉ** mà `a` đang giữ (bằng chứng "copy địa chỉ, không copy object"); `reassign` làm `sb` trỏ sang **địa chỉ mới** trong khi `a` vẫn giữ địa chỉ cũ; `swap` không đổi được gì.
+
+### Từng bước trong bộ nhớ
+
+```text
+BƯỚC 0 — trước khi gọi:
+   stack main                       heap
+   a ──[ref @6646153]──────▶  [ StringBuilder "hello" ]
+
+BƯỚC 1 — gọi mutate(a): copy CON SỐ @6646153 vào slot sb
+   stack main:            a ──[@6646153]──┐
+   stack mutate:          sb ──[@6646153]─┤
+                                          ▼
+                              [ StringBuilder "hello" ]  ← CHỈ MỘT object
+   sb.append(" world") sửa object này → a cũng thấy ✓
+
+BƯỚC 2 — gọi reassign(a): copy như trên, nhưng method chạy sb = new ...
+   stack main:            a ──[@6646153]─────────▶ [ "hello world" ]  ← vô sự
+   stack mutate:          sb ──[@21507a04]──▶ [ "new" ]  ← object mới
+   method return → slot sb bị vứt bỏ → object "new" thành rác chờ GC
+```
+
+### Bài test phát hiện pass-by-reference thật
+
+Muốn biết một ngôn ngữ có "pass-by-reference" thật không, chỉ cần một câu hỏi: *method có thay đổi được **chính biến** của người gọi không?* Thử gán lại tham số:
+
+```java
+static void changeIt(StringBuilder param) {
+    param = new StringBuilder("CHANGED");  // nếu là pass-by-reference thật,
+}                                           // biến gốc sẽ trỏ sang object mới
+```
+
+- **Java**: biến gốc không đổi → pass-by-value ✅
+- **C++** với `void f(String& s)`: `s` là *alias* trỏ thẳng vào ô nhớ của biến gốc → gán `s` chính là gán biến gốc → swap hoạt động. Đó mới là pass-by-reference thật.
+
+Vì sao hiểu lầm này sống dai dẳng đến vậy? Vì `mutate(a)` **thay đổi được thứ mà `a` trỏ tới** — nhìn cứ như tham chiếu được truyền vào. Nhưng đó chỉ là hệ quả tự nhiên của việc copy địa chỉ: bản photo địa chỉ vẫn đưa bạn tới đúng căn nhà để sơn tường. **Sửa object qua reference** ≠ **thay đổi biến của người gọi** — Java chỉ làm được cái đầu.
 
 > [!WARNING]
-> Phát biểu đúng: *Java truyền **bản sao của reference**.* Bạn có thể **sửa nội dung** object qua bản sao reference đó (cùng địa chỉ heap), nhưng **gán lại** tham số chỉ đổi bản sao cục bộ — biến gốc ngoài method không hề thay đổi. Đây là lý do swap hai object bằng method không bao giờ hoạt động.
+> Phát biểu đúng: *Java truyền **bản sao của reference**.* Bạn có thể **sửa nội dung** object qua bản sao reference đó (cùng địa chỉ heap), nhưng **gán lại** tham số chỉ đổi bản sao cục bộ — biến gốc ngoài method không hề thay đổi. Muốn "đổi" object cho người gọi: sửa nội dung nó (`set...`, `append...`), hoặc trả về object mới và để người gọi tự gán.
 
 ---
 

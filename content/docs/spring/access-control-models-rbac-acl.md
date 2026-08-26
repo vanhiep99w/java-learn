@@ -37,7 +37,7 @@ Authorization trả lời câu hỏi: **một principal đã được xác thự
   - [Cache và thay đổi quyền thời gian thực](#48-cache-và-thay-đổi-quyền-thời-gian-thực)
 - [5. ACL chuyên sâu](#5-acl-chuyên-sâu)
   - [ACL giải quyết bài toán nào](#51-acl-giải-quyết-bài-toán-nào)
-  - [Cấu trúc một ACE](#52-cấu-trúc-một-ace)
+  - [ACL và ACE khác nhau thế nào](#52-acl-và-ace-khác-nhau-thế-nào)
   - [Thứ tự đánh giá allow và deny](#53-thứ-tự-đánh-giá-allow-và-deny)
   - [Vì sao kết hợp RBAC và ACL](#54-vì-sao-kết-hợp-rbac-và-acl)
 - [6. Tự triển khai domain ACL](#6-tự-triển-khai-domain-acl)
@@ -356,45 +356,54 @@ Tránh permission mơ hồ như `CAN_MANAGE` hoặc `FULL_ACCESS`. Tên permissi
 
 ### 4.2. Bước 2 — tạo database schema
 
-Ví dụ PostgreSQL:
+RBAC cần ba bảng chính và hai bảng liên kết:
 
-```sql
-CREATE TABLE app_user (
-    id          BIGSERIAL PRIMARY KEY,
-    username    VARCHAR(100) NOT NULL UNIQUE,
-    password    VARCHAR(255) NOT NULL,
-    enabled     BOOLEAN NOT NULL DEFAULT TRUE
-);
+```mermaid
+erDiagram
+    APP_USER ||--o{ USER_ROLE : "được gán"
+    ROLE ||--o{ USER_ROLE : "có người dùng"
+    ROLE ||--o{ ROLE_PERMISSION : "được cấp"
+    PERMISSION ||--o{ ROLE_PERMISSION : "thuộc role"
 
-CREATE TABLE role (
-    id          BIGSERIAL PRIMARY KEY,
-    code        VARCHAR(100) NOT NULL UNIQUE,
-    description VARCHAR(255)
-);
+    APP_USER {
+        BIGINT id PK
+        VARCHAR username UK
+        VARCHAR password
+        BOOLEAN enabled
+    }
 
-CREATE TABLE permission (
-    id          BIGSERIAL PRIMARY KEY,
-    code        VARCHAR(120) NOT NULL UNIQUE,
-    description VARCHAR(255)
-);
+    ROLE {
+        BIGINT id PK
+        VARCHAR code UK
+        VARCHAR description
+    }
 
-CREATE TABLE user_role (
-    user_id     BIGINT NOT NULL REFERENCES app_user(id),
-    role_id     BIGINT NOT NULL REFERENCES role(id),
-    PRIMARY KEY (user_id, role_id)
-);
+    PERMISSION {
+        BIGINT id PK
+        VARCHAR code UK
+        VARCHAR description
+    }
 
-CREATE TABLE role_permission (
-    role_id       BIGINT NOT NULL REFERENCES role(id),
-    permission_id BIGINT NOT NULL REFERENCES permission(id),
-    PRIMARY KEY (role_id, permission_id)
-);
+    USER_ROLE {
+        BIGINT user_id PK, FK
+        BIGINT role_id PK, FK
+    }
 
-CREATE INDEX idx_user_role_lookup
-    ON user_role (user_id, role_id);
-CREATE INDEX idx_role_permission_lookup
-    ON role_permission (role_id, permission_id);
+    ROLE_PERMISSION {
+        BIGINT role_id PK, FK
+        BIGINT permission_id PK, FK
+    }
 ```
+
+| Bảng | Vai trò | Ví dụ dữ liệu |
+|---|---|---|
+| `app_user` | Lưu tài khoản đăng nhập | `alice` |
+| `role` | Gom nhóm trách nhiệm nghiệp vụ | `FINANCE_MANAGER` |
+| `permission` | Mô tả một hành động được phép | `invoice:approve` |
+| `user_role` | Gán nhiều role cho user | `alice → FINANCE_MANAGER` |
+| `role_permission` | Gán nhiều permission cho role | `FINANCE_MANAGER → invoice:approve` |
+
+Hai bảng liên kết dùng khóa chính kép để ngăn cùng một role hoặc permission bị gán lặp. Trong database thực tế, foreign key cũng phải được khai báo để không tạo ra assignment trỏ tới user, role hoặc permission không tồn tại.
 
 Query nạp permission hiệu lực:
 
@@ -642,7 +651,7 @@ Các use case điển hình:
 - Project private chỉ cho member cụ thể.
 - Support engineer chỉ được mở ticket đã assign.
 
-### 5.2. Cấu trúc một ACE
+### 5.2. ACL và ACE khác nhau thế nào
 
 **ACE — Access Control Entry** là một quy tắc cấp hoặc từ chối **một permission hoặc một tập permission** cho **một subject** trên **một resource cụ thể**. Với schema mỗi permission một row ở phần 6, một ACE tương ứng với một row.
 
