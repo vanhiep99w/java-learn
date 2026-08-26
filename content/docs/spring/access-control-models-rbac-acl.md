@@ -39,14 +39,17 @@ Authorization trả lời câu hỏi: **một principal đã được xác thự
   - [ACL giải quyết bài toán nào](#51-acl-giải-quyết-bài-toán-nào)
   - [Cấu trúc một ACE](#52-cấu-trúc-một-ace)
   - [Thứ tự đánh giá allow và deny](#53-thứ-tự-đánh-giá-allow-và-deny)
-  - [RBAC và ACL phối hợp](#54-rbac-và-acl-phối-hợp)
-- [6. Tự triển khai ACL không dùng bitmask](#6-tự-triển-khai-acl-không-dùng-bitmask)
+  - [Vì sao kết hợp RBAC và ACL](#54-vì-sao-kết-hợp-rbac-và-acl)
+- [6. Tự triển khai domain ACL](#6-tự-triển-khai-domain-acl)
   - [Schema ACL thực dụng](#61-schema-acl-thực-dụng)
   - [Repository đọc ACL](#62-repository-đọc-acl)
   - [Authorization service](#63-authorization-service)
   - [Tích hợp với @PreAuthorize](#64-tích-hợp-với-preauthorize)
   - [Grant và revoke an toàn](#65-grant-và-revoke-an-toàn)
 - [7. Tối ưu ACL bằng bitmask](#7-tối-ưu-acl-bằng-bitmask)
+  - [Giới hạn của mô hình mỗi permission một row](#71-giới-hạn-của-mô-hình-mỗi-permission-một-row)
+  - [Bitmask giải quyết gì](#72-bitmask-giải-quyết-gì)
+  - [Triển khai permission mask](#73-triển-khai-permission-mask)
 - [8. Dùng Spring Security ACL module](#8-dùng-spring-security-acl-module)
   - [Bốn bảng cốt lõi](#81-bốn-bảng-cốt-lõi)
   - [Dependency và cấu hình](#82-dependency-và-cấu-hình)
@@ -641,13 +644,38 @@ Các use case điển hình:
 
 ### 5.2. Cấu trúc một ACE
 
-Một ACE nên chứa ít nhất:
+**ACE — Access Control Entry** là một quy tắc cấp hoặc từ chối **một permission hoặc một tập permission** cho **một subject** trên **một resource cụ thể**. Với schema mỗi permission một row ở phần 6, một ACE tương ứng với một row.
+
+Cần phân biệt ACL và ACE:
+
+- **ACL — Access Control List** là toàn bộ danh sách quyền của một resource.
+- **ACE — Access Control Entry** là một phần tử trong danh sách đó.
+
+Ví dụ ACL của invoice `42` có ba ACE:
+
+```text
+ACL của INVOICE:42
+├── ACE 1: USER:alice   được READ
+├── ACE 2: ROLE:AUDITOR được READ
+└── ACE 3: USER:eve     bị từ chối READ
+```
+
+Có thể biểu diễn mỗi ACE bằng sáu trường:
 
 ```text
 (resource_type, resource_id, subject_type, subject_id, permission, effect)
 ```
 
-Ví dụ:
+| Trường | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `resource_type` | Loại object được bảo vệ | `INVOICE` |
+| `resource_id` | ID của object cụ thể | `42` |
+| `subject_type` | Loại đối tượng nhận quyền | `USER` hoặc `ROLE` |
+| `subject_id` | User hoặc role nhận quyền | `alice`, `AUDITOR` |
+| `permission` | Hành động hoặc tập hành động được kiểm soát | `READ`, `WRITE` |
+| `effect` | Cấp hay từ chối permission | `ALLOW`, `DENY` |
+
+Ba ACE trên được lưu như sau:
 
 ```text
 (INVOICE, 42, USER, alice, READ, ALLOW)
@@ -655,7 +683,21 @@ Ví dụ:
 (INVOICE, 42, USER, eve, READ, DENY)
 ```
 
-Có thể thêm thời hạn, người cấp, lý do và audit timestamp.
+ACE đầu tiên được đọc thành một câu hoàn chỉnh:
+
+> Cho phép user `alice` thực hiện action `READ` trên invoice có ID `42`.
+
+Khi Alice yêu cầu đọc invoice `42`, authorization service tìm các ACE khớp với:
+
+```text
+resource = INVOICE:42
+subject  = USER:alice hoặc các role của Alice
+permission = READ
+```
+
+Sau đó service áp dụng policy allow/deny để đưa ra quyết định cuối cùng. Nếu hệ thống chỉ hỗ trợ grant, có thể bỏ trường `effect`: tìm thấy ACE thì `ALLOW`, không tìm thấy thì `DENY`.
+
+Một ACE có thể bổ sung thời hạn, người cấp, lý do và audit timestamp. Những trường này không thay đổi ý nghĩa cốt lõi của ACE: **một rule về subject, permission và resource**.
 
 ### 5.3. Thứ tự đánh giá allow và deny
 
@@ -673,34 +715,122 @@ Không nên phụ thuộc vào thứ tự row ngẫu nhiên từ database. Nếu
 > [!WARNING]
 > Kết hợp user grant và role deny cần rule ưu tiên rõ ràng. Nếu team không thực sự cần explicit deny, chỉ hỗ trợ grant và default-deny thường đơn giản, ít bất ngờ hơn.
 
-### 5.4. RBAC và ACL phối hợp
+### 5.4. Vì sao kết hợp RBAC và ACL
 
-Mô hình hybrid khuyên dùng:
+ACL **không bắt buộc** phải đi cùng RBAC. Một hệ thống chia sẻ file có thể chỉ cần ACL: ai có ACE `READ` thì được đọc. Một hệ thống nội bộ đơn giản cũng có thể chỉ cần RBAC: mọi user có permission `invoice:read` đều được đọc mọi invoice.
+
+Chỉ cần kết hợp khi quyết định authorization có đồng thời hai câu hỏi độc lập:
+
+1. **User có được thực hiện loại nghiệp vụ này không?** — RBAC trả lời bằng capability như `invoice:approve`.
+2. **User được thực hiện trên object nào?** — ACL trả lời bằng ACE như `APPROVE` trên invoice `42`.
+
+#### Vấn đề nếu chỉ dùng RBAC
+
+Giả sử role `FINANCE_STAFF` có permission `invoice:read`:
 
 ```text
-ALLOW = RBAC capability AND object scope
-
-invoice:read              AND ACL READ trên INV-42
-invoice:update            AND ACL WRITE trên INV-42
-invoice:approve           AND không phải người tạo invoice
+Alice → FINANCE_STAFF → invoice:read
 ```
 
-RBAC là coarse-grained gate. ACL thu hẹp object nào được thao tác. Không nên để ACL `READ` tự động cấp capability đọc invoice cho một principal vốn không thuộc module invoice, trừ khi đó là policy chia sẻ được chủ ý thiết kế.
+Permission này cho biết Alice có khả năng đọc invoice, nhưng không chỉ ra Alice được đọc invoice nào. Nếu code chỉ gọi `hasAuthority("invoice:read")`, Alice có thể đọc cả invoice `42`, `43` và mọi invoice khác.
+
+Có thể tạo thêm các role như `FINANCE_HANOI`, `FINANCE_HCM` hoặc `INVOICE_42_READER`, nhưng role sẽ tăng theo region, project và từng ngoại lệ. Đây là **role explosion**: dùng role để biểu diễn phạm vi object mà role không phù hợp để quản lý.
+
+#### Vấn đề nếu chỉ dùng ACL
+
+ACL có thể biểu diễn toàn bộ quyền:
+
+```text
+(INVOICE, 42, USER, alice, APPROVE, ALLOW)
+```
+
+Về kỹ thuật, ACE này đã đủ để cho Alice duyệt invoice `42`. Tuy nhiên, với nghiệp vụ nhạy cảm, hệ thống có thể còn yêu cầu chỉ nhân viên tài chính mới được duyệt invoice. Nếu ACL là kiểm tra duy nhất, một ACE được cấp nhầm cho user ngoài phòng tài chính cũng trở thành quyền duyệt hợp lệ.
+
+Dùng ACL cho mọi capability tổ chức còn tạo thêm chi phí quản trị:
+
+- Phải tạo ACE trên nhiều object để cấp cùng một khả năng cho cả nhóm user.
+- Khó thu hồi một capability trên toàn hệ thống khi user đổi chức vụ.
+- Khó trả lời “những ai có chức năng duyệt invoice?” vì quyền nằm rải rác theo object.
+
+RBAC giải quyết phần quyền theo trách nhiệm tổ chức; ACL chỉ cần quản lý phạm vi object và các ngoại lệ chia sẻ.
+
+#### Cách mô hình hybrid đưa ra quyết định
+
+Với policy chặt, request chỉ được phép khi vượt qua cả hai lớp:
+
+```text
+ALLOW = RBAC capability AND ACL object scope
+
+invoice:read    AND ACL READ trên INV-42
+invoice:update  AND ACL WRITE trên INV-42
+invoice:approve AND ACL APPROVE trên INV-42
+```
+
+Ví dụ dữ liệu:
+
+```text
+RBAC của Alice
+└── FINANCE_STAFF → invoice:read, invoice:update
+
+ACL của Alice
+├── INVOICE:42 → READ, WRITE
+└── INVOICE:43 → READ
+```
+
+Kết quả:
+
+| Request | RBAC | ACL | Kết quả |
+|---|---:|---:|---:|
+| Đọc invoice `42` | có `invoice:read` | có `READ` | `ALLOW` |
+| Sửa invoice `42` | có `invoice:update` | có `WRITE` | `ALLOW` |
+| Sửa invoice `43` | có `invoice:update` | thiếu `WRITE` | `DENY` |
+| Xóa invoice `42` | thiếu `invoice:delete` | không quan trọng | `DENY` |
 
 ```mermaid
 flowchart TD
     A[Request update INV-42] --> B{Có invoice:update?}
     B -->|Không| D[DENY 403]
-    B -->|Có| E{ACL WRITE?}
+    B -->|Có| E{ACL WRITE trên INV-42?}
     E -->|Không| D
     E -->|Có| F[ALLOW]
 ```
 
-## 6. Tự triển khai ACL không dùng bitmask
+Trong Spring Security, rule tương ứng là:
 
-Hãy bắt đầu bằng schema **mỗi permission một row**. Cách này thể hiện trực tiếp mô hình ACL, dễ đọc trong database và chưa cần biết phép toán bit. Sau khi hiểu đầy đủ luồng lưu ACE, truy vấn và kiểm tra quyền ở phần này, phần 7 mới thay cột `permission` bằng bitmask như một tối ưu lưu trữ.
+```java
+@PreAuthorize("hasAuthority('invoice:update') and " +
+              "@acl.can(authentication, 'INVOICE', #invoiceId, 'WRITE')")
+public void update(UUID invoiceId, UpdateInvoiceCommand command) {
+    // Chỉ chạy khi có cả capability và object scope.
+}
+```
 
-Custom domain ACL không dùng bitmask thường dễ hiểu hơn Spring Security ACL module khi:
+#### Không phải lúc nào cũng dùng phép AND
+
+Cách kết hợp phải phản ánh đúng business policy:
+
+| Policy | Công thức | Trường hợp phù hợp |
+|---|---|---|
+| ACL quyết định hoàn toàn | `ACL grant` | Chia sẻ file hoặc workspace |
+| Cả hai cùng bắt buộc | `RBAC capability AND ACL grant` | Tài chính, y tế, dữ liệu nhạy cảm |
+| Quyền toàn cục hoặc quyền được chia sẻ | `RBAC global permission OR ACL grant` | Admin đọc mọi object; user thường chỉ đọc object được share |
+
+Ví dụ admin có thể đọc tất cả document, còn user thường phải có ACE:
+
+```text
+ALLOW = hasAuthority('document:read-all') OR ACL READ
+```
+
+Việc một ACE dùng `ROLE:AUDITOR` làm subject cũng chưa có nghĩa hệ thống đang áp dụng công thức `RBAC AND ACL`. Trong trường hợp đó, role chỉ là một nhóm người nhận cùng ACE trên object. Chỉ khi application kiểm tra riêng capability của role rồi tiếp tục kiểm tra ACL, hai mô hình mới tạo thành hai lớp authorization.
+
+> [!IMPORTANT]
+> Không thêm RBAC chỉ vì đang dùng ACL. Hãy kết hợp khi business thực sự cần tách **“được làm loại việc gì”** khỏi **“được làm trên object nào”**, sau đó quy định rõ dùng `AND`, `OR` hay ACL độc lập.
+
+## 6. Tự triển khai domain ACL
+
+Một custom domain ACL phù hợp khi ứng dụng cần kiểm soát quyền trên từng object và muốn giữ schema cùng logic authorization sát với nghiệp vụ.
+
+Cách triển khai này thường dễ hiểu hơn Spring Security ACL module khi:
 
 - ID là UUID/string.
 - Permission theo domain như `APPROVE`, `EXPORT`, `COMMENT`.
@@ -921,30 +1051,9 @@ Các invariant cần bảo vệ:
 
 ## 7. Tối ưu ACL bằng bitmask
 
-Phần 6 đã triển khai ACL theo cách dễ hiểu nhất: mỗi permission là một ACE riêng. Khi số row trở thành vấn đề và tập permission đủ nhỏ, ổn định, có thể nén nhiều permission của cùng một subject-resource vào một bitmask.
+### 7.1. Giới hạn của mô hình mỗi permission một row
 
-Trước hết cần tách hai khái niệm:
-
-- **ACL** trả lời: subject nào có quyền gì trên resource nào.
-- **Bitmask** chỉ là cách nén nhiều permission của một ACL entry vào một số nguyên.
-
-Vì vậy, bitmask **không thay thế ACL**. Nó là một cách lưu trường `permissions` bên trong ACL.
-
-```text
-ACL entry
-├── resource: Document 42
-├── subject: alice
-└── permissions: READ + WRITE  ← có thể lưu bằng nhiều row hoặc một bitmask
-```
-
-> [!IMPORTANT]
-> Nếu schema “mỗi permission một row” đã đủ nhanh và dễ quản trị, không bắt buộc dùng bitmask. Chỉ dùng bitmask khi tập permission nhỏ, ổn định và lợi ích giảm số row thực sự đáng kể.
-
-**Vì sao không chỉ dùng ACL với mỗi permission một row?**
-
-Giả sử Alice có ba quyền trên document `42`: `READ`, `WRITE`, `DELETE`.
-
-Cách ACL mỗi permission một row:
+Schema ở phần 6 lưu một permission thành một row. Ví dụ Alice có `READ`, `WRITE` và `DELETE` trên document `42` thì cần ba row:
 
 ```text
 resource  resource_id  subject  permission
@@ -953,25 +1062,58 @@ DOCUMENT  42           alice    WRITE
 DOCUMENT  42           alice    DELETE
 ```
 
-Cách ACL dùng bitmask:
+Mô hình này rõ ràng, dễ query và dễ audit. Với đa số hệ thống, đây vẫn là lựa chọn nên bắt đầu.
+
+Giới hạn xuất hiện khi một cặp subject-resource thường có nhiều permission. Nếu hệ thống có 5 triệu cặp subject-resource và trung bình mỗi cặp có bốn permission, bảng ACL cần khoảng 20 triệu row. Số row tăng kéo theo:
+
+- Index lớn hơn và tốn thêm dung lượng lưu trữ.
+- Nhiều lần insert/delete hơn khi cấp hoặc thu hồi một nhóm quyền.
+- Nhiều row phải đọc và hợp nhất hơn khi cần tính toàn bộ quyền của một subject trên object.
+
+Đây chưa chắc là bottleneck. Database có index phù hợp vẫn có thể xử lý tốt. Chỉ nên đổi cách lưu sau khi đo query plan, latency, kích thước index và tốc độ grant/revoke trên dữ liệu gần với production.
+
+### 7.2. Bitmask giải quyết gì
+
+Bitmask gộp nhiều permission của cùng một cặp subject-resource vào một số nguyên:
 
 ```text
 resource  resource_id  subject  permission_mask
 DOCUMENT  42           alice    7
 ```
 
-Cả hai đều là ACL. Khác biệt chỉ nằm ở cách lưu tập permission:
+Trong ví dụ này, `7` biểu diễn `READ + WRITE + DELETE`. Ba row được rút xuống còn một row.
+
+Bitmask mang lại bốn lợi ích chính:
+
+- Giảm số row khi một subject có nhiều permission trên cùng resource.
+- Đọc toàn bộ tập permission bằng một giá trị.
+- Kiểm tra hoặc hợp nhất permission nhanh bằng phép toán `AND` và `OR`.
+- Có thể grant/revoke atomically bằng một câu `UPDATE`, tránh flow đọc rồi ghi lại giá trị cũ.
+
+Tuy nhiên, bitmask chỉ tối ưu **cách lưu và thao tác tập permission**. Nó không giải quyết việc tìm subject/role liên quan, thứ tự ưu tiên allow/deny, cache invalidation, audit hay query danh sách resource có phân quyền.
 
 | Tiêu chí | Mỗi permission một row | Bitmask trong một row |
 |---|---|---|
 | Dễ đọc trực tiếp trong DB | tốt | phải decode số |
 | Thêm permission động | dễ | bị giới hạn số bit |
 | Số row | nhiều hơn | ít hơn |
-| Kiểm tra permission | tìm row | phép toán bit rất nhanh |
+| Lấy toàn bộ quyền | đọc nhiều row | đọc một giá trị |
 | Audit từng lần grant | tự nhiên | cần audit table riêng |
 | Migration permission | đơn giản | phải giữ bit ổn định |
 
-Bitmask phù hợp khi một resource-subject có nhiều permission và permission ít thay đổi. Row-per-permission phù hợp khi cần tính linh hoạt và khả năng quan sát cao hơn.
+> [!IMPORTANT]
+> Nếu schema hiện tại đã đáp ứng latency và dung lượng, hãy giữ mô hình mỗi permission một row. Bitmask phù hợp khi tập permission nhỏ, ổn định và việc giảm số row mang lại lợi ích đã đo được.
+
+### 7.3. Triển khai permission mask
+
+Bitmask không thay thế ACL. Nó chỉ thay cách biểu diễn tập permission bên trong một ACL entry:
+
+```text
+ACL entry
+├── resource: Document 42
+├── subject: alice
+└── permissions: READ + WRITE  → lưu thành một permission mask
+```
 
 **Bước 1 — gán mỗi permission vào một bit**
 
