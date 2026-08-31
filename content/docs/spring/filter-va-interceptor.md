@@ -27,6 +27,7 @@ description: "Phân biệt Servlet Filter, Spring MVC HandlerInterceptor và AOP
 - [7. Đăng ký và sắp xếp HandlerInterceptor](#7-đăng-ký-và-sắp-xếp-handlerinterceptor)
 - [8. Ví dụ thực tế: correlation ID và request logging](#8-ví-dụ-thực-tế-correlation-id-và-request-logging)
 - [9. Authentication và authorization: đặt ở đâu?](#9-authentication-và-authorization-đặt-ở-đâu)
+  - [9.1. Vì sao không dùng HandlerInterceptor làm security chính?](#91-vì-sao-không-dùng-handlerinterceptor-làm-security-chính)
 - [10. CORS, exception và response: những ranh giới quan trọng](#10-cors-exception-và-response-những-ranh-giới-quan-trọng)
 - [11. Async request và ThreadLocal](#11-async-request-và-threadlocal)
 - [12. Reactive WebFlux: không dùng Servlet Filter](#12-reactive-webflux-không-dùng-servlet-filter)
@@ -616,6 +617,44 @@ SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         .build();
 }
 ```
+
+### 9.1. Vì sao không dùng `HandlerInterceptor` làm security chính?
+
+`HandlerInterceptor.preHandle()` **đúng là chạy trước controller method**. Vì vậy, về mặt kỹ thuật, interceptor có thể đọc JWT và đặt `Authentication` vào `SecurityContextHolder` để controller/service phía sau dùng được.
+
+```text
+HTTP request
+  → Servlet Filter chain
+  → Spring Security FilterChain
+  → DispatcherServlet bắt đầu xử lý
+  → HandlerMapping tìm handler
+  → HandlerInterceptor.preHandle()
+  → Controller method
+```
+
+Khác biệt không phải là “interceptor chạy sau controller”; nó chạy trước controller. Khác biệt là Spring Security cần chạy **trước toàn bộ Spring MVC pipeline**, còn interceptor chỉ chạy sau khi `DispatcherServlet` đã bắt đầu xử lý và tìm được một `HandlerExecutionChain`.
+
+| Yêu cầu của security | Vì sao Filter phù hợp hơn Interceptor |
+|---|---|
+| Chặn request trước MVC | Filter có thể trả `401`/`403` trước khi `DispatcherServlet` tìm handler. Interceptor chỉ chạy sau bước handler mapping. |
+| Bao phủ ở tầng Servlet | Filter áp dụng theo servlet mapping/dispatcher type và không phụ thuộc controller annotation. `HandlerInterceptor` chỉ áp dụng khi Spring MVC có handler phù hợp. |
+| Xử lý HTTP security | CORS preflight, CSRF, security headers, logout, request cache và session là concern của HTTP/Servlet request-response. |
+| Quản lý lifecycle context | Security filter bọc phần còn lại của chain bằng `try/finally`: load context, authenticate/authorize, sau đó clear context khi response hoàn tất để không rò rỉ sang thread pool request kế tiếp. |
+| Tích hợp cơ chế chuẩn | `AuthenticationEntryPoint`, `AccessDeniedHandler`, async context propagation và nhiều cơ chế OAuth2/session đã được Spring Security thiết kế trong filter chain. |
+
+Ví dụ một request không authenticated có thể bị dừng ngay ở filter:
+
+```text
+GET /admin/users
+  → AuthorizationFilter: chưa xác thực
+  → ExceptionTranslationFilter: trả 401 hoặc redirect login
+  → DispatcherServlet, HandlerInterceptor và Controller không chạy
+```
+
+Tự authenticate trong `HandlerInterceptor` không luôn sai. Nó có thể phù hợp với một kiểm tra **MVC-specific** sau khi identity đã được Spring Security thiết lập, chẳng hạn kiểm tra annotation endpoint hoặc dựng tenant context dựa trên route. Tuy nhiên, không nên dùng nó thay cho authentication, URL authorization, CSRF hoặc CORS của Spring Security.
+
+> [!IMPORTANT]
+> “Trước controller” chưa đủ để trở thành security boundary chính. Spring Security cần đứng ở **Servlet filter boundary**, tức trước `DispatcherServlet`, để toàn bộ MVC phía sau nhìn thấy `SecurityContext` đã được thiết lập và để request bị từ chối không cần đi vào MVC.
 
 `BearerTokenAuthenticationFilter` đọc token và tạo `Authentication`. `AuthorizationFilter` kiểm tra quyền trước khi DispatcherServlet chạy. Controller/interceptor sau đó có thể đọc principal từ `SecurityContextHolder`, nhưng không nên tự parse JWT lần nữa.
 

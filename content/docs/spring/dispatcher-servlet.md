@@ -1,6 +1,6 @@
 ---
 title: "DispatcherServlet trong Spring và Spring Boot"
-description: "Mổ xẻ DispatcherServlet, Front Controller pattern, HandlerMapping, HandlerAdapter, exception resolver, view/message conversion và cách Spring Boot tự động đăng ký, cấu hình servlet trung tâm của Spring MVC."
+description: "Bắt đầu từ Servlet API, giải thích vì sao Spring MVC chọn một DispatcherServlet thay vì nhiều servlet; sau đó mổ xẻ Front Controller, HandlerMapping, HandlerAdapter và Spring Boot auto-configuration."
 ---
 
 `DispatcherServlet` là servlet trung tâm của Spring MVC. Nó nhận request đã đi qua Servlet Filter chain, tìm controller phù hợp, điều phối xử lý, chuyển kết quả thành HTTP response và kết thúc request bằng exception resolver hoặc view rendering khi cần.
@@ -10,36 +10,122 @@ description: "Mổ xẻ DispatcherServlet, Front Controller pattern, HandlerMapp
 
 ## Mục lục
 
-- [1. DispatcherServlet giải quyết vấn đề gì?](#1-dispatcherservlet-giải-quyết-vấn-đề-gì)
-- [2. Vị trí trong kiến trúc Servlet](#2-vị-trí-trong-kiến-trúc-servlet)
-- [3. Front Controller pattern](#3-front-controller-pattern)
-- [4. DispatcherServlet khởi tạo như thế nào?](#4-dispatcherservlet-khởi-tạo-như-thế-nào)
-  - [4.1. Servlet container và ApplicationContext](#41-servlet-container-và-applicationcontext)
-  - [4.2. Chiến lược mặc định](#42-chiến-lược-mặc-định)
-- [5. Luồng doDispatch từng bước](#5-luồng-dodispatch-từng-bước)
-- [6. HandlerMapping: tìm controller cho request](#6-handlermapping-tìm-controller-cho-request)
-- [7. HandlerAdapter: gọi đúng loại handler](#7-handleradapter-gọi-đúng-loại-handler)
-- [8. HandlerInterceptor trong vòng đời DispatcherServlet](#8-handlerinterceptor-trong-vòng-đời-dispatcherservlet)
-- [9. Controller result: view, JSON và HTTP response](#9-controller-result-view-json-và-http-response)
-  - [9.1. ViewResolver](#91-viewresolver)
-  - [9.2. HttpMessageConverter](#92-httpmessageconverter)
-- [10. Exception handling: HandlerExceptionResolver](#10-exception-handling-handlerexceptionresolver)
-- [11. Multipart, locale, flash attribute và các strategy khác](#11-multipart-locale-flash-attribute-và-các-strategy-khác)
-- [12. Async MVC: dispatch không luôn kết thúc trên một thread](#12-async-mvc-dispatch-không-luôn-kết-thúc-trên-một-thread)
-- [13. Spring Boot auto-configure DispatcherServlet](#13-spring-boot-auto-configure-dispatcherservlet)
-  - [13.1. Điều kiện kích hoạt Web MVC](#131-điều-kiện-kích-hoạt-web-mvc)
-  - [13.2. DispatcherServletAutoConfiguration](#132-dispatcherservletautoconfiguration)
-  - [13.3. WebMvcAutoConfiguration](#133-webmvcautoconfiguration)
-- [14. Cấu hình trong Spring Boot](#14-cấu-hình-trong-spring-boot)
-- [15. Debugging và observability](#15-debugging-và-observability)
-- [16. Anti-patterns và cạm bẫy](#16-anti-patterns-và-cạm-bẫy)
-- [17. Tóm tắt](#17-tóm-tắt)
+- [1. Servlet là gì?](#1-servlet-là-gì)
+  - [1.1. Servlet lifecycle và URL mapping](#11-servlet-lifecycle-và-url-mapping)
+  - [1.2. Vì sao không tạo một servlet cho mỗi nhóm URL?](#12-vì-sao-không-tạo-một-servlet-cho-mỗi-nhóm-url)
+- [2. Vì sao Spring dùng DispatcherServlet?](#2-vì-sao-spring-dùng-dispatcherservlet)
+- [3. Vị trí trong kiến trúc Servlet](#3-vị-trí-trong-kiến-trúc-servlet)
+- [4. Front Controller pattern](#4-front-controller-pattern)
+- [5. DispatcherServlet khởi tạo như thế nào?](#5-dispatcherservlet-khởi-tạo-như-thế-nào)
+  - [5.1. Servlet container và ApplicationContext](#51-servlet-container-và-applicationcontext)
+  - [5.2. Chiến lược mặc định](#52-chiến-lược-mặc-định)
+- [6. Luồng doDispatch từng bước](#6-luồng-dodispatch-từng-bước)
+- [7. HandlerMapping: tìm controller cho request](#7-handlermapping-tìm-controller-cho-request)
+- [8. HandlerAdapter: gọi đúng loại handler](#8-handleradapter-gọi-đúng-loại-handler)
+- [9. HandlerInterceptor trong vòng đời DispatcherServlet](#9-handlerinterceptor-trong-vòng-đời-dispatcherservlet)
+- [10. Controller result: view, JSON và HTTP response](#10-controller-result-view-json-và-http-response)
+  - [10.1. ViewResolver](#101-viewresolver)
+  - [10.2. HttpMessageConverter](#102-httpmessageconverter)
+- [11. Exception handling: HandlerExceptionResolver](#11-exception-handling-handlerexceptionresolver)
+- [12. Multipart, locale, flash attribute và các strategy khác](#12-multipart-locale-flash-attribute-và-các-strategy-khác)
+- [13. Async MVC: dispatch không luôn kết thúc trên một thread](#13-async-mvc-dispatch-không-luôn-kết-thúc-trên-một-thread)
+- [14. Spring Boot auto-configure DispatcherServlet](#14-spring-boot-auto-configure-dispatcherservlet)
+  - [14.1. Điều kiện kích hoạt Web MVC](#141-điều-kiện-kích-hoạt-web-mvc)
+  - [14.2. DispatcherServletAutoConfiguration](#142-dispatcherservletautoconfiguration)
+  - [14.3. WebMvcAutoConfiguration](#143-webmvcautoconfiguration)
+- [15. Cấu hình trong Spring Boot](#15-cấu-hình-trong-spring-boot)
+- [16. Debugging và observability](#16-debugging-và-observability)
+- [17. Anti-patterns và cạm bẫy](#17-anti-patterns-và-cạm-bẫy)
+- [18. Tóm tắt](#18-tóm-tắt)
 
 ---
 
-## 1. DispatcherServlet giải quyết vấn đề gì?
+## 1. Servlet là gì?
 
-Không có `DispatcherServlet`, mỗi servlet tự xử lý URL mapping, parse request, gọi code nghiệp vụ, format response và xử lý lỗi. Logic dùng chung bị lặp lại ở nhiều servlet.
+**Servlet** là một Java component theo Jakarta Servlet API. Servlet container — Tomcat, Jetty hoặc Undertow — quản lý lifecycle của component này và gọi nó khi một HTTP request match URL mapping đã đăng ký.
+
+Một servlet HTTP thường kế thừa `HttpServlet` và override `doGet`, `doPost` hoặc các method HTTP tương ứng:
+
+```java
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+@WebServlet("/orders/*")
+public class OrdersServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(
+            HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        response.setContentType("application/json");
+        response.getWriter().write("{\"message\":\"orders\"}");
+    }
+}
+```
+
+Servlet không tự mở port hay đọc socket. Container làm việc đó, tạo `HttpServletRequest`/`HttpServletResponse`, chạy filter chain, chọn servlet theo URL mapping rồi gọi servlet.
+
+### 1.1. Servlet lifecycle và URL mapping
+
+Container quản lý lifecycle này:
+
+```text
+Application startup
+  → tạo servlet instance
+  → init(ServletConfig)        // một lần
+
+Mỗi HTTP request match mapping
+  → service(request, response)
+  → HttpServlet phân nhánh tới doGet/doPost/doPut/...
+
+Application shutdown
+  → destroy()                  // một lần
+```
+
+Một servlet instance thường phục vụ nhiều request đồng thời trên nhiều container thread. Vì vậy không lưu state theo request vào instance field:
+
+```java
+// ❌ Sai: field bị chia sẻ giữa các request/thread
+public class OrdersServlet extends HttpServlet {
+    private String currentOrderId;
+}
+
+// ✅ Đúng: dùng local variable, request attribute hoặc service stateless
+protected void doGet(HttpServletRequest request, HttpServletResponse response) {
+    String orderId = request.getPathInfo();
+}
+```
+
+Servlet mapping có độ ưu tiên. Mapping chính xác hoặc dài hơn thường được container chọn trước mapping tổng quát. Một app có thể đăng ký nhiều servlet; ví dụ một servlet legacy ở `/legacy/*` vẫn có thể cùng tồn tại với `DispatcherServlet` ở `/`.
+
+### 1.2. Vì sao không tạo một servlet cho mỗi nhóm URL?
+
+Hoàn toàn **có thể** viết nhiều servlet:
+
+```text
+/orders/*   → OrdersServlet
+/users/*    → UsersServlet
+/payments/* → PaymentsServlet
+```
+
+Đây là cách hợp lý với ứng dụng Servlet nhỏ hoặc endpoint có protocol đặc biệt. Nhưng khi application tăng lên, mỗi servlet phải tự lặp lại hoặc tự xây framework riêng cho các concern giống nhau:
+
+| Concern bị lặp ở nhiều servlet | Nếu mỗi servlet tự làm |
+|---|---|
+| Routing bên trong `/orders/*` | Tự parse path/method, viết `if`/`switch` |
+| Parse JSON và serialize response | Tự dùng `ObjectMapper`, set content type/status |
+| Bind và validate input | Tự đọc parameter/body, tự tạo error format |
+| Exception handling | Mỗi servlet tự try/catch hoặc response không nhất quán |
+| Interceptor/audit/locale | Tự gọi ở từng servlet hoặc tạo code chung phức tạp |
+| View rendering/content negotiation | Tự quyết định HTML/JSON và template engine |
+
+Vấn đề không phải “nhiều servlet làm chậm hơn”. Vấn đề là **các HTTP concern bị phân mảnh và lặp lại**. Một framework web cần một pipeline chung, nhưng vẫn phải cho mỗi endpoint định nghĩa URL, method, input và output một cách nhỏ gọn.
+
+## 2. Vì sao Spring dùng DispatcherServlet?
+
+Spring MVC chọn một servlet trung tâm tên `DispatcherServlet`. Nó nhận request MVC rồi phân phối tới nhiều controller method. Nhờ vậy Spring tập trung routing, binding, validation, exception handling và rendering vào một pipeline có thể mở rộng, thay vì buộc mỗi `OrdersServlet`, `UsersServlet` tự hiện thực các concern này.
 
 `DispatcherServlet` áp dụng **Front Controller pattern**: một entry point chung nhận tất cả request MVC, sau đó delegate cho các strategy chuyên trách.
 
@@ -59,7 +145,7 @@ Có DispatcherServlet:
 
 Lợi ích không nằm ở việc mọi endpoint dùng một class duy nhất. Lợi ích là framework có một pipeline nhất quán cho routing, binding, validation, authentication context, error response, locale và rendering.
 
-## 2. Vị trí trong kiến trúc Servlet
+## 3. Vị trí trong kiến trúc Servlet
 
 Trong Spring Boot Servlet application, embedded Tomcat/Jetty/Undertow là Servlet container. Nó lắng nghe HTTP port, tạo `HttpServletRequest`/`HttpServletResponse`, chạy filter chain rồi chọn servlet theo URL mapping.
 
@@ -83,7 +169,7 @@ Mapping mặc định của Boot thường là `/`, nghĩa là `DispatcherServle
 > [!NOTE]
 > Filter chạy **trước** DispatcherServlet. Vì vậy Spring Security, CORS filter, correlation ID filter hoặc compression filter có thể dừng request trước khi controller được chọn. `HandlerInterceptor` chạy muộn hơn, bên trong DispatcherServlet sau bước handler mapping.
 
-## 3. Front Controller pattern
+## 4. Front Controller pattern
 
 `DispatcherServlet` không hard-code rằng mọi handler phải là `@GetMapping` controller. Nó phối hợp các interface strategy:
 
@@ -116,7 +202,7 @@ class OrderController {
 - `RequestMappingHandlerAdapter` resolve `@PathVariable Long id` và invoke Java method.
 - `RequestResponseBodyMethodProcessor` chọn Jackson message converter để ghi `OrderResponse` thành JSON.
 
-## 4. DispatcherServlet khởi tạo như thế nào?
+## 5. DispatcherServlet khởi tạo như thế nào?
 
 `DispatcherServlet` kế thừa `FrameworkServlet`, rồi kế thừa `HttpServlet`. Container gọi lifecycle Servlet chuẩn: tạo instance, gọi `init()`, sau đó gọi `service()` cho từng request.
 
@@ -127,7 +213,7 @@ HttpServlet
               └── DispatcherServlet
 ```
 
-### 4.1. Servlet container và ApplicationContext
+### 5.1. Servlet container và ApplicationContext
 
 Trong ứng dụng Spring MVC truyền thống, có thể có hai context:
 
@@ -145,7 +231,7 @@ Context con nhìn thấy bean của parent, nhưng parent không nhìn thấy be
 
 Trong Spring Boot hiện đại, phần lớn ứng dụng dùng một `ApplicationContext` duy nhất. Boot đăng ký `DispatcherServlet` như bean và map nó vào embedded container. Bạn vẫn có thể tạo servlet/context riêng, nhưng đó là trường hợp nâng cao.
 
-### 4.2. Chiến lược mặc định
+### 5.2. Chiến lược mặc định
 
 Khi `DispatcherServlet` refresh context, `onRefresh()` gọi `initStrategies()` để khởi tạo các strategy:
 
@@ -172,7 +258,7 @@ Nguyên tắc lookup:
 
 Đừng tạo một bean `HandlerMapping` hoặc `HandlerAdapter` chỉ để “thử”. Thêm strategy có thể thay đổi routing toàn hệ thống, đặc biệt khi order của mapping mới cao hơn mapping hiện có.
 
-## 5. Luồng doDispatch từng bước
+## 6. Luồng doDispatch từng bước
 
 `DispatcherServlet.doService()` chuẩn bị request attributes, sau đó gọi `doDispatch()`. Đây là lõi của Spring MVC request handling.
 
@@ -260,7 +346,7 @@ sequenceDiagram
 
 Điểm quan trọng: controller không tự quyết định tất cả. Handler adapter xử lý argument resolution, data binding, validation và return value handling trước khi DispatcherServlet render hoặc hoàn tất response.
 
-## 6. HandlerMapping: tìm controller cho request
+## 7. HandlerMapping: tìm controller cho request
 
 `HandlerMapping` nhận `HttpServletRequest` và trả về `HandlerExecutionChain`: handler cộng các interceptor áp dụng.
 
@@ -315,7 +401,7 @@ Nếu nhiều mapping match, Spring chọn mapping “cụ thể” hơn. Hai ma
 
 **Thứ tự HandlerMapping rất quan trọng.** DispatcherServlet duyệt theo order và dùng mapping đầu tiên trả về handler. Một mapping custom có order quá cao có thể “cướp” request khỏi annotation controller hoặc static resource handler.
 
-## 7. HandlerAdapter: gọi đúng loại handler
+## 8. HandlerAdapter: gọi đúng loại handler
 
 Sau khi có handler object, DispatcherServlet không gọi trực tiếp vì handler có thể có nhiều dạng. `HandlerAdapter` quyết định nó hỗ trợ handler nào và cách invoke.
 
@@ -371,7 +457,7 @@ ResponseEntity<OrderResponse> create(
 > [!TIP]
 > Controller nên mô tả HTTP contract, không chứa logic parse JSON, tự gọi Jackson hay tự kiểm tra từng field thủ công. Argument resolver, validation và converter đã xử lý các concern đó trong pipeline chuẩn.
 
-## 8. HandlerInterceptor trong vòng đời DispatcherServlet
+## 9. HandlerInterceptor trong vòng đời DispatcherServlet
 
 `HandlerInterceptor` là một phần của `HandlerExecutionChain`, không phải một filter container.
 
@@ -426,11 +512,11 @@ class MvcConfig implements WebMvcConfigurer {
 
 `postHandle()` không đáng tin để sửa REST JSON body. Với `@ResponseBody`, body có thể được ghi trước callback này. Nếu cần chuẩn hoá response JSON, cân nhắc `ResponseBodyAdvice`; nếu cần lỗi HTTP nhất quán, dùng `@RestControllerAdvice`.
 
-## 9. Controller result: view, JSON và HTTP response
+## 10. Controller result: view, JSON và HTTP response
 
 Controller method có thể trả về logical view, `ModelAndView`, Java object cho response body, `ResponseEntity`, hoặc không trả gì. Handler adapter/return value handler chuyển các kiểu này vào bước render phù hợp.
 
-### 9.1. ViewResolver
+### 10.1. ViewResolver
 
 Ứng dụng server-side rendering có thể trả về view name:
 
@@ -463,7 +549,7 @@ HTML response
 
 `InternalResourceViewResolver` thường map view name tới JSP path. Khi dùng Thymeleaf, starter/configuration cung cấp resolver/template engine tương ứng. Spring Boot có thể auto-configure các integration này khi dependency xuất hiện trên classpath.
 
-### 9.2. HttpMessageConverter
+### 10.2. HttpMessageConverter
 
 REST controller thường dùng `@ResponseBody` ngầm qua `@RestController`:
 
@@ -507,7 +593,7 @@ Content-Type: application/json
 > [!WARNING]
 > Không dùng `ObjectMapper` trực tiếp trong từng controller để viết JSON vào `HttpServletResponse`. Bạn sẽ bỏ qua content negotiation, standard error handling và phần lớn cơ chế message converter của framework.
 
-## 10. Exception handling: HandlerExceptionResolver
+## 11. Exception handling: HandlerExceptionResolver
 
 Khi handler hoặc handler adapter ném exception, DispatcherServlet gọi `processHandlerException()` và duyệt `HandlerExceptionResolver` theo order.
 
@@ -562,7 +648,7 @@ Nếu không resolver nào xử lý exception, exception thoát về servlet con
 > [!IMPORTANT]
 > `@ControllerAdvice` xử lý exception trong DispatcherServlet flow. Nó không phải catch-all cho exception ném bởi servlet filter nằm trước DispatcherServlet. Security filter có cơ chế riêng: `ExceptionTranslationFilter`, `AuthenticationEntryPoint` và `AccessDeniedHandler`.
 
-## 11. Multipart, locale, flash attribute và các strategy khác
+## 12. Multipart, locale, flash attribute và các strategy khác
 
 ### MultipartResolver
 
@@ -607,7 +693,7 @@ String create(CreateOrderForm form, RedirectAttributes redirectAttributes) {
 
 Các strategy này tồn tại để controller tập trung vào endpoint contract thay vì tự parse multipart, locale hoặc session detail.
 
-## 12. Async MVC: dispatch không luôn kết thúc trên một thread
+## 13. Async MVC: dispatch không luôn kết thúc trên một thread
 
 Servlet MVC hỗ trợ async qua `Callable`, `DeferredResult`, `WebAsyncTask`, `ResponseBodyEmitter` và `SseEmitter`.
 
@@ -644,11 +730,11 @@ Do đó không giữ request context quan trọng chỉ trong `ThreadLocal` mà 
 > [!WARNING]
 > Async không làm CPU-bound code nhanh hơn. Nó giúp giải phóng servlet thread khi chờ I/O hoặc work async. Nếu executor không được cấu hình giới hạn, async có thể chỉ chuyển vấn đề từ Tomcat thread pool sang một pool vô hạn/đầy queue khác.
 
-## 13. Spring Boot auto-configure DispatcherServlet
+## 14. Spring Boot auto-configure DispatcherServlet
 
 Spring Framework cung cấp DispatcherServlet và MVC infrastructure. Spring Boot quyết định khi nào tạo, đăng ký vào embedded container, thêm default MVC configuration và bind properties.
 
-### 13.1. Điều kiện kích hoạt Web MVC
+### 14.1. Điều kiện kích hoạt Web MVC
 
 `WebMvcAutoConfiguration` chỉ áp dụng khi app là Servlet web application và các class Spring MVC có trên classpath. `spring-boot-starter-web` thường kéo theo mọi dependency cần thiết:
 
@@ -663,7 +749,7 @@ spring-boot-starter-web
 
 Khi cả `spring-boot-starter-web` và `spring-boot-starter-webflux` cùng tồn tại, Boot thường ưu tiên Servlet MVC nếu Servlet API có mặt. Đừng đưa cả hai starter vào classpath trừ khi bạn thực sự hiểu loại application cần chạy.
 
-### 13.2. DispatcherServletAutoConfiguration
+### 14.2. DispatcherServletAutoConfiguration
 
 Về mặt khái niệm, auto-configuration làm ba việc:
 
@@ -699,7 +785,7 @@ public class DispatcherServletAutoConfiguration {
 
 Tên mặc định bean/servlet là `dispatcherServlet`. Mapping mặc định thường là `/`.
 
-### 13.3. WebMvcAutoConfiguration
+### 14.3. WebMvcAutoConfiguration
 
 `DispatcherServletAutoConfiguration` đăng ký servlet. `WebMvcAutoConfiguration` cấu hình **MVC infrastructure** xung quanh servlet, ví dụ:
 
@@ -716,7 +802,7 @@ Boot dùng triết lý **convention over configuration**: JSON converter xuất 
 > [!TIP]
 > Muốn **thêm** interceptor, formatter hoặc converter, implement `WebMvcConfigurer`. Không thêm `@EnableWebMvc` chỉ để làm việc đó. `@EnableWebMvc` chuyển sang “full control” và khiến nhiều auto-config MVC mặc định của Boot back off.
 
-## 14. Cấu hình trong Spring Boot
+## 15. Cấu hình trong Spring Boot
 
 Các property phổ biến:
 
@@ -776,7 +862,7 @@ class MvcConfiguration implements WebMvcConfigurer {
 class FullMvcConfiguration implements WebMvcConfigurer { }
 ```
 
-## 15. Debugging và observability
+## 16. Debugging và observability
 
 Khi endpoint trả 404, 405, 406 hoặc controller “không chạy”, debug theo pipeline thay vì đoán.
 
@@ -821,7 +907,7 @@ Có thể đặt breakpoint theo thứ tự:
 
 Không debug production bằng cách log toàn bộ request body/token. Dùng correlation ID, structured logging, access log và metrics để liên kết request một cách an toàn.
 
-## 16. Anti-patterns và cạm bẫy
+## 17. Anti-patterns và cạm bẫy
 
 | Anti-pattern | Hậu quả | Cách làm đúng |
 |---|---|---|
@@ -836,7 +922,7 @@ Không debug production bằng cách log toàn bộ request body/token. Dùng co
 | Quên async lifecycle | MDC/tenant context rò rỉ hoặc biến mất ở worker thread | Dùng async interceptor, task decorator, `finally` cleanup |
 | Để exception từ filter mong `@ControllerAdvice` bắt | Error format không nhất quán | Xử lý tại filter/security layer hoặc delegate đúng mechanism |
 
-## 17. Tóm tắt
+## 18. Tóm tắt
 
 ```text
 1. Servlet container nhận HTTP request.
