@@ -14,6 +14,12 @@ JVM là runtime thực thi Java bytecode và cung cấp các dịch vụ như qu
 - [Runtime Data Areas — memory layout](#5-runtime-data-areas--memory-layout)
 - [Bytecode — instruction set cơ bản](#6-bytecode--instruction-set-cơ-bản)
 - [Execution Engine — Interpreter → JIT](#7-execution-engine--interpreter--jit)
+  - [7.1. Ba loại code: source, bytecode và native machine code](#71-ba-loại-code-source-bytecode-và-native-machine-code)
+  - [7.2. Interpreter: cái gì được thông dịch, chạy khi nào?](#72-interpreter-cái-gì-được-thông-dịch-chạy-khi-nào)
+  - [7.3. JIT: cái gì được biên dịch, chạy khi nào?](#73-jit-cái-gì-được-biên-dịch-chạy-khi-nào)
+  - [7.4. Một method đi qua các trạng thái nào?](#74-một-method-đi-qua-các-trạng-thái-nào)
+  - [7.5. Method, loop và native method: trường hợp nào khác?](#75-method-loop-và-native-method-trường-hợp-nào-khác)
+  - [7.6. Tại sao JIT có thể nhanh hơn AOT?](#76-tại-sao-jit-có-thể-nhanh-hơn-aot)
 - [Tiered Compilation — C1 & C2 pipeline](#8-tiered-compilation--c1--c2-pipeline)
 - [Method Dispatch — virtual, interface, dynamic](#9-method-dispatch--virtual-interface-dynamic)
 - [Inlining — optimisation quan trọng nhất](#10-inlining--optimisation-quan-trọng-nhất)
@@ -276,35 +282,176 @@ String greet(String name) {
 
 ## 7. Execution Engine — Interpreter → JIT
 
-### 7.1. Interpreter
+`Execution Engine` là phần HotSpot thực thi **bytecode đã được load**, chứ không đọc trực tiếp file `.java`. Nó có hai đường chính:
 
-Đọc bytecode → decode → execute từng instruction. **Chậm** (switch-case dispatch) nhưng:
-- Bắt đầu **ngay lập tức** (không cần compile time)
-- Thu thập **profiling data** (method call count, branch frequencies)
+- **Interpreter**: thông dịch bytecode từng instruction khi code còn mới hoặc không đủ nóng.
+- **JIT compiler** (*Just-In-Time*): biên dịch bytecode của method/loop nóng thành machine code đúng kiến trúc CPU hiện tại; CPU chạy machine code đó trực tiếp.
 
-### 7.2. JIT Compiler (Just-In-Time)
+Một ứng dụng bình thường dùng **cả hai**, không phải chọn một trong hai cho toàn bộ chương trình.
 
-Khi method được gọi đủ nhiều (**hot**) → JIT compile thành **native machine code**:
+### 7.1. Ba loại code: source, bytecode và native machine code
 
+Cần tách ba lần “biên dịch/thực thi” thường bị gọi lẫn là “Java được compile”.
+
+```text
+.java source
+  └─ javac (khi build; trước lúc application chạy)
+       └─ .class bytecode
+            └─ HotSpot Interpreter (lúc runtime; từng bytecode instruction)
+                 hoặc
+            └─ HotSpot JIT C1/C2 (lúc runtime; chỉ code nóng)
+                 └─ native machine code trong Code Cache
+                      └─ CPU thực thi trực tiếp
 ```
-Invocation Counter >= CompileThreshold (default: 10,000)
-   → Trigger compilation
-   → Native code lưu vào Code Cache
-   → Subsequent calls → execute native code trực tiếp
+
+| Thành phần | Input → Output | Khi chạy | Có làm cho mọi method không? |
+|---|---|---|---|
+| `javac` | Java source → JVM bytecode | Build/CI, trước khi chạy app | Có, với source được build |
+| **Interpreter** | Đọc và thực hiện bytecode | Runtime, khi method được gọi | Có thể; cold method thường chỉ đi đường này |
+| **JIT** (`C1`/`C2`) | Bytecode → native machine code | Runtime, sau khi JVM thấy code hot | Không; chỉ compile method hoặc loop đáng đầu tư |
+| CPU | Machine code → thao tác phần cứng | Runtime | Chỉ chạy native code: JIT code, JVM runtime và JNI |
+
+Ví dụ code Java:
+
+```java
+static int add(int a, int b) {
+    return a + b;
+}
 ```
 
-### 7.3. Tại sao JIT có thể nhanh hơn AOT?
+Sau `javac`, JVM nhận bytecode gần như sau:
+
+```text
+iload_0       // lấy a, đẩy vào operand stack
+iload_1       // lấy b, đẩy vào operand stack
+iadd          // cộng hai int
+ireturn       // trả kết quả
+```
+
+- Nếu `add` còn cold, **interpreter** lần lượt xử lý `iload_0`, `iload_1`, `iadd`, `ireturn` mỗi lần gọi.
+- Nếu `add` hot, **JIT** biến cả chuỗi bytecode thành vài native CPU instruction, đại ý `add registerA, registerB; return`. Những lần gọi sau nhảy vào native code đó thay vì quay lại dispatch từng bytecode instruction.
+
+> [!NOTE]
+> “Java là interpreted” và “Java là compiled” đều đúng nhưng đang nói về hai tầng khác nhau: `javac` compile **source → bytecode** trước runtime; HotSpot interpreter/JIT xử lý **bytecode → kết quả** lúc runtime.
+
+### 7.2. Interpreter: cái gì được thông dịch, chạy khi nào?
+
+Interpreter thông dịch **JVM bytecode**, không thông dịch Java source. Khi thread gọi một Java method chưa có native code JIT phù hợp, nó thường vào interpreter trước. Interpreter đọc bytecode theo program counter (PC), thực hiện semantics của instruction, rồi chuyển PC sang instruction tiếp theo.
+
+```text
+Lần đầu gọi OrderService.calculateTotal()
+  → JVM có bytecode của method
+  → chưa có JIT native code trong Code Cache
+  → interpreter chạy bytecode instruction-by-instruction
+  → đồng thời cập nhật profile/counter cho call site, branch và type thực tế
+```
+
+Interpreter chậm hơn native code vì mỗi bytecode instruction phải qua một lớp dispatch/runtime work của JVM. Đổi lại, nó có các lợi ích quan trọng:
+
+1. **Startup nhanh**: application chạy ngay, không phải chờ compile hàng nghìn method mà có thể chẳng bao giờ dùng.
+2. **Không tốn Code Cache cho code lạnh**: error handler hoặc endpoint hiếm gọi không cần native code riêng.
+3. **Tạo dữ liệu để JIT quyết định**: JVM biết method nào gọi nhiều, nhánh `if` nào thường xảy ra và ở một virtual call site thường gặp class nào.
+
+Một cold method có thể **luôn** được thông dịch trong cả vòng đời process. JVM không có yêu cầu phải JIT compile mọi bytecode.
+
+### 7.3. JIT: cái gì được biên dịch, chạy khi nào?
+
+JIT không biên dịch lại `.java` source. Nó lấy bytecode của một **method nóng** hoặc một **loop nóng** đã được interpreter/C1 profile rồi biên dịch thành native machine code cho CPU đang chạy process, ví dụ x86-64 hoặc AArch64. Native code được giữ trong **Code Cache**.
+
+```text
+Method/loop đủ hot
+  → JVM xếp compilation task cho compiler thread
+  → application thread vẫn tiếp tục chạy bản interpreter hoặc bản C1 hiện có
+  → C1/C2 compile xong và JVM cài native code vào Code Cache
+  → lần gọi/back-edge kế tiếp phù hợp sẽ thực thi native code
+```
+
+Điểm cuối rất quan trọng: JIT compilation thường chạy trên **compiler thread nền**. Request/thread gọi method không đứng yên chờ C2 compile xong; nó tiếp tục chạy phiên bản hiện tại. Khi bản native được cài xong, JVM chuyển execution sang bản mới ở điểm vào an toàn.
+
+JVM đánh giá “hot” bằng nhiều tín hiệu, chủ yếu là:
+
+- **Invocation counter**: số lần method được gọi.
+- **Back-edge counter**: số lần nhảy ngược ở cuối loop; loop dài trong một lần gọi cũng có thể hot dù method không được gọi nhiều.
+- **Profile**: type receiver tại virtual call, tần suất branch, exception path, allocation pattern.
+
+Không nên coi `-XX:CompileThreshold=10000` là luật cố định “đúng 10.000 lần sẽ compile”. Với tiered compilation mặc định, ngưỡng và quyết định compile thay đổi theo level, tốc độ tăng counter, compiler queue, CPU và profile của process. `10.000` chỉ là một ví dụ trực giác cho cơ chế đếm của HotSpot trong một số cấu hình.
+
+### 7.4. Một method đi qua các trạng thái nào?
+
+Với tiered compilation mặc định, lifecycle điển hình của hot method là:
+
+```text
+(1) Class được load; method có bytecode
+             │
+             ▼
+(2) Interpreter chạy các lần gọi đầu
+    └─ thu thập counter/profile
+             │
+             ├── vẫn cold ───────────────► tiếp tục interpreter
+             │
+             ▼
+(3) C1 compile nhanh (thường level 1–3)
+    └─ native code tối ưu cơ bản; có thể tiếp tục thu profile
+             │
+             ▼
+(4) C2 compile chậm hơn (level 4)
+    └─ native code tối ưu mạnh theo profile
+             │
+             ├── assumption còn đúng ───► tiếp tục chạy C2 code
+             │
+             └── assumption sai ────────► deoptimization → interpreter/C1 → có thể recompile
+```
+
+Ví dụ một API chạy lâu:
+
+```java
+long sumPrices(List<Order> orders) {
+    long total = 0;
+    for (Order order : orders) {
+        total += order.priceInCents();
+    }
+    return total;
+}
+```
+
+- Vài request đầu: interpreter chạy bytecode của `sumPrices` và `priceInCents`.
+- Khi traffic tăng: C1 có thể compile nhanh `sumPrices` để giảm overhead trong lúc tiếp tục đo profile.
+- Nếu hầu hết phần tử thực tế đều là `StandardOrder`: C2 có thể inline `StandardOrder.priceInCents()`, tối ưu loop và loại bỏ các kiểm tra đã chứng minh là dư thừa.
+- Nếu sau đó xuất hiện nhiều implementation `Order` khác: giả định type không còn đúng; JVM có thể deoptimize rồi compile lại phương án tổng quát hơn.
+
+Do đó, **cùng một method có thể được thực thi bằng interpreter, C1 native code hoặc C2 native code ở các thời điểm khác nhau trong cùng một process**.
+
+### 7.5. Method, loop và native method: trường hợp nào khác?
+
+**Loop nóng có thể được compile khi method đang chạy.** Nếu một method được gọi một lần nhưng có loop chạy hàng triệu vòng, back-edge counter có thể kích hoạt **On-Stack Replacement (OSR)**. JVM biên dịch loop, rồi chuyển frame đang chạy từ interpreter sang native code ở một iteration an toàn thay vì đợi method return và được gọi lại.
+
+```java
+void importRows(List<Row> rows) {
+    for (Row row : rows) { // có thể OSR nếu loop rất dài
+        process(row);
+    }
+}
+```
+
+**Native method** là trường hợp khác với JIT. Method khai báo `native`, ví dụ một phần của `System.arraycopy` hoặc JNI library, đã là mã native do JVM/JDK/library cung cấp (C/C++/assembly hoặc tương đương). JVM không thông dịch bytecode của thân method đó vì không có thân bytecode Java để thông dịch. JIT có thể tối ưu *call site* quanh native method trong một số trường hợp, nhưng không JIT-compile implementation native bên ngoài như một Java method.
+
+```text
+Java method bình thường: bytecode → interpreter hoặc JIT → native code
+native method / JNI:     Java call boundary → native library/JVM runtime code
+```
+
+### 7.6. Tại sao JIT có thể nhanh hơn AOT?
 
 | JIT advantage | Lý do |
 |---------------|-------|
 | **Profile-guided optimization** | Biết branch nào hay taken → optimize hot path |
 | **Speculative optimization** | Inline virtual method nếu chỉ 1 implementation loaded |
-| **Escape analysis** | Object không escape method → allocate trên stack (không GC) |
-| **Loop optimization** | Unroll loop theo actual iteration count |
-| **Dead code elimination** | Runtime biết branch nào never taken |
+| **Escape analysis** | Object không escape method → có thể loại allocation hoặc scalar-replace; không mặc định đồng nghĩa “allocate trên stack” |
+| **Loop optimization** | Unroll/vectorize loop dựa trên profile và CPU feature hiện có |
+| **Dead code elimination** | Runtime biết một số branch/type không xảy ra ở hot path |
 
 > [!IMPORTANT]
-> JIT = **adaptive optimization**: tối ưu dựa trên **actual runtime behavior** chứ không phải static analysis. Đó là lý do warm JVM nhanh hơn cả C++ trong nhiều benchmark (speculative inlining, devirtualization).
+> JIT là **adaptive optimization**: tối ưu dựa trên hành vi runtime thực tế, rồi có thể deoptimize khi giả định không còn đúng. Lợi ích này thường giúp JVM đạt peak throughput rất cao sau warm-up; không có nghĩa JVM luôn nhanh hơn C++ trong mọi benchmark.
 
 ---
 
