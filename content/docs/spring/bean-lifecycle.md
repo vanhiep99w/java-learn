@@ -8,7 +8,9 @@ Spring Bean Lifecycle mô tả các giai đoạn từ lúc container đọc bean
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
-- [Lifecycle tổng quan — 11 bước từ definition đến destruction](#2-lifecycle-tổng-quan--11-bước-từ-definition-đến-destruction)
+- [Lifecycle tổng quan — hai cách nhìn](#2-lifecycle-tổng-quan--hai-cách-nhìn)
+  - [Lifecycle rút gọn của một bean](#21-lifecycle-rút-gọn-của-một-bean)
+  - [Luồng đầy đủ: container preparation + bean lifecycle](#22-luồng-đầy-đủ-container-preparation--bean-lifecycle)
 - [BeanDefinition — metadata trước khi bean tồn tại](#3-beandefinition--metadata-trước-khi-bean-tồn-tại)
 - [BeanFactoryPostProcessor — sửa definition trước instantiation](#4-beanfactorypostprocessor--sửa-definition-trước-instantiation)
 - [Instantiation & Dependency Injection](#5-instantiation--dependency-injection)
@@ -30,27 +32,64 @@ Trong quá trình khởi tạo, bean đi qua constructor, dependency injection, 
 
 Hiểu lifecycle giúp chọn đúng extension point và giải thích các lỗi liên quan đến `@PostConstruct`, circular dependency, AOP proxy và cleanup tài nguyên.
 
-## 2. Lifecycle tổng quan — 11 bước từ definition đến destruction
+## 2. Lifecycle tổng quan — hai cách nhìn
+
+Cụm “Spring Bean Lifecycle” có thể được mô tả theo hai mức độ. Cả hai đều đúng, nhưng chúng trả lời hai câu hỏi khác nhau:
+
+- **Lifecycle rút gọn** trả lời: *một bean object đi qua các pha nào sau khi Spring bắt đầu tạo nó?*
+- **Luồng đầy đủ** trả lời: *ApplicationContext chuẩn bị metadata thế nào, rồi tạo, khởi tạo, dùng và hủy bean ra sao?*
+
+Các bước `BeanDefinition Loading` và `BeanFactoryPostProcessor` thuộc quá trình chuẩn bị của container. Chúng chạy **trước khi instance của bean tồn tại**, vì vậy không nằm trong phiên bản rút gọn của lifecycle một bean.
+
+### 2.1. Lifecycle rút gọn của một bean
+
+Đây là câu trả lời nên dùng trong phỏng vấn hoặc khi cần một mental model ngắn gọn:
+
+```text
+Instantiate → Populate → Initialize → Use → Destroy
+```
+
+| Pha | Spring làm gì? | Hook/điểm mở rộng tiêu biểu |
+|---|---|---|
+| **Instantiate** | Tạo object qua constructor hoặc factory method | Constructor, `FactoryBean` |
+| **Populate** | Đặt dependency và property vào instance | `@Autowired`, `@Value`, setter injection |
+| **Initialize** | Chạy callback sau injection; có thể wrap object bằng proxy | `Aware`, `BeanPostProcessor`, `@PostConstruct`, `afterPropertiesSet()`, init method |
+| **Use** | Bean hoàn tất init, được lấy/inject từ container để phục vụ app | Business method, AOP proxy có thể chặn lời gọi |
+| **Destroy** | Context đóng và gọi cleanup callback cho bean được container quản lý | `@PreDestroy`, `DisposableBean.destroy()`, destroy method |
+
+`Use` là **trạng thái** bean đã sẵn sàng, không phải callback lifecycle riêng của Spring. Cũng cần nhớ rằng destruction callback được Spring quản lý đầy đủ cho singleton; prototype bean thường không được container theo dõi để tự hủy.
+
+### 2.2. Luồng đầy đủ: container preparation + bean lifecycle
+
+Khi cần debug startup, circular dependency hoặc AOP proxy, dùng phiên bản chi tiết dưới đây:
 
 ```mermaid
 flowchart TD
-    A["1. BeanDefinition Loading<br/>(scan @Component, @Bean, XML)"] --> B["2. BeanFactoryPostProcessor<br/>(modify definitions)"]
-    B --> C["3. Instantiation<br/>(constructor call)"]
-    C --> D["4. Populate Properties<br/>(@Autowired, @Value injection)"]
-    D --> E["5. BeanNameAware, BeanFactoryAware<br/>(awareness callbacks)"]
-    E --> F["6. BeanPostProcessor.postProcessBeforeInitialization"]
-    F --> G["7. @PostConstruct"]
-    G --> H["8. InitializingBean.afterPropertiesSet()"]
-    H --> I["9. Custom init-method"]
-    I --> J["10. BeanPostProcessor.postProcessAfterInitialization<br/>(AOP proxy creation here!)"]
-    J --> K["11. Bean Ready — sử dụng"]
-    K --> L["12. @PreDestroy"]
-    L --> M["13. DisposableBean.destroy()"]
-    M --> N["14. Custom destroy-method"]
+    subgraph P[Container preparation — bean instance chưa tồn tại]
+        A["1. BeanDefinition Loading<br/>(scan @Component, @Bean, XML)"] --> B["2. BeanFactoryPostProcessor<br/>(modify definitions)"]
+    end
+
+    subgraph L[Bean lifecycle]
+        C["3. Instantiate<br/>(constructor / factory method)"] --> D["4. Populate Properties<br/>(@Autowired, @Value injection)"]
+        D --> E["5. Aware callbacks<br/>(BeanNameAware, BeanFactoryAware...)"]
+        E --> F["6. BeanPostProcessor.beforeInitialization"]
+        F --> G["7. @PostConstruct"]
+        G --> H["8. InitializingBean.afterPropertiesSet()"]
+        H --> I["9. Custom init-method"]
+        I --> J["10. BeanPostProcessor.afterInitialization<br/>(thường tạo AOP proxy)"]
+        J --> K["11. Use — bean ready"]
+        K --> L1["12. @PreDestroy"]
+        L1 --> M["13. DisposableBean.destroy()"]
+        M --> N["14. Custom destroy-method"]
+    end
+
+    B --> C
 ```
 
+**`Initialize` trong bản rút gọn bao gồm steps 5–10**. Đây là lý do hai cách biểu diễn không mâu thuẫn: một cách nhóm các callback kỹ thuật dưới một pha, cách còn lại bung chúng ra để thấy thứ tự chính xác.
+
 > [!NOTE]
-> **Thứ tự quan trọng**: DI injection (step 4) xảy ra SAU constructor (step 3). AOP proxy (step 10) xảy ra SAU initialization. Nếu bạn gọi dependency trong constructor → null. Nếu bạn self-call → bypass proxy.
+> **Thứ tự quan trọng**: Populate/DI (step 4) xảy ra sau constructor (step 3). `@PostConstruct` chỉ chạy sau khi injection hoàn tất. AOP proxy thường xuất hiện sau initialization (step 10), nên self-invocation bằng `this` sẽ bypass proxy. Circular dependency là edge case có thể cần early reference/proxy trong lúc populate.
 
 ---
 

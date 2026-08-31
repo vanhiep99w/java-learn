@@ -6,6 +6,8 @@
     "transactional-self-invocation",
     "async-cacheable-not-working",
     "transactional-readonly",
-    "long-transaction-external-api-rollback"
+    "long-transaction-external-api-rollback",
+    "component-service-repository-difference",
+    "constructor-vs-field-injection"
   ]
 }
