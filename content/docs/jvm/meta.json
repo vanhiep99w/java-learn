@@ -5,6 +5,7 @@
     "jvm-architecture",
     "garbage-collection",
     "memory-leak",
+    "object-reference-memory-address",
     "classloader-deep-dive",
     "reference-types-deep-dive",
     "jit-compilation-deep-dive"

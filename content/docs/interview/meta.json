@@ -1,6 +1,7 @@
 {
   "title": "Câu hỏi phỏng vấn",
   "pages": [
+    "java-pass-by-value-vs-pass-by-reference",
     "volatile-loop-never-stops",
     "more-threads-not-faster",
     "transactional-self-invocation",
