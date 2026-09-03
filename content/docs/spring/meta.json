@@ -5,6 +5,7 @@
     "spring-ioc-container",
     "bean-lifecycle",
     "spring-proxy",
+    "spring-aop",
     "spring-transaction",
     "spring-boot-autoconfiguration",
     "objectmapper-trong-spring",
