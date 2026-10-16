@@ -39,14 +39,21 @@ HashMap định vị một entry qua **hai bước**, dùng **hai method khác n
 1. `hashCode()` → quyết định **bucket nào** (vị trí trong mảng).
 2. `equals()` → trong bucket đó, tìm **đúng key nào** (so khớp chính xác).
 
-```mermaid
-flowchart LR
-    K[key] -->|hashCode| H[hash value]
-    H -->|"(n-1) & hash"| B[bucket index]
-    B --> L[duyệt node trong bucket]
-    L -->|equals| M{trùng key?}
-    M -->|có| R[trả về / cập nhật value]
-    M -->|không| N[thêm node mới]
+```d2 title="2. HashMap nhìn Key như thế nào — hashCode & equals"
+direction: right
+n_K: "key"
+n_H: "hash value"
+n_B: "bucket index"
+n_L: "duyệt node trong bucket"
+n_M: "trùng key?" { shape: diamond }
+n_R: "trả về / cập nhật value"
+n_N: "thêm node mới"
+n_K -> n_H: "hashCode"
+n_H -> n_B: "(n-1) & hash"
+n_B -> n_L
+n_L -> n_M: "equals"
+n_M -> n_R: "có"
+n_M -> n_N: "không"
 ```
 
 ### 2.1. Hợp đồng (contract) bắt buộc
@@ -189,13 +196,19 @@ Chi phí thao tác phụ thuộc **độ dài chain**:
 
 Để chặn worst-case O(n) của chain dài (gồm cả Hash DoS), JDK 8 thêm cơ chế **treeify**: khi một bucket có **≥ 8 node** *và* table đã **≥ 64 bucket**, chain đó được chuyển thành **Red-Black Tree** (cây nhị phân tìm kiếm tự cân bằng), hạ độ phức tạp bucket từ O(n) xuống **O(log n)**.
 
-```mermaid
-flowchart TD
-    A["Bucket nhận node mới"] --> B{"chain length >= 8 ?"}
-    B -->|không| L["Giữ linked list"]
-    B -->|có| C{"table.length >= 64 ?"}
-    C -->|"không (< 64)"| R["resize() thay vì treeify"]
-    C -->|có| T["treeifyBin(): chain → Red-Black Tree"]
+```d2 title="6. Treeify — khi linked list biến thành Red-Black Tree"
+direction: down
+n_A: "Bucket nhận node mới"
+n_B: "chain length >= 8 ?" { shape: diamond }
+n_L: "Giữ linked list"
+n_C: "table.length >= 64 ?" { shape: diamond }
+n_R: "resize() thay vì treeify"
+n_T: "treeifyBin(): chain → Red-Black Tree"
+n_A -> n_B
+n_B -> n_L: "không"
+n_B -> n_C: "có"
+n_C -> n_R: "không (< 64)"
+n_C -> n_T: "có"
 ```
 
 > [!IMPORTANT]
@@ -262,11 +275,15 @@ else
 
 Vì `newCap - 1` chỉ thêm **đúng 1 bit cao** so với `oldCap - 1`, nên việc node ở lại hay dời đi chỉ phụ thuộc bit đó. JDK 8 tách mỗi chain thành 2 chain con (`lo` và `hi`) **mà không cần tính lại hash** và **giữ nguyên thứ tự** trong chain:
 
-```
-oldCap = 16, bucket j = 5, chain: A → B → C → D
-            (xét bit thứ 4 = oldCap = 16 của mỗi hash)
- ┌─ bit = 0 → lo list → vẫn ở bucket 5
- └─ bit = 1 → hi list → sang bucket 5 + 16 = 21
+```d2 title="7.2. Phép tách lo/hi — tinh tế của luỹ thừa 2"
+direction: right
+chain: "oldCap = 16, bucket j = 5\nA → B → C → D"
+bit: "Xét bit oldCap = 16 của mỗi hash"
+lo: "bit = 0: lo list\nvẫn ở bucket 5"
+hi: "bit = 1: hi list\nsang bucket 5 + 16 = 21"
+chain -> bit
+bit -> lo: 0
+bit -> hi: 1
 ```
 
 > [!TIP]

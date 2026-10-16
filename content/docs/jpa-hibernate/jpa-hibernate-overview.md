@@ -6,6 +6,9 @@ description: "Phân biệt JPA, Jakarta Persistence, Hibernate và Spring Data J
 > [!NOTE]
 > Bài này dành cho người đã biết Java và SQL cơ bản. Sau khi đọc, bạn có thể giải thích JPA, Hibernate và Spring Data JPA nằm ở đâu trong ứng dụng Spring Boot; dự đoán khi nào SQL được sinh; và nhận ra những lỗi ORM phổ biến trước khi chúng xuất hiện ở production.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Bức tranh tổng thể](#bức-tranh-tổng-thể)
@@ -54,9 +57,13 @@ description: "Phân biệt JPA, Jakarta Persistence, Hibernate và Spring Data J
 
 **ORM (Object-Relational Mapping)** là kỹ thuật ánh xạ object sang dữ liệu quan hệ. ORM cho phép code thao tác với entity và quan hệ giữa chúng, sau đó chuyển các thao tác đó thành SQL. ORM không thay thế database và cũng không làm SQL biến mất. Nó chỉ thêm một lớp quản lý trạng thái, ánh xạ và sinh câu lệnh ở giữa ứng dụng với JDBC.
 
-```text
-Java object  ⇄  ORM  ⇄  JDBC  ⇄  Database
-Product          JPA      driver     products table
+```d2 title="Bức tranh tổng thể"
+direction: right
+object: "Java object: Product"
+orm: "ORM: JPA"
+jdbc: "JDBC: driver"
+db: "Database: products table"
+object <-> orm <-> jdbc <-> db
 ```
 
 ### Vì sao cần ORM
@@ -91,14 +98,20 @@ Ba tên này giải quyết ba lớp khác nhau. Nhầm chúng dẫn đến nh�
 | Hibernate ORM | Persistence provider | Hiện thực JPA, dirty checking, SQL generation, cache, extension riêng | `Session`, `@BatchSize`, HQL |
 | Spring Data JPA | Abstraction của Spring trên JPA | Tạo repository, query derivation, pagination, specification | `JpaRepository`, `@Query`, `Page` |
 
-```mermaid
-flowchart TB
-    App["Code nghiệp vụ"] --> SD["Spring Data JPA<br/>repository abstraction"]
-    App --> API["Jakarta Persistence<br/>API và specification"]
-    SD --> API
-    API --> H["Hibernate ORM<br/>JPA provider"]
-    H --> JDBC["JDBC driver"]
-    JDBC --> DB[(Relational database)]
+```d2 title="Phân biệt JPA Hibernate và Spring Data JPA"
+direction: down
+n_App: "Code nghiệp vụ"
+n_SD: "Spring Data JPA\nrepository abstraction"
+n_API: "Jakarta Persistence\nAPI và specification"
+n_H: "Hibernate ORM\nJPA provider"
+n_JDBC: "JDBC driver"
+n_DB: "Relational database" { shape: cylinder }
+n_App -> n_SD
+n_App -> n_API
+n_SD -> n_API
+n_API -> n_H
+n_H -> n_JDBC
+n_JDBC -> n_DB
 ```
 
 ### Jakarta Persistence JPA
@@ -163,32 +176,30 @@ Trong Spring Boot, auto-configuration thường tạo `DataSource`, `EntityManag
 
 ### Một request đi qua hệ thống như thế nào
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client
-    participant Controller
-    participant Service
-    participant PC as Persistence Context
-    participant H as Hibernate
-    participant DB as Database
-
-    Client->>Controller: PATCH /products/42
-    Controller->>Service: rename(42, "Mechanical Keyboard")
-    Note over Service,PC: Spring mở transaction và gắn EntityManager
-    Service->>PC: find(Product.class, 42)
-    PC->>H: cần tải entity nếu chưa có
-    H->>DB: SELECT ... WHERE id = ?
-    DB-->>H: một row
-    H-->>PC: hydrate Product và quản lý instance
-    Service->>PC: product.rename(...)
-    Note over PC: dirty checking phát hiện name đổi
-    PC->>H: flush trước commit
-    H->>DB: UPDATE products SET name = ? WHERE id = ?
-    DB-->>H: affected rows = 1
-    Note over Service,DB: transaction commit
-    Service-->>Controller: hoàn tất
-    Controller-->>Client: 204 No Content
+```d2 title="Một request đi qua hệ thống như thế nào"
+shape: sequence_diagram
+n_Client: "Client"
+n_Controller: "Controller"
+n_Service: "Service"
+n_PC: "Persistence Context"
+n_H: "Hibernate"
+n_DB: "Database"
+n_Client -> n_Controller: "1. PATCH /products/42"
+n_Controller -> n_Service: "2. rename(42, \"Mechanical Keyboard\")"
+n_Service.note1: "Service / Persistence Context: Spring\nmở transaction và gắn EntityManager"
+n_Service -> n_PC: "3. find(Product.class, 42)"
+n_PC -> n_H: "4. cần tải entity nếu chưa có"
+n_H -> n_DB: "5. SELECT ... WHERE id = ?"
+n_DB -> n_H: "6. một row" { style.stroke-dash: 3 }
+n_H -> n_PC: "7. hydrate Product và quản lý instance" { style.stroke-dash: 3 }
+n_Service -> n_PC: "8. product.rename(...)"
+n_PC.note2: "dirty checking phát hiện name đổi"
+n_PC -> n_H: "9. flush trước commit"
+n_H -> n_DB: "10. UPDATE products SET name = ? WHERE\nid = ?"
+n_DB -> n_H: "11. affected rows = 1" { style.stroke-dash: 3 }
+n_Service.note3: "Service / Database: transaction commit"
+n_Service -> n_Controller: "12. hoàn tất" { style.stroke-dash: 3 }
+n_Controller -> n_Client: "13. 204 No Content" { style.stroke-dash: 3 }
 ```
 
 **Hydration** là quá trình biến một row từ kết quả SQL thành entity Java. Sau hydration, entity được đặt vào persistence context và trở thành managed. Từ đó, Hibernate có thể theo dõi thay đổi mà không cần gọi `update()` thủ công.
@@ -213,7 +224,7 @@ Cột `version` phục vụ **optimistic locking** — cơ chế phát hiện ha
 
 ### Khai báo entity
 
-```java
+```java source="jpa-hibernate-overview/01/Product.java"
 package com.example.catalog;
 
 import jakarta.persistence.Column;
@@ -280,6 +291,10 @@ public class Product {
 }
 ```
 
+<SourceRef project="jpa-hibernate-overview" file="01/Product.java" region="example" variant="button">
+  Xem Product.java cùng các ví dụ khác
+</SourceRef>
+
 Một entity hiện đại nên bảo vệ invariant bằng method nghiệp vụ như `changePrice` thay vì mở setter cho mọi field. **Invariant** là điều kiện luôn phải đúng, ở đây là giá không âm. Mapping entity không đồng nghĩa với việc biến entity thành túi dữ liệu không có hành vi.
 
 Chiến lược identity yêu cầu database sinh khóa khi `INSERT`. Vì vậy Hibernate có thể phải gửi `INSERT` sớm hơn dự kiến để lấy `id`. Thời điểm chính xác còn phụ thuộc chiến lược sinh khóa, provider và việc ứng dụng gọi `flush`. Xem sâu hơn tại [Entity mapping và identity](./entity-mapping-and-identity).
@@ -309,7 +324,7 @@ logging:
 
 ### Ghi và cập nhật entity
 
-```java
+```java source="jpa-hibernate-overview/02/ProductService.java"
 package com.example.catalog;
 
 import jakarta.persistence.EntityManager;
@@ -344,6 +359,10 @@ public class ProductService {
     }
 }
 ```
+
+<SourceRef project="jpa-hibernate-overview" file="02/ProductService.java" region="example" variant="button">
+  Xem ProductService.java cùng các ví dụ khác
+</SourceRef>
 
 Khi `create` chạy với `GenerationType.IDENTITY`, SQL điển hình là:
 
@@ -413,15 +432,21 @@ Tên method `findBySku` được Spring Data phân tích để tạo query. Hibe
 
 Một entity không chỉ là POJO có annotation. Nó có trạng thái so với persistence context:
 
-```mermaid
-stateDiagram-v2
-    [*] --> Transient: new Product(...)
-    Transient --> Managed: persist(entity)
-    Detached --> Managed: merge(entity) trả về bản managed
-    Managed --> Detached: detach / clear / close
-    Managed --> Removed: remove(entity)
-    Removed --> [*]: flush và commit DELETE
-    Managed --> [*]: transaction kết thúc và context đóng
+```d2 title="Trạng thái entity"
+direction: right
+n_Transient: "Transient"
+n_Managed: "Managed"
+n_Detached: "Detached"
+n_Removed: "Removed"
+n_start: "Bắt đầu" { shape: circle }
+n_end: "Kết thúc" { shape: circle }
+n_start -> n_Transient: "new Product(...)"
+n_Transient -> n_Managed: "persist(entity)"
+n_Detached -> n_Managed: "merge(entity) trả về bản managed"
+n_Managed -> n_Detached: "detach / clear / close"
+n_Managed -> n_Removed: "remove(entity)"
+n_Removed -> n_end: "flush và commit DELETE"
+n_Managed -> n_end: "transaction kết thúc và context đóng"
 ```
 
 | Trạng thái | Diễn giải | Hibernate có theo dõi thay đổi không |
@@ -705,7 +730,7 @@ Các anti-pattern khác cần nhớ:
 
 Test ORM đáng tin cậy phải flush và clear. Nếu chỉ assert object vừa thay đổi trong cùng persistence context, test có thể pass dù mapping hoặc SQL thực tế sai.
 
-```java
+```java source="jpa-hibernate-overview/03/ProductMappingTest.java"
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
@@ -740,6 +765,10 @@ class ProductMappingTest {
     }
 }
 ```
+
+<SourceRef project="jpa-hibernate-overview" file="03/ProductMappingTest.java" region="example" variant="button">
+  Xem ProductMappingTest.java cùng các ví dụ khác
+</SourceRef>
 
 `@DataJpaTest` thường dùng embedded database nếu dự án có dependency tương ứng. Với hành vi phụ thuộc dialect, index, lock, kiểu dữ liệu hoặc execution plan, hãy dùng Testcontainers chạy đúng loại và phiên bản database gần production. H2 không phải bản thay thế hoàn hảo cho PostgreSQL, MySQL hay Oracle.
 

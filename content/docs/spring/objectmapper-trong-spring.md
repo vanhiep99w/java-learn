@@ -8,6 +8,9 @@ description: "Hiểu ObjectMapper của Jackson trong Spring Boot: luồng JSON 
 > [!NOTE]
 > Bài viết dùng Spring Boot 3.x và Jackson 2.x. Trong Spring Boot, không cần tự tạo `ObjectMapper` cho các nhu cầu thông thường: Boot đã auto-configure một bean dùng chung và các HTTP message converter dùng chính cấu hình đó.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan: ObjectMapper làm gì?](#1-tổng-quan-objectmapper-làm-gì)
@@ -45,14 +48,21 @@ String json = mapper.writeValueAsString(user);
 
 Jackson không chỉ sao chép tên field. Nó dựa trên metadata của class, getter/setter, constructor và annotation như `@JsonProperty` để quyết định JSON nào hợp lệ và JSON đầu ra có hình dạng gì.
 
-```mermaid
-flowchart LR
-    A[JSON bytes hoặc String] --> B[JsonParser]
-    B --> C[ObjectMapper]
-    C --> D[Deserializer]
-    D --> E[Java object]
-    E --> F[Serializer]
-    F --> G[JSON bytes hoặc String]
+```d2 title="1. Tổng quan: ObjectMapper làm gì?"
+direction: right
+n_A: "JSON bytes hoặc String"
+n_B: "JsonParser"
+n_C: "ObjectMapper"
+n_D: "Deserializer"
+n_E: "Java object"
+n_F: "Serializer"
+n_G: "JSON bytes hoặc String"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
 ```
 
 > [!TIP]
@@ -62,7 +72,7 @@ flowchart LR
 
 Khi controller nhận hoặc trả DTO, bạn thường không gọi `ObjectMapper` trực tiếp. Spring MVC gọi `HttpMessageConverter`; với JSON, converter phổ biến là `MappingJackson2HttpMessageConverter`. Converter này dùng `ObjectMapper` do Spring Boot cấu hình.
 
-```java
+```java source="objectmapper-trong-spring/01/UserController.java"
 @RestController
 @RequestMapping("/users")
 class UserController {
@@ -77,6 +87,10 @@ record CreateUserRequest(String name, String email) { }
 record UserResponse(Long id, String name) { }
 ```
 
+<SourceRef project="objectmapper-trong-spring" file="01/UserController.java" region="example" variant="button">
+  Xem UserController.java cùng các ví dụ khác
+</SourceRef>
+
 Với request sau:
 
 ```http
@@ -88,23 +102,22 @@ Content-Type: application/json
 
 luồng xử lý là:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant MVC as Spring MVC
-    participant Converter as MappingJackson2HttpMessageConverter
-    participant Mapper as ObjectMapper
-    participant Controller
-
-    Client->>MVC: POST /users + JSON body
-    MVC->>Converter: đọc @RequestBody CreateUserRequest
-    Converter->>Mapper: readValue(body, CreateUserRequest)
-    Mapper-->>Converter: CreateUserRequest
-    Converter-->>Controller: tham số request
-    Controller-->>MVC: UserResponse
-    MVC->>Converter: ghi response JSON
-    Converter->>Mapper: writeValue(response)
-    Mapper-->>Client: 200 + JSON body
+```d2 title="2. Luồng JSON trong Spring MVC"
+shape: sequence_diagram
+n_Client: "Client"
+n_MVC: "Spring MVC"
+n_Converter: "MappingJackson2HttpMessageConverter"
+n_Mapper: "ObjectMapper"
+n_Controller: "Controller"
+n_Client -> n_MVC: "POST /users + JSON body"
+n_MVC -> n_Converter: "đọc @RequestBody CreateUserRequest"
+n_Converter -> n_Mapper: "readValue(body, CreateUserRequest)"
+n_Mapper -> n_Converter: "CreateUserRequest" { style.stroke-dash: 3 }
+n_Converter -> n_Controller: "tham số request" { style.stroke-dash: 3 }
+n_Controller -> n_MVC: "UserResponse" { style.stroke-dash: 3 }
+n_MVC -> n_Converter: "ghi response JSON"
+n_Converter -> n_Mapper: "writeValue(response)"
+n_Mapper -> n_Client: "200 + JSON body" { style.stroke-dash: 3 }
 ```
 
 Vì vậy, một thay đổi ở `spring.jackson.*`, `@JsonProperty`, serializer tùy biến hoặc bean `ObjectMapper` có thể ảnh hưởng **toàn bộ REST API**. Đó là lý do cần ưu tiên cấu hình tập trung thay vì tự dùng các mapper khác nhau ở từng controller.
@@ -123,7 +136,7 @@ Vì vậy, một thay đổi ở `spring.jackson.*`, `@JsonProperty`, serializer
 
 Ví dụ đọc/ghi đơn giản:
 
-```java
+```java source="objectmapper-trong-spring/02/AuditPayloadService.java"
 @Service
 @RequiredArgsConstructor
 class AuditPayloadService {
@@ -138,6 +151,10 @@ class AuditPayloadService {
     }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="02/AuditPayloadService.java" region="example" variant="button">
+  Xem AuditPayloadService.java cùng các ví dụ khác
+</SourceRef>
 
 `JsonProcessingException` là lỗi dữ liệu hoặc lỗi mapping có thể dự đoán được. Đừng nuốt exception rồi trả về `null`: caller sẽ mất thông tin JSON nào sai và có thể tạo lỗi `NullPointerException` ở nơi khác.
 
@@ -162,7 +179,7 @@ Các khác biệt đáng chú ý so với `new ObjectMapper()` thuần:
 
 Bạn có thể inject đúng mapper mà HTTP layer đang dùng:
 
-```java
+```java source="objectmapper-trong-spring/03/DebugController.java"
 @RestController
 @RequiredArgsConstructor
 class DebugController {
@@ -174,6 +191,10 @@ class DebugController {
     }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="03/DebugController.java" region="example" variant="button">
+  Xem DebugController.java cùng các ví dụ khác
+</SourceRef>
 
 ## 5. Định hình JSON bằng annotation
 
@@ -215,7 +236,7 @@ JSON `{"full_name":"An"}` và `{"name":"An"}` đều đọc được, nhưng res
 
 Với record và constructor có tên tham số rõ ràng, Jackson hiện đại có thể bind trực tiếp. Khi cần factory có kiểm tra riêng, dùng `@JsonCreator` và `@JsonProperty`:
 
-```java
+```java source="objectmapper-trong-spring/04/Money.java"
 class Money {
     private final BigDecimal amount;
     private final Currency currency;
@@ -236,6 +257,10 @@ class Money {
     public Currency getCurrency() { return currency; }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="04/Money.java" region="example" variant="button">
+  Xem Money.java cùng các ví dụ khác
+</SourceRef>
 
 Password là dữ liệu chỉ nên **đọc từ request**, không được phản chiếu lại trong response:
 
@@ -375,7 +400,7 @@ Nếu type đặc biệt xuất hiện nhiều nơi, đóng gói quy tắc trong
 
 Ví dụ serialize `Money` thành một chuỗi dễ đọc:
 
-```java
+```java source="objectmapper-trong-spring/05/JacksonConfiguration.java"
 @Configuration
 class JacksonConfiguration {
 
@@ -396,9 +421,13 @@ class JacksonConfiguration {
 record Money(BigDecimal amount, Currency currency) { }
 ```
 
+<SourceRef project="objectmapper-trong-spring" file="05/JacksonConfiguration.java" region="example" variant="button">
+  Xem JacksonConfiguration.java cùng các ví dụ khác
+</SourceRef>
+
 Nếu cần thay đổi feature của builder nhưng không muốn thay mapper, dùng `Jackson2ObjectMapperBuilderCustomizer`:
 
-```java
+```java source="objectmapper-trong-spring/06/JacksonConfiguration.java"
 @Configuration
 class JacksonConfiguration {
 
@@ -410,6 +439,10 @@ class JacksonConfiguration {
     }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="06/JacksonConfiguration.java" region="example" variant="button">
+  Xem JacksonConfiguration.java cùng các ví dụ khác
+</SourceRef>
 
 Một custom serializer chỉ giải quyết chiều ghi. Nếu API cũng phải **đọc** format `"120000 VND"`, hãy đăng ký thêm `JsonDeserializer<Money>` và quy định rõ lỗi khi format sai.
 
@@ -451,7 +484,7 @@ Trong Spring MVC, JSON sai cú pháp hoặc không map được vào `@RequestBo
 
 Trả lỗi 400 nhất quán bằng `@RestControllerAdvice`:
 
-```java
+```java source="objectmapper-trong-spring/07/ApiExceptionHandler.java"
 @RestControllerAdvice
 class ApiExceptionHandler {
 
@@ -465,6 +498,10 @@ class ApiExceptionHandler {
     }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="07/ApiExceptionHandler.java" region="example" variant="button">
+  Xem ApiExceptionHandler.java cùng các ví dụ khác
+</SourceRef>
 
 Đừng trả nguyên `exception.getMessage()` cho client. Thông điệp đó có thể lộ tên class nội bộ, đường dẫn property hoặc chi tiết không ổn định giữa phiên bản thư viện. Hãy log exception đầy đủ ở server và trả error code ổn định ra ngoài.
 
@@ -590,7 +627,7 @@ Nói ngắn gọn: mapper dùng chung cho contract chung; `ObjectReader`/`Object
 
 JSON là contract giữa server và client. Kiểm thử serialization giúp phát hiện đổi tên field, format ngày hoặc lộ field nhạy cảm trước khi deploy.
 
-```java
+```java source="objectmapper-trong-spring/08/ObjectMapperContractTest.java"
 @SpringBootTest
 class ObjectMapperContractTest {
 
@@ -610,6 +647,10 @@ class ObjectMapperContractTest {
     }
 }
 ```
+
+<SourceRef project="objectmapper-trong-spring" file="08/ObjectMapperContractTest.java" region="example" variant="button">
+  Xem ObjectMapperContractTest.java cùng các ví dụ khác
+</SourceRef>
 
 Test trên dùng **mapper thật của Spring Boot**, nên phát hiện cả thay đổi global như `property-naming-strategy` hoặc module bean. Với controller, thêm `MockMvc` test để xác nhận HTTP status và error body khi JSON sai.
 

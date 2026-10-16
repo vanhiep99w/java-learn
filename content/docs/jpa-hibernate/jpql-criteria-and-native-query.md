@@ -10,6 +10,9 @@ Tài liệu này dùng Jakarta Persistence API hiện đại với package `jaka
 > [!NOTE]
 > Các câu SQL trong bài là dạng minh họa mà Hibernate có thể sinh cho PostgreSQL. Alias, thứ tự cột và cú pháp phân trang có thể khác theo phiên bản Hibernate và SQL dialect. Hãy đọc log của chính ứng dụng thay vì phụ thuộc vào chuỗi SQL trong tài liệu.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1 Mô hình tinh thần](#1-mô-hình-tinh-thần)
@@ -57,18 +60,27 @@ Tài liệu này dùng Jakarta Persistence API hiện đại với package `jaka
 
 **JPQL** — Jakarta Persistence Query Language — là ngôn ngữ truy vấn bằng chuỗi trên entity và thuộc tính Java. **Criteria API** biểu diễn cùng mô hình truy vấn bằng object Java. **Native query** gửi SQL gần như trực tiếp cho database.
 
-```mermaid
-flowchart LR
-    A["Code ứng dụng"] --> B{"Cách mô tả truy vấn"}
-    B -->|"JPQL string"| C["Jakarta Persistence Query"]
-    B -->|"Criteria object graph"| C
-    B -->|"Native SQL"| D["SQL theo database"]
-    C --> E["Hibernate parser và SQL AST"]
-    E --> F["SQL theo dialect"]
-    D --> G["Hibernate bind parameter và map kết quả"]
-    F --> H[(Database)]
-    G --> H
-    H --> I["Entity DTO scalar hoặc Tuple"]
+```d2 title="1 Mô hình tinh thần"
+direction: right
+n_A: "Code ứng dụng"
+n_B: "Cách mô tả truy vấn" { shape: diamond }
+n_C: "Jakarta Persistence Query"
+n_D: "SQL theo database"
+n_E: "Hibernate parser và SQL AST"
+n_F: "SQL theo dialect"
+n_G: "Hibernate bind parameter và map kết\nquả"
+n_H: "Database" { shape: cylinder }
+n_I: "Entity DTO scalar hoặc Tuple"
+n_A -> n_B
+n_B -> n_C: "JPQL string"
+n_B -> n_C: "Criteria object graph"
+n_B -> n_D: "Native SQL"
+n_C -> n_E
+n_E -> n_F
+n_D -> n_G
+n_F -> n_H
+n_G -> n_H
+n_H -> n_I
 ```
 
 JPQL và Criteria API dùng **abstract persistence schema** — mô hình logic gồm entity, thuộc tính và quan hệ — thay vì tên bảng và khóa ngoại vật lý. Native SQL thì đi thẳng vào schema database.
@@ -90,36 +102,38 @@ JPQL không đồng nghĩa với HQL. **HQL** — Hibernate Query Language — l
 
 Các ví dụ dùng ba entity: `Customer`, `PurchaseOrder` và `OrderItem`. Tên `PurchaseOrder` tránh đụng từ khóa `ORDER` trong SQL.
 
-```mermaid
-erDiagram
-    CUSTOMER ||--o{ PURCHASE_ORDER : places
-    PURCHASE_ORDER ||--|{ ORDER_ITEM : contains
-
-    CUSTOMER {
-        bigint id PK
-        varchar name
-        varchar tier
-    }
-    PURCHASE_ORDER {
-        bigint id PK
-        bigint customer_id FK
-        varchar status
-        decimal total
-        timestamp created_at
-        bigint version
-    }
-    ORDER_ITEM {
-        bigint id PK
-        bigint order_id FK
-        varchar sku
-        int quantity
-        decimal unit_price
-    }
+```d2 title="1.2 Domain dùng trong ví dụ"
+direction: right
+n_CUSTOMER: "CUSTOMER" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "name": "varchar"
+  "tier": "varchar"
+}
+n_PURCHASE_ORDER: "PURCHASE_ORDER" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "customer_id": "bigint" { constraint: [foreign_key] }
+  "status": "varchar"
+  "total": "decimal"
+  "created_at": "timestamp"
+  "version": "bigint"
+}
+n_ORDER_ITEM: "ORDER_ITEM" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "order_id": "bigint" { constraint: [foreign_key] }
+  "sku": "varchar"
+  "quantity": "int"
+  "unit_price": "decimal"
+}
+n_CUSTOMER -> n_PURCHASE_ORDER: "places (1 → 0..*)"
+n_PURCHASE_ORDER -> n_ORDER_ITEM: "contains (1 → 1..*)"
 ```
 
 Phần mapping tối thiểu:
 
-```java
+```java source="jpql-criteria-and-native-query/01/PurchaseOrder.java"
 @Entity
 @Table(name = "purchase_orders")
 public class PurchaseOrder {
@@ -151,6 +165,10 @@ public enum OrderStatus {
     NEW, PAID, SHIPPED, CANCELLED
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="01/PurchaseOrder.java" region="example" variant="button">
+  Xem PurchaseOrder.java cùng các ví dụ khác
+</SourceRef>
 
 JPQL dùng `PurchaseOrder`, `customer`, `createdAt`; SQL dùng `purchase_orders`, `customer_id`, `created_at`. Đây là khác biệt cần nhớ trước mọi ví dụ tiếp theo.
 
@@ -469,7 +487,7 @@ int cancelExpired(
 
 `@NamedQuery` đặt JPQL dưới một tên ổn định và thường được provider parse khi persistence unit khởi tạo. Nó phù hợp với query dùng lại nhiều nơi nhưng làm entity dễ bị chất đầy query.
 
-```java
+```java source="jpql-criteria-and-native-query/02/PurchaseOrder.java"
 @NamedQuery(
     name = "PurchaseOrder.findRecentPaid",
     query = """
@@ -484,6 +502,10 @@ public class PurchaseOrder {
     // ...
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="02/PurchaseOrder.java" region="example" variant="button">
+  Xem PurchaseOrder.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 List<PurchaseOrder> orders = entityManager
@@ -548,7 +570,7 @@ public record OrderFilter(
 ) {}
 ```
 
-```java
+```java source="jpql-criteria-and-native-query/03/OrderQueryRepository.java"
 @Repository
 public class OrderQueryRepository {
     private final EntityManager entityManager;
@@ -604,6 +626,10 @@ public class OrderQueryRepository {
 }
 ```
 
+<SourceRef project="jpql-criteria-and-native-query" file="03/OrderQueryRepository.java" region="example" variant="button">
+  Xem OrderQueryRepository.java cùng các ví dụ khác
+</SourceRef>
+
 Không nối chuỗi kiểu `jpql += " and ..."`. Danh sách `Predicate` giữ value binding, cấu trúc ngoặc và kiểu expression trong API query.
 
 Criteria cũng hỗ trợ projection:
@@ -658,7 +684,7 @@ public interface PurchaseOrderRepository
 }
 ```
 
-```java
+```java source="jpql-criteria-and-native-query/04/OrderSpecifications.java"
 public final class OrderSpecifications {
     private OrderSpecifications() {}
 
@@ -672,6 +698,10 @@ public final class OrderSpecifications {
     }
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="04/OrderSpecifications.java" region="example" variant="button">
+  Xem OrderSpecifications.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 Specification<PurchaseOrder> spec =
@@ -748,7 +778,7 @@ Map entity từ `select *` khá mong manh: thêm cột trùng tên khi join ho�
 
 Để map DTO theo chuẩn JPA, khai báo `@SqlResultSetMapping`:
 
-```java
+```java source="jpql-criteria-and-native-query/05/PurchaseOrder.java"
 @SqlResultSetMapping(
     name = "OrderSummaryMapping",
     classes = @ConstructorResult(
@@ -766,6 +796,10 @@ public class PurchaseOrder {
     // mapping entity...
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="05/PurchaseOrder.java" region="example" variant="button">
+  Xem PurchaseOrder.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 @SuppressWarnings("unchecked")
@@ -798,7 +832,7 @@ public interface OrderTotalView {
 }
 ```
 
-```java
+```java source="jpql-criteria-and-native-query/06/PurchaseOrderRepository.java"
 public interface PurchaseOrderRepository
         extends JpaRepository<PurchaseOrder, Long> {
 
@@ -826,6 +860,10 @@ public interface PurchaseOrderRepository
     );
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="06/PurchaseOrderRepository.java" region="example" variant="button">
+  Xem PurchaseOrderRepository.java cùng các ví dụ khác
+</SourceRef>
 
 Ở đây named parameter do Spring Data xử lý trên provider đang dùng; đây không phải cam kết portability của native SQL thuần JPA. Alias camelCase giúp Spring map `orderId` và `customerName` vào getter tương ứng.
 
@@ -1126,7 +1164,7 @@ Query cần integration test vì compiler không xác nhận JPQL string, mappin
 
 Ví dụ kiểm tra projection và thứ tự ổn định:
 
-```java
+```java source="jpql-criteria-and-native-query/07/OrderQueryRepositoryTest.java"
 @DataJpaTest
 class OrderQueryRepositoryTest {
     @Autowired EntityManager entityManager;
@@ -1164,6 +1202,10 @@ class OrderQueryRepositoryTest {
     }
 }
 ```
+
+<SourceRef project="jpql-criteria-and-native-query" file="07/OrderQueryRepositoryTest.java" region="example" variant="button">
+  Xem OrderQueryRepositoryTest.java cùng các ví dụ khác
+</SourceRef>
 
 `flush()` buộc lỗi ghi dữ liệu xuất hiện trong pha arrange. `clear()` ngăn test vô tình thành công chỉ vì entity còn sẵn trong persistence context.
 

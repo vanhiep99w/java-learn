@@ -5,6 +5,9 @@ description: "Mổ xẻ chi tiết Spring Security từ source code: DelegatingF
 
 Spring Security cung cấp authentication, authorization và các cơ chế bảo vệ ứng dụng Spring. Với web application, phần lớn xử lý bắt đầu trong security filter chain trước khi request đi tới controller.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -38,40 +41,40 @@ Cấu hình an toàn cần xem xét toàn bộ chuỗi xử lý, session hoặc 
 
 ## 2. Kiến trúc tổng quan — Filter Chain Architecture
 
-```
-HTTP Request
-     │
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    Servlet Container (Tomcat)                │
-│                                                              │
-│  Servlet Filter Chain:                                       │
-│  [CharacterEncodingFilter]                                   │
-│  [HiddenHttpMethodFilter]                                    │
-│  [DelegatingFilterProxy] ──────────────────────────┐         │
-│  [...]                                             │         │
-│                                                    ▼         │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │FilterChainProxy(Spring Bean:"springSecurityFilterChain")│ │
-│  │                                                         │ │
-│  │  SecurityFilterChain #0: /api/**                        │ │
-│  │    → [SecurityContextHolderFilter]                      │ │
-│  │    → [CsrfFilter]                                       │ │
-│  │    → [BearerTokenAuthenticationFilter]                  │ │
-│  │    → [AuthorizationFilter]                              │ │
-│  │                                                         │ │
-│  │  SecurityFilterChain #1: /**                            │ │
-│  │    → [SecurityContextHolderFilter]                      │ │
-│  │    → [CsrfFilter]                                       │ │
-│  │    → [UsernamePasswordAuthenticationFilter]             │ │
-│  │    → [AnonymousAuthenticationFilter]                    │ │
-│  │    → [ExceptionTranslationFilter]                       │ │
-│  │    → [AuthorizationFilter]                              │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│                    DispatcherServlet                         │
-│                    └── Controller                            │
-└──────────────────────────────────────────────────────────────┘
+```d2 title="2. Kiến trúc tổng quan — Filter Chain Architecture"
+direction: down
+request: "HTTP Request"
+container: "Servlet Container (Tomcat)" {
+  encoding: CharacterEncodingFilter
+  hidden: HiddenHttpMethodFilter
+  delegate: DelegatingFilterProxy
+  proxy: "FilterChainProxy: springSecurityFilterChain"
+  api: "SecurityFilterChain #0: /api/**" {
+    context: SecurityContextHolderFilter
+    csrf: CsrfFilter
+    auth: BearerTokenAuthenticationFilter
+    az: AuthorizationFilter
+    context -> csrf -> auth -> az
+  }
+  web: "SecurityFilterChain #1: /**" {
+    context: SecurityContextHolderFilter
+    csrf: CsrfFilter
+    auth: UsernamePasswordAuthenticationFilter
+    anonymous: AnonymousAuthenticationFilter
+    exception: ExceptionTranslationFilter
+    az: AuthorizationFilter
+    context -> csrf -> auth -> anonymous -> exception -> az
+  }
+  ds: DispatcherServlet
+  controller: Controller
+  encoding -> hidden -> delegate -> proxy
+  proxy -> api.context: "match /api/**"
+  proxy -> web.context: "fallback /**"
+  api.az -> ds
+  web.az -> ds
+  ds -> controller
+}
+request -> container.encoding
 ```
 
 `FilterChainProxy` giữ **danh sách** `SecurityFilterChain`. Mỗi chain có **request matcher** + **danh sách filter riêng**. `FilterChainProxy` chọn chain **đầu tiên** match request → chạy filter chain đó → request không đi qua chain khác.
@@ -84,7 +87,7 @@ HTTP Request
 
 Servlet container (Tomcat) không biết Spring Bean. `DelegatingFilterProxy` là **javax.servlet.Filter** đăng ký với Tomcat, lazy-lookup Spring Bean và delegate:
 
-```java
+```java source="spring-security/01/DelegatingFilterProxy.java"
 // Rút gọn từ DelegatingFilterProxy
 public class DelegatingFilterProxy extends GenericFilterBean {
     private String targetBeanName;       // = "springSecurityFilterChain"
@@ -105,9 +108,13 @@ public class DelegatingFilterProxy extends GenericFilterBean {
 }
 ```
 
+<SourceRef project="spring-security" file="01/DelegatingFilterProxy.java" region="example" variant="button">
+  Xem DelegatingFilterProxy.java cùng các ví dụ khác
+</SourceRef>
+
 ### 3.2. FilterChainProxy — chọn chain và chạy VirtualFilterChain
 
-```java
+```java source="spring-security/02/FilterChainProxy.java"
 // Rút gọn từ FilterChainProxy
 public class FilterChainProxy extends GenericFilterBean {
     private List<SecurityFilterChain> filterChains;
@@ -142,6 +149,10 @@ public class FilterChainProxy extends GenericFilterBean {
     }
 }
 ```
+
+<SourceRef project="spring-security" file="02/FilterChainProxy.java" region="example" variant="button">
+  Xem FilterChainProxy.java cùng các ví dụ khác
+</SourceRef>
 
 ### 3.3. VirtualFilterChain — engine chạy filter
 
@@ -264,7 +275,7 @@ Thứ tự filter trong chain mặc định (Spring Security 6.x):
 
 ### 5.1. FilterOrderRegistration — ai quyết định thứ tự?
 
-```java
+```java source="spring-security/03/FilterOrderRegistration.java"
 // FilterOrderRegistration (Spring Security internal)
 // Mỗi filter class được gán 1 order number cố định:
 put(DisableEncodeUrlFilter.class, 100);
@@ -279,6 +290,10 @@ put(ExceptionTranslationFilter.class, 3300);
 put(AuthorizationFilter.class, 3400);
 ```
 
+<SourceRef project="spring-security" file="03/FilterOrderRegistration.java" region="example" variant="button">
+  Xem FilterOrderRegistration.java cùng các ví dụ khác
+</SourceRef>
+
 Khi bạn gọi `addFilterBefore(myFilter, UsernamePasswordAuthenticationFilter.class)`, Spring gán order = 1900 - 1 = 1899 cho `myFilter` → nó nằm **trước** `UsernamePasswordAuthenticationFilter` trong chain.
 
 > [!TIP]
@@ -290,38 +305,37 @@ Khi bạn gọi `addFilterBefore(myFilter, UsernamePasswordAuthenticationFilter.
 
 ### 6.1. Flow tổng quan
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant F as AuthenticationFilter
-    participant AM as AuthenticationManager
-    participant PM as ProviderManager
-    participant AP as AuthenticationProvider
-    participant UDS as UserDetailsService
-    participant PE as PasswordEncoder
-
-    C->>F: POST /login (username, password)
-    F->>F: Tạo UsernamePasswordAuthenticationToken<br/>(unauthenticated)
-    F->>AM: authenticate(token)
-    AM->>PM: delegate
-    PM->>PM: Duyệt providers list
-    PM->>AP: supports(token.class)? → true
-    PM->>AP: authenticate(token)
-    AP->>UDS: loadUserByUsername(username)
-    UDS-->>AP: UserDetails
-    AP->>PE: matches(rawPassword, encodedPassword)
-    PE-->>AP: true
-    AP-->>PM: Authentication(authenticated=true, authorities)
-    Note over PM: eraseCredentials(result)
-    PM-->>AM: return
-    AM-->>F: return
-    F->>F: SecurityContextHolder.setContext(auth)
-    F-->>C: 302 Redirect / 200 OK
+```d2 title="6.1. Flow tổng quan"
+shape: sequence_diagram
+n_C: "Client"
+n_F: "AuthenticationFilter"
+n_AM: "AuthenticationManager"
+n_PM: "ProviderManager"
+n_AP: "AuthenticationProvider"
+n_UDS: "UserDetailsService"
+n_PE: "PasswordEncoder"
+n_C -> n_F: "POST /login (username, password)"
+n_F -> n_F: "Tạo\nUsernamePasswordAuthenticationToken\n(unauthenticated)"
+n_F -> n_AM: "authenticate(token)"
+n_AM -> n_PM: "delegate"
+n_PM -> n_PM: "Duyệt providers list"
+n_PM -> n_AP: "supports(token.class)? → true"
+n_PM -> n_AP: "authenticate(token)"
+n_AP -> n_UDS: "loadUserByUsername(username)"
+n_UDS -> n_AP: "UserDetails" { style.stroke-dash: 3 }
+n_AP -> n_PE: "matches(rawPassword, encodedPassword)"
+n_PE -> n_AP: "true" { style.stroke-dash: 3 }
+n_AP -> n_PM: "Authentication(authenticated=true,\nauthorities)" { style.stroke-dash: 3 }
+n_PM.note1: "eraseCredentials(result)"
+n_PM -> n_AM: "return" { style.stroke-dash: 3 }
+n_AM -> n_F: "return" { style.stroke-dash: 3 }
+n_F -> n_F: "SecurityContextHolder.setContext(auth)"
+n_F -> n_C: "302 Redirect / 200 OK" { style.stroke-dash: 3 }
 ```
 
 ### 6.2. ProviderManager — chain of providers + parent
 
-```java
+```java source="spring-security/04/ProviderManager.java"
 // Rút gọn từ ProviderManager
 public class ProviderManager implements AuthenticationManager {
     private List<AuthenticationProvider> providers;
@@ -376,14 +390,23 @@ public class ProviderManager implements AuthenticationManager {
 }
 ```
 
+<SourceRef project="spring-security" file="04/ProviderManager.java" region="example" variant="button">
+  Xem ProviderManager.java cùng các ví dụ khác
+</SourceRef>
+
 ### 6.3. Parent chain — ProviderManager hierarchy
 
-```
-ProviderManager (API endpoints)
-├── JwtAuthenticationProvider (Bearer token)
-└── parent: ProviderManager (global)
-         ├── DaoAuthenticationProvider (username/password)
-         └── LdapAuthenticationProvider (LDAP)
+```d2 title="6.3. Parent chain — ProviderManager hierarchy"
+direction: right
+t0: "ProviderManager (API endpoints)"
+t1: "JwtAuthenticationProvider (Bearer token)"
+t0 -> t1
+t2: "parent: ProviderManager (global)"
+t0 -> t2
+t3: "DaoAuthenticationProvider (username/password)"
+t2 -> t3
+t4: "LdapAuthenticationProvider (LDAP)"
+t2 -> t4
 ```
 
 Khi API chain không có provider cho username/password → delegate lên parent → `DaoAuthenticationProvider` xử lý. Pattern này cho phép **share** provider giữa nhiều `SecurityFilterChain`.
@@ -441,21 +464,35 @@ public Authentication authenticate(Authentication authentication) {
 
 ### 7.2. Pre/Post authentication checks timeline
 
-```mermaid
-flowchart LR
-    A["loadUserByUsername()"] --> B["preAuthenticationChecks"]
-    B --> B1{"isAccountNonLocked?"}
-    B1 -->|"locked"| X1["LockedException"]
-    B1 -->|"OK"| B2{"isEnabled?"}
-    B2 -->|"disabled"| X2["DisabledException"]
-    B2 -->|"OK"| B3{"isAccountNonExpired?"}
-    B3 -->|"expired"| X3["AccountExpiredException"]
-    B3 -->|"OK"| C["additionalAuthenticationChecks<br/>(verify password)"]
-    C -->|"wrong password"| X4["BadCredentialsException"]
-    C -->|"OK"| D["postAuthenticationChecks"]
-    D --> D1{"isCredentialsNonExpired?"}
-    D1 -->|"expired"| X5["CredentialsExpiredException"]
-    D1 -->|"OK"| E["✓ Authentication success"]
+```d2 title="7.2. Pre/Post authentication checks timeline"
+direction: right
+n_A: "loadUserByUsername()"
+n_B: "preAuthenticationChecks"
+n_B1: "isAccountNonLocked?" { shape: diamond }
+n_X1: "LockedException"
+n_B2: "isEnabled?" { shape: diamond }
+n_X2: "DisabledException"
+n_B3: "isAccountNonExpired?" { shape: diamond }
+n_X3: "AccountExpiredException"
+n_C: "additionalAuthenticationChecks\n(verify password)"
+n_X4: "BadCredentialsException"
+n_D: "postAuthenticationChecks"
+n_D1: "isCredentialsNonExpired?" { shape: diamond }
+n_X5: "CredentialsExpiredException"
+n_E: "✓ Authentication success"
+n_A -> n_B
+n_B -> n_B1
+n_B1 -> n_X1: "locked"
+n_B1 -> n_B2: "OK"
+n_B2 -> n_X2: "disabled"
+n_B2 -> n_B3: "OK"
+n_B3 -> n_X3: "expired"
+n_B3 -> n_C: "OK"
+n_C -> n_X4: "wrong password"
+n_C -> n_D: "OK"
+n_D -> n_D1
+n_D1 -> n_X5: "expired"
+n_D1 -> n_E: "OK"
 ```
 
 ### 7.3. UserCache — tối ưu cho UserDetailsService chậm
@@ -483,7 +520,7 @@ DaoAuthenticationProvider authProvider(UserDetailsService uds, PasswordEncoder p
 
 ### 8.1. SecurityContextHolder internals
 
-```java
+```java source="spring-security/05/SecurityContextHolder.java"
 // SecurityContextHolder — facade cho strategy pattern
 public class SecurityContextHolder {
     private static SecurityContextHolderStrategy strategy;
@@ -509,38 +546,37 @@ final class ThreadLocalSecurityContextHolderStrategy {
 }
 ```
 
+<SourceRef project="spring-security" file="05/SecurityContextHolder.java" region="example" variant="button">
+  Xem SecurityContextHolder.java cùng các ví dụ khác
+</SourceRef>
+
 ### 8.2. Lifecycle trong 1 HTTP request
 
-```mermaid
-sequenceDiagram
-    participant T as Tomcat Thread
-    participant SCHF as SecurityContextHolderFilter
-    participant SCR as SecurityContextRepository
-    participant TL as ThreadLocal
-    participant AF as Auth Filters
-    participant C as Controller
-    participant AZ as AuthorizationFilter
-
-    T->>SCHF: doFilter(request)
-    SCHF->>SCR: loadDeferredContext(request)
-    Note over SCR: Session-based: HttpSession.getAttribute("SPRING_SECURITY_CONTEXT")<br/>Stateless: return empty
-    SCR-->>SCHF: Supplier&lt;SecurityContext&gt; (lazy!)
-    SCHF->>TL: setContext(supplier)
-
-    T->>AF: Authentication filters chạy
-    AF->>TL: getContext() → supplier.get() → trigger load
-    AF->>TL: setAuthentication(auth)
-
-    T->>AZ: AuthorizationFilter
-    AZ->>TL: getContext().getAuthentication() → check authorities
-
-    T->>C: Controller
-    C->>TL: SecurityContextHolder.getContext() → user info
-
-    Note over SCHF: Response complete
-    SCHF->>SCR: saveContext(context, request, response)
-    Note over SCR: Session-based: save to HttpSession<br/>Stateless: no-op
-    SCHF->>TL: clearContext() ⚠️ CRITICAL — prevent thread pool leak
+```d2 title="8.2. Lifecycle trong 1 HTTP request"
+shape: sequence_diagram
+n_T: "Tomcat Thread"
+n_SCHF: "SecurityContextHolderFilter"
+n_SCR: "SecurityContextRepository"
+n_TL: "ThreadLocal"
+n_AF: "Auth Filters"
+n_C: "Controller"
+n_AZ: "AuthorizationFilter"
+n_T -> n_SCHF: "doFilter(request)"
+n_SCHF -> n_SCR: "loadDeferredContext(request)"
+n_SCR.note1: "Session-based:\nHttpSession.getAttribute(\"SPRING_SECURITY_CONTEXT\")\nStateless: return empty"
+n_SCR -> n_SCHF: "Supplier<SecurityContext> (lazy!)" { style.stroke-dash: 3 }
+n_SCHF -> n_TL: "setContext(supplier)"
+n_T -> n_AF: "Authentication filters chạy"
+n_AF -> n_TL: "getContext() → supplier.get() →\ntrigger load"
+n_AF -> n_TL: "setAuthentication(auth)"
+n_T -> n_AZ: "AuthorizationFilter"
+n_AZ -> n_TL: "getContext().getAuthentication() →\ncheck authorities"
+n_T -> n_C: "Controller"
+n_C -> n_TL: "SecurityContextHolder.getContext() →\nuser info"
+n_SCHF.note2: "Response complete"
+n_SCHF -> n_SCR: "saveContext(context, request,\nresponse)"
+n_SCR.note3: "Session-based: save to HttpSession\nStateless: no-op"
+n_SCHF -> n_TL: "clearContext() ⚠️ CRITICAL — prevent\nthread pool leak"
 ```
 
 ### 8.3. SecurityContextRepository — lưu context ở đâu?
@@ -686,7 +722,7 @@ public boolean matches(CharSequence rawPassword, String prefixEncodedPassword) {
 
 ### 10.1. Request-level: AuthorizationFilter
 
-```java
+```java source="spring-security/06/AuthorizationFilter.java"
 // Rút gọn từ AuthorizationFilter (thay thế FilterSecurityInterceptor từ Spring Security 6)
 public class AuthorizationFilter extends GenericFilterBean {
     private final AuthorizationManager<HttpServletRequest> authorizationManager;
@@ -711,6 +747,10 @@ public class AuthorizationFilter extends GenericFilterBean {
     }
 }
 ```
+
+<SourceRef project="spring-security" file="06/AuthorizationFilter.java" region="example" variant="button">
+  Xem AuthorizationFilter.java cùng các ví dụ khác
+</SourceRef>
 
 ### 10.2. RequestMatcherDelegatingAuthorizationManager
 
@@ -742,7 +782,7 @@ Duyệt tuần tự — **matcher đầu tiên** match → dùng `AuthorizationM
 
 `@EnableMethodSecurity` đăng ký `AuthorizationManagerBeforeMethodInterceptor` — một AOP `MethodInterceptor` chạy **trước** method:
 
-```java
+```java source="spring-security/07/AuthorizationManagerBeforeMethodInterceptor.java"
 // Rút gọn từ AuthorizationManagerBeforeMethodInterceptor
 public class AuthorizationManagerBeforeMethodInterceptor implements MethodInterceptor {
     private final AuthorizationManager<MethodInvocation> authorizationManager;
@@ -765,6 +805,10 @@ public class AuthorizationManagerBeforeMethodInterceptor implements MethodInterc
     }
 }
 ```
+
+<SourceRef project="spring-security" file="07/AuthorizationManagerBeforeMethodInterceptor.java" region="example" variant="button">
+  Xem AuthorizationManagerBeforeMethodInterceptor.java cùng các ví dụ khác
+</SourceRef>
 
 ### 10.4. SpEL evaluation cho @PreAuthorize
 
@@ -814,7 +858,7 @@ Evaluation flow:
 
 `ExceptionTranslationFilter` nằm **trước** `AuthorizationFilter` trong chain. Nó catch exception từ `AuthorizationFilter` (và các filter sau nó) rồi **translate** thành HTTP response phù hợp:
 
-```java
+```java source="spring-security/08/ExceptionTranslationFilter.java"
 // Rút gọn từ ExceptionTranslationFilter
 public class ExceptionTranslationFilter extends GenericFilterBean {
     private AuthenticationEntryPoint authenticationEntryPoint;   // xử lý 401
@@ -850,6 +894,10 @@ public class ExceptionTranslationFilter extends GenericFilterBean {
     }
 }
 ```
+
+<SourceRef project="spring-security" file="08/ExceptionTranslationFilter.java" region="example" variant="button">
+  Xem ExceptionTranslationFilter.java cùng các ví dụ khác
+</SourceRef>
 
 ### 11.1. AuthenticationEntryPoint implementations
 
@@ -952,17 +1000,26 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
 ### 12.3. JwtDecoder — verify signature
 
-```mermaid
-flowchart TD
-    A["JWT token: header.payload.signature"] --> B["Parse header → alg: RS256, kid: key-1"]
-    B --> C["Fetch JWK Set từ auth server<br/>(cached, refresh khi kid không match)"]
-    C --> D["Tìm public key theo kid"]
-    D --> E["Verify signature bằng RSA public key"]
-    E -->|"invalid"| F["throw BadJwtException"]
-    E -->|"valid"| G["Parse claims: sub, exp, iat, scope..."]
-    G --> H{"exp > now?"}
-    H -->|"expired"| F
-    H -->|"valid"| I["Return Jwt object"]
+```d2 title="12.3. JwtDecoder — verify signature"
+direction: down
+n_A: "JWT token: header.payload.signature"
+n_B: "Parse header → alg: RS256, kid: key-1"
+n_C: "Fetch JWK Set từ auth server\n(cached, refresh khi kid không match)"
+n_D: "Tìm public key theo kid"
+n_E: "Verify signature bằng RSA public key"
+n_F: "throw BadJwtException"
+n_G: "Parse claims: sub, exp, iat, scope..."
+n_H: "exp > now?" { shape: diamond }
+n_I: "Return Jwt object"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F: "invalid"
+n_E -> n_G: "valid"
+n_G -> n_H
+n_H -> n_F: "expired"
+n_H -> n_I: "valid"
 ```
 
 ### 12.4. Opaque Token — token introspection
@@ -1027,27 +1084,24 @@ spring:
 
 ### 13.2. Authorization Code Flow
 
-```mermaid
-sequenceDiagram
-    participant U as User Browser
-    participant App as Spring App
-    participant Auth as Google OAuth2
-
-    U->>App: GET /oauth2/authorization/google
-    App->>App: OAuth2AuthorizationRequestRedirectFilter<br/>Tạo authorization request (state, nonce, PKCE)
-    App-->>U: 302 Redirect → Google authorization endpoint
-
-    U->>Auth: Login + consent
-    Auth-->>U: 302 Redirect → /login/oauth2/code/google?code=abc&state=xyz
-
-    U->>App: GET /login/oauth2/code/google?code=abc&state=xyz
-    App->>App: OAuth2LoginAuthenticationFilter<br/>Extract code + verify state
-    App->>Auth: POST /token (code + client_secret + redirect_uri)
-    Auth-->>App: { access_token, id_token, refresh_token }
-    App->>Auth: GET /userinfo (Authorization: Bearer access_token)
-    Auth-->>App: { sub, email, name, picture }
-    App->>App: Tạo OAuth2AuthenticationToken<br/>Set SecurityContext
-    App-->>U: 302 Redirect → /dashboard
+```d2 title="13.2. Authorization Code Flow"
+shape: sequence_diagram
+n_U: "User Browser"
+n_App: "Spring App"
+n_Auth: "Google OAuth2"
+n_U -> n_App: "GET /oauth2/authorization/google"
+n_App -> n_App: "OAuth2AuthorizationRequestRedirectFilter\nTạo authorization request (state,\nnonce, PKCE)"
+n_App -> n_U: "302 Redirect → Google authorization\nendpoint" { style.stroke-dash: 3 }
+n_U -> n_Auth: "Login + consent"
+n_Auth -> n_U: "302 Redirect →\n/login/oauth2/code/google?code=abc&state=xyz" { style.stroke-dash: 3 }
+n_U -> n_App: "GET\n/login/oauth2/code/google?code=abc&state=xyz"
+n_App -> n_App: "OAuth2LoginAuthenticationFilter\nExtract code + verify state"
+n_App -> n_Auth: "POST /token (code + client_secret +\nredirect_uri)"
+n_Auth -> n_App: "{ access_token, id_token,\nrefresh_token }" { style.stroke-dash: 3 }
+n_App -> n_Auth: "GET /userinfo (Authorization: Bearer\naccess_token)"
+n_Auth -> n_App: "{ sub, email, name, picture }" { style.stroke-dash: 3 }
+n_App -> n_App: "Tạo OAuth2AuthenticationToken\nSet SecurityContext"
+n_App -> n_U: "302 Redirect → /dashboard" { style.stroke-dash: 3 }
 ```
 
 ### 13.3. Hai filter chính

@@ -77,14 +77,18 @@ int x = 0; boolean ready = false;
 
 Không có happens-before, compiler/CPU được phép sắp `ready = true` **trước** `x = 42`. Thread 2 thấy `ready` nhưng `x` vẫn 0.
 
-```mermaid
-flowchart LR
-    subgraph Code["Thứ tự code"]
-        A1["x = 42"] --> A2["ready = true"]
-    end
-    subgraph Run["Thứ tự CPU/JIT có thể thực thi"]
-        B1["ready = true"] --> B2["x = 42"]
-    end
+```d2 title="3.2. Reordering — lệnh bị sắp xếp lại"
+direction: right
+n_Code: "Thứ tự code" {
+  n_A1: "x = 42"
+  n_A2: "ready = true"
+}
+n_Run: "Thứ tự CPU/JIT có thể thực thi" {
+  n_B1: "ready = true"
+  n_B2: "x = 42"
+}
+n_Code.n_A1 -> n_Code.n_A2
+n_Run.n_B1 -> n_Run.n_B2
 ```
 
 > [!WARNING]
@@ -190,14 +194,21 @@ Race khó tái hiện vì phụ thuộc timing. Công cụ:
 
 ## 8. Cách khắc phục
 
-```mermaid
-flowchart TD
-    P{"Biến chia sẻ + có ghi?"} -->|không| Safe["An toàn (read-only / local)"]
-    P -->|có| Q{"Chỉ cần visibility 1 biến?"}
-    Q -->|có| Vol["volatile / AtomicX"]
-    Q -->|cần atomic NHIỀU thao tác| R{"Tranh chấp cao?"}
-    R -->|thấp| CAS["CAS loop / Atomic compound"]
-    R -->|cao hoặc phức tạp| Lock["synchronized / ReentrantLock"]
+```d2 title="8. Cách khắc phục"
+direction: down
+n_P: "Biến chia sẻ + có ghi?" { shape: diamond }
+n_Safe: "An toàn (read-only / local)"
+n_Q: "Chỉ cần visibility 1 biến?" { shape: diamond }
+n_Vol: "volatile / AtomicX"
+n_R: "Tranh chấp cao?" { shape: diamond }
+n_CAS: "CAS loop / Atomic compound"
+n_Lock: "synchronized / ReentrantLock"
+n_P -> n_Safe: "không"
+n_P -> n_Q: "có"
+n_Q -> n_Vol: "có"
+n_Q -> n_R: "cần atomic NHIỀU thao tác"
+n_R -> n_CAS: "thấp"
+n_R -> n_Lock: "cao hoặc phức tạp"
 ```
 
 | Vấn đề | Công cụ |

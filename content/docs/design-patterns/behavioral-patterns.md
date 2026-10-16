@@ -81,11 +81,15 @@ class EventBus {
 }
 ```
 
-```mermaid
-flowchart TD
-    S["Subject / EventBus"] -->|notify| O1["Observer 1"]
-    S -->|notify| O2["Observer 2"]
-    S -->|notify| O3["Observer 3"]
+```d2 title="3. Observer — pub/sub và bẫy memory leak"
+direction: down
+n_S: "Subject / EventBus"
+n_O1: "Observer 1"
+n_O2: "Observer 2"
+n_O3: "Observer 3"
+n_S -> n_O1: "notify"
+n_S -> n_O2: "notify"
+n_S -> n_O3: "notify"
 ```
 
 > [!WARNING]
@@ -144,9 +148,17 @@ abstract class Handler {
 
 Ví dụ kinh điển: **Servlet Filter chain**, Spring Security filter chain, middleware (auth → log → rate-limit → handler):
 
-```mermaid
-flowchart LR
-    Req[Request] --> A["AuthFilter"] --> B["LogFilter"] --> C["RateLimitFilter"] --> H["Controller"]
+```d2 title="5. Chain of Responsibility — chuyền request qua chuỗi xử lý"
+direction: right
+n_Req: "Request"
+n_A: "AuthFilter"
+n_B: "LogFilter"
+n_C: "RateLimitFilter"
+n_H: "Controller"
+n_Req -> n_A
+n_A -> n_B
+n_B -> n_C
+n_C -> n_H
 ```
 
 > [!NOTE]

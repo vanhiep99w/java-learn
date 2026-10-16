@@ -175,17 +175,14 @@ Vì vậy, câu trả lời phỏng vấn tốt là: **chúng cùng là Spring b
 
 ## 6. Ví dụ thực tế
 
-```text
-HTTP request
-    │
-    ▼
-OrderController       @RestController: nhận/trả HTTP, validate input ở biên
-    │
-    ▼
-OrderService          @Service: thực thi use case và business rule
-    │
-    ▼
-OrderRepositoryImpl   @Repository: đọc/ghi database, dịch exception persistence
+```d2 title="6. Ví dụ thực tế"
+direction: down
+http: "HTTP request"
+controller: "@Controller / @RestController: nhận\nrequest"
+service: "@Service: nghiệp vụ, transaction\nboundary"
+repo: "@Repository: truy cập dữ liệu, exception\ntranslation"
+db: "Database"
+http -> controller -> service -> repo -> db
 ```
 
 ```java

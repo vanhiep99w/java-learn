@@ -38,21 +38,14 @@ Từ Java 9 và hệ module, cách phân phối runtime đã thay đổi và JRE
 
 Đây là quan hệ **bao hàm**, không phải ba thứ ngang hàng:
 
-```
-┌──────────────────────────────────────────────┐
-│ JDK (Java Development Kit)                   │
-│  ┌──────────────────────────────────────┐    │
-│  │ JRE (Java Runtime Environment)       │    │
-│  │  ┌──────────────────────────────┐    │    │
-│  │  │ JVM                          │    │    │
-│  │  │ (class loader, bộ thực thi,  │    │    │
-│  │  │  GC, JIT compiler)           │    │    │
-│  │  └──────────────────────────────┘    │    │
-│  │  + thư viện runtime (java.base, ...) │    │
-│  └──────────────────────────────────────┘    │
-│  + công cụ dev: javac, jdb, jar, javadoc,    │
-│    jlink, jstack, jmap, jcmd, jconsole...    │
-└──────────────────────────────────────────────┘
+```d2 title="2. Ba lớp lồng nhau: JDK ⊃ JRE ⊃ JVM"
+jdk: "JDK (Java Development Kit)" {
+  tools: "Development tools: javac, jar, javadoc, jdb, ..."
+  jre: "JRE (Java Runtime Environment)" {
+    libraries: "Core libraries: java.*, javax.*, ..."
+    jvm: "JVM (Java Virtual Machine)\nClassLoader + Execution Engine + Runtime Data Areas"
+  }
+}
 ```
 
 | Thành phần | Là gì | Chứa | Dùng để |
@@ -70,14 +63,21 @@ Từ Java 9 và hệ module, cách phân phối runtime đã thay đổi và JRE
 
 JVM không chỉ là một chương trình đọc từng dòng bytecode. Nó là một runtime gồm bộ nạp class, các vùng dữ liệu runtime, bộ thực thi và cầu nối tới mã native. Các khối này phối hợp để biến một file `.class` thành hành vi mà CPU có thể thực hiện.
 
-```mermaid
-flowchart LR
-    BYTES[".class<br/>bytecode"] --> CL["ClassLoader subsystem<br/>Load · Link · Initialize"]
-    CL --> RDA["Runtime Data Areas<br/>Heap · Metaspace · Stack · PC"]
-    RDA <--> EE["Execution Engine<br/>Interpreter · JIT · GC"]
-    EE --> NATIVE["Native machine code<br/>CPU / OS"]
-    EE <--> JNI["JNI"]
-    JNI <--> LIB["Native method libraries<br/>.dll · .so"]
+```d2 title="3. JVM gồm những thành phần chính?"
+direction: right
+n_BYTES: ".class\nbytecode"
+n_CL: "ClassLoader subsystem\nLoad · Link · Initialize"
+n_RDA: "Runtime Data Areas\nHeap · Metaspace · Stack · PC"
+n_EE: "Execution Engine\nInterpreter · JIT · GC"
+n_NATIVE: "Native machine code\nCPU / OS"
+n_JNI: "JNI"
+n_LIB: "Native method libraries\n.dll · .so"
+n_BYTES -> n_CL
+n_CL -> n_RDA
+n_RDA <-> n_EE
+n_EE -> n_NATIVE
+n_EE <-> n_JNI
+n_JNI <-> n_LIB
 ```
 
 Đây là mô hình khái niệm. JVM Specification quy định hành vi cần có, nhưng không bắt buộc mọi JVM phải dùng đúng tên hoặc đúng cách tổ chức như HotSpot.
@@ -126,14 +126,21 @@ Garbage Collector thường được xem là một dịch vụ runtime đi cùng
 
 `javac` là **trình biên dịch tĩnh** nhưng nó làm ít hơn bạn nghĩ — nó cố tình *không* tối ưu sâu (để dành cho JIT lúc runtime). Pipeline của `javac`:
 
-```mermaid
-flowchart LR
-    SRC[".java"] --> P["Parse → AST"]
-    P --> E["Enter + phân giải symbol"]
-    E --> A["Annotation processing"]
-    A --> T["Type check (kiểu, generic)"]
-    T --> D["Desugar (lambda, generics erasure, enum...)"]
-    D --> G["Sinh bytecode → .class"]
+```d2 title="4. javac — từ .java tới bytecode .class"
+direction: right
+n_SRC: ".java"
+n_P: "Parse → AST"
+n_E: "Enter + phân giải symbol"
+n_A: "Annotation processing"
+n_T: "Type check (kiểu, generic)"
+n_D: "Desugar (lambda, generics erasure,\nenum...)"
+n_G: "Sinh bytecode → .class"
+n_SRC -> n_P
+n_P -> n_E
+n_E -> n_A
+n_A -> n_T
+n_T -> n_D
+n_D -> n_G
 ```
 
 Những việc `javac` làm mà nhiều người không để ý:
@@ -255,18 +262,28 @@ java Hello
 
 Luồng tổng quát là **load → link → initialize → execute**. JVM không nhất thiết load và resolve toàn bộ class của ứng dụng ngay lúc khởi động. Nhiều class và symbolic reference chỉ được xử lý khi code thật sự sử dụng chúng.
 
-```mermaid
-flowchart TD
-    A["java Hello"] --> B["Khởi tạo JVM<br/>và main thread"]
-    B --> C["Load<br/>Application ClassLoader tìm Hello.class"]
-    C --> D["Link<br/>Verify → Prepare → Resolve"]
-    D --> E["Initialize<br/>chạy &lt;clinit&gt; nếu có"]
-    E --> F["Gọi main(String[])<br/>tạo stack frame"]
-    F --> G["Interpreter chạy bytecode<br/>và thu profiling"]
-    G --> H{"Method hoặc loop đủ nóng?"}
-    H -->|"Chưa"| G
-    H -->|"Rồi"| I["JIT compile<br/>vào Code Cache"]
-    I --> J["CPU chạy native code"]
+```d2 title="7. JVM hoạt động như thế nào khi chạy một file .class?"
+direction: down
+n_A: "java Hello"
+n_B: "Khởi tạo JVM\nvà main thread"
+n_C: "Load\nApplication ClassLoader tìm\nHello.class"
+n_D: "Link\nVerify → Prepare → Resolve"
+n_E: "Initialize\nchạy <clinit> nếu có"
+n_F: "Gọi main(String[])\ntạo stack frame"
+n_G: "Interpreter chạy bytecode\nvà thu profiling"
+n_H: "Method hoặc loop đủ nóng?" { shape: diamond }
+n_I: "JIT compile\nvào Code Cache"
+n_J: "CPU chạy native code"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H
+n_H -> n_G: "Chưa"
+n_H -> n_I: "Rồi"
+n_I -> n_J
 ```
 
 Các bước cụ thể:
@@ -296,15 +313,21 @@ Lỗi cũng thường gắn với từng phase: `UnsupportedClassVersionError` h
 
 Sau khi class đã được load, link và initialize, Execution Engine bắt đầu chạy các method. Ban đầu JVM **thông dịch** (interpret) — đọc từng bytecode và thực thi. Thông dịch khởi động nhanh nhưng chạy chậm. Song song, JVM **đếm số lần** method/loop chạy. Khi vượt ngưỡng → method "nóng" → **JIT compiler** dịch nó sang **mã máy native** và cache lại.
 
-```mermaid
-flowchart TD
-    Load["Nạp method"] --> Interp["Interpreter chạy + đếm (profiling)"]
-    Interp --> Hot{"Đủ nóng?<br/>(invocation/backedge counter)"}
-    Hot -->|chưa| Interp
-    Hot -->|rồi| JIT["JIT dịch sang mã máy"]
-    JIT --> Native["Chạy mã máy native (nhanh ~10-100x)"]
-    Native -.->|"giả định sai"| Deopt["Deoptimize → quay về interpreter"]
-    Deopt --> Interp
+```d2 title="8. JVM thực thi: Interpreter + JIT"
+direction: down
+n_Load: "Nạp method"
+n_Interp: "Interpreter chạy + đếm (profiling)"
+n_Hot: "Đủ nóng?\n(invocation/backedge counter)" { shape: diamond }
+n_JIT: "JIT dịch sang mã máy"
+n_Native: "Chạy mã máy native (nhanh ~10-100x)"
+n_Deopt: "Deoptimize → quay về interpreter"
+n_Load -> n_Interp
+n_Interp -> n_Hot
+n_Hot -> n_Interp: "chưa"
+n_Hot -> n_JIT: "rồi"
+n_JIT -> n_Native
+n_Native -> n_Deopt: "giả định sai" { style.stroke-dash: 3 }
+n_Deopt -> n_Interp
 ```
 
 Điểm tinh tế: JIT làm **tối ưu suy đoán** (speculative) dựa trên profiling. Ví dụ thấy một call site luôn gặp `Dog` → inline luôn `Dog.sound()`. Nếu sau đó xuất hiện `Cat` → giả định sai → **deoptimize**, quay về thông dịch rồi compile lại. Đây là lý do Java "ấm máy" (warmup): vài giây đầu chậm, sau đó nhanh dần.
@@ -340,15 +363,23 @@ java -XX:+UnlockDiagnosticVMOptions -XX:+PrintInlining Main  # xem inline
 
 Câu hỏi trung tâm của Java là: làm thế nào cùng một `Hello.class` có thể chạy trên Windows x86-64, Linux ARM64 và macOS Apple Silicon?
 
-```mermaid
-flowchart TD
-    SRC["Hello.java"] -->|"javac"| BC["Hello.class<br/>JVM bytecode"]
-    BC --> WIN["JVM trên Windows<br/>x86-64"]
-    BC --> LINUX["JVM trên Linux<br/>ARM64"]
-    BC --> MAC["JVM trên macOS<br/>Apple Silicon"]
-    WIN --> WCPU["native code → CPU"]
-    LINUX --> LCPU["native code → CPU"]
-    MAC --> MCPU["native code → CPU"]
+```d2 title="10. Tại sao Java \"write once, run anywhere\"?"
+direction: down
+n_SRC: "Hello.java"
+n_BC: "Hello.class\nJVM bytecode"
+n_WIN: "JVM trên Windows\nx86-64"
+n_LINUX: "JVM trên Linux\nARM64"
+n_MAC: "JVM trên macOS\nApple Silicon"
+n_WCPU: "native code → CPU"
+n_LCPU: "native code → CPU"
+n_MCPU: "native code → CPU"
+n_SRC -> n_BC: "javac"
+n_BC -> n_WIN
+n_BC -> n_LINUX
+n_BC -> n_MAC
+n_WIN -> n_WCPU
+n_LINUX -> n_LCPU
+n_MAC -> n_MCPU
 ```
 
 Cơ chế có hai phần:

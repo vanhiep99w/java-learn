@@ -5,6 +5,9 @@ description: "Mổ xẻ Fork/Join framework: work-stealing algorithm, ForkJoinPo
 
 Fork/Join Framework hỗ trợ bài toán chia để trị bằng cách tách một tác vụ lớn thành các tác vụ nhỏ rồi kết hợp kết quả. Nó phù hợp nhất với công việc CPU-bound có thể phân rã đệ quy và đủ lớn để bù chi phí lập lịch.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -33,36 +36,45 @@ Hiệu năng phụ thuộc mạnh vào ngưỡng chia, độ cân bằng của t
 
 **Divide and conquer pattern:**
 
-```
-Task(100M elements)
-├── fork: Task(0..50M)
-│   ├── fork: Task(0..25M)
-│   │   ├── fork: Task(0..12.5M)
-│   │   └── ...
-│   └── fork: Task(25M..50M)
-└── compute: Task(50M..100M)
-    ├── fork: Task(50M..75M)
-    └── ...
+```d2 title="2. Fork/Join là gì — divide-and-conquer + work-stealing"
+direction: right
+t0: "Task(100M elements)"
+t1: "fork: Task(0..50M)"
+t0 -> t1
+t2: "fork: Task(0..25M)"
+t1 -> t2
+t3: "fork: Task(0..12.5M)"
+t2 -> t3
+t4: "..."
+t2 -> t4
+t5: "fork: Task(25M..50M)"
+t1 -> t5
+t6: "compute: Task(50M..100M)"
+t0 -> t6
+t7: "fork: Task(50M..75M)"
+t6 -> t7
+t8: "..."
+t6 -> t8
 ```
 
 **Work-stealing**: khi 1 worker hết việc (deque rỗng), nó **steal** task từ deque của worker khác. Tự động cân bằng load mà không cần central scheduler.
 
-```mermaid
-flowchart LR
-    subgraph "Worker 0 (busy)"
-        D0["Deque: T1 T2 T3 T4"]
-    end
-    subgraph "Worker 1 (idle)"
-        D1["Deque: (empty)"]
-    end
-    D0 -->|"steal T1 từ tail"| D1
+```d2 title="2. Fork/Join là gì — divide-and-conquer + work-stealing"
+direction: right
+n_group1: "Worker 0 (busy)" {
+  n_D0: "Deque: T1 T2 T3 T4"
+}
+n_group2: "Worker 1 (idle)" {
+  n_D1: "Deque: (empty)"
+}
+n_group1.n_D0 -> n_group2.n_D1: "steal T1 từ tail"
 ```
 
 ---
 
 ## 3. ForkJoinPool architecture — WorkQueue deque per worker
 
-```java
+```java source="forkjoin-deep-dive/01/ForkJoinPool.java"
 public class ForkJoinPool extends AbstractExecutorService {
     volatile WorkQueue[] workQueues;   // array of per-worker deques
     // Even indices: submission queues (external tasks)
@@ -77,6 +89,10 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 }
 ```
+
+<SourceRef project="forkjoin-deep-dive" file="01/ForkJoinPool.java" region="example" variant="button">
+  Xem ForkJoinPool.java cùng các ví dụ khác
+</SourceRef>
 
 ```
 workQueues array:
@@ -140,7 +156,7 @@ ForkJoinTask<?> scan() {
 
 ## 5. ForkJoinTask lifecycle — fork(), join(), compute()
 
-```java
+```java source="forkjoin-deep-dive/02/ForkJoinTask.java"
 public abstract class ForkJoinTask<V> {
     volatile int status;    // completion status
     // status < 0 = completed (DONE/CANCELLED/EXCEPTIONAL)
@@ -169,22 +185,33 @@ public abstract class ForkJoinTask<V> {
 }
 ```
 
-```mermaid
-stateDiagram-v2
-    [*] --> Created: new ForkJoinTask()
-    Created --> Queued: fork()
-    Queued --> Executing: worker pop/steal
-    Executing --> Completed: compute() return
-    Executing --> Exceptional: compute() throw
-    Completed --> [*]: join() returns result
-    Exceptional --> [*]: join() re-throws
+<SourceRef project="forkjoin-deep-dive" file="02/ForkJoinTask.java" region="example" variant="button">
+  Xem ForkJoinTask.java cùng các ví dụ khác
+</SourceRef>
+
+```d2 title="5. ForkJoinTask lifecycle — fork(), join(), compute()"
+direction: right
+n_Created: "Created"
+n_Queued: "Queued"
+n_Executing: "Executing"
+n_Completed: "Completed"
+n_Exceptional: "Exceptional"
+n_start: "Bắt đầu" { shape: circle }
+n_end: "Kết thúc" { shape: circle }
+n_start -> n_Created: "new ForkJoinTask()"
+n_Created -> n_Queued: "fork()"
+n_Queued -> n_Executing: "worker pop/steal"
+n_Executing -> n_Completed: "compute() return"
+n_Executing -> n_Exceptional: "compute() throw"
+n_Completed -> n_end: "join() returns result"
+n_Exceptional -> n_end: "join() re-throws"
 ```
 
 ---
 
 ## 6. RecursiveTask vs RecursiveAction — có return vs void
 
-```java
+```java source="forkjoin-deep-dive/03/SumTask.java"
 // RecursiveTask<V> — trả kết quả
 class SumTask extends RecursiveTask<Long> {
     int[] arr; int lo, hi;
@@ -212,6 +239,10 @@ class ParallelSort extends RecursiveAction {
     }
 }
 ```
+
+<SourceRef project="forkjoin-deep-dive" file="03/SumTask.java" region="example" variant="button">
+  Xem SumTask.java cùng các ví dụ khác
+</SourceRef>
 
 **Invoke pattern chuẩn:**
 

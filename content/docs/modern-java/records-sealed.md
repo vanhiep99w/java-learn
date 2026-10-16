@@ -92,17 +92,17 @@ public final int hashCode();
 
 `invokedynamic` (indy) là lệnh "gọi mà đích được quyết định lần đầu lúc runtime" — nền tảng của lambda và record. Với record, bootstrap là `java.lang.runtime.ObjectMethods.bootstrap(...)`.
 
-```mermaid
-sequenceDiagram
-    participant C as Code gọi point.equals(p2)
-    participant I as invokedynamic (lần đầu)
-    participant B as ObjectMethods.bootstrap
-    participant T as CallSite (đã link)
-    C->>I: lần gọi đầu tiên — chưa link
-    I->>B: gọi bootstrap với danh sách component [x, y]
-    B-->>I: trả CallSite chứa hàm so sánh x,y
-    I->>T: gắn CallSite (chỉ một lần)
-    Note over C,T: các lần sau gọi thẳng CallSite — nhanh như method thường
+```d2 title="4. invokedynamic & ObjectMethods bootstrap"
+shape: sequence_diagram
+n_C: "Code gọi point.equals(p2)"
+n_I: "invokedynamic (lần đầu)"
+n_B: "ObjectMethods.bootstrap"
+n_T: "CallSite (đã link)"
+n_C -> n_I: "lần gọi đầu tiên — chưa link"
+n_I -> n_B: "gọi bootstrap với danh sách component\n[x, y]"
+n_B -> n_I: "trả CallSite chứa hàm so sánh x,y" { style.stroke-dash: 3 }
+n_I -> n_T: "gắn CallSite (chỉ một lần)"
+n_C.note1: "Code gọi point.equals(p2) / CallSite\n(đã link): các lần sau gọi thẳng\nCallSite — nhanh như method thường"
 ```
 
 - Lần đầu chạm tới `equals`/`hashCode`/`toString`, JVM gọi bootstrap, nó dựng động một `MethodHandle` so sánh/băm **đúng các component**.
@@ -214,11 +214,15 @@ double area(Shape s) {
 }
 ```
 
-```mermaid
-flowchart TD
-    A["switch trên Shape (sealed)"] --> B{"compiler kiểm tra<br/>đã phủ hết permits?"}
-    B -->|"đủ Circle+Rectangle+Triangle"| C["biên dịch OK, không cần default"]
-    B -->|"thiếu một nhánh"| D["LỖI BIÊN DỊCH:<br/>switch không exhaustive"]
+```d2 title="8. PermittedSubclasses & exhaustive switch"
+direction: down
+n_A: "switch trên Shape (sealed)"
+n_B: "compiler kiểm tra\nđã phủ hết permits?" { shape: diamond }
+n_C: "biên dịch OK, không cần default"
+n_D: "LỖI BIÊN DỊCH:\nswitch không exhaustive"
+n_A -> n_B
+n_B -> n_C: "đủ Circle+Rectangle+Triangle"
+n_B -> n_D: "thiếu một nhánh"
 ```
 
 > [!IMPORTANT]

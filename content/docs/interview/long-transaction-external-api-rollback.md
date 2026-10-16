@@ -3,6 +3,9 @@ title: "Long transaction: update DB, gọi nhiều API rồi rollback tất cả
 description: "Câu hỏi phỏng vấn backend/Spring về transaction kéo dài qua nhiều HTTP API: vì sao @Transactional không thể rollback side effect bên ngoài, khi nào dùng Saga, TCC, Transactional Outbox, idempotency, compensation, XA/2PC và cách thiết kế production-ready."
 ---
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Câu hỏi phỏng vấn](#1-câu-hỏi-phỏng-vấn)
@@ -196,11 +199,13 @@ public void processOrder(Long orderId) {
 
 Khi `inventoryClient.reserve()` ném exception:
 
-```text
-Spring TransactionInterceptor
-  └─ gọi JpaTransactionManager.rollback()
-       └─ JDBC Connection.rollback()
-            └─ rollback SQL trên Order DB
+```d2 title="5. Vì sao @Transactional không rollback được HTTP API"
+direction: right
+interceptor: "Spring TransactionInterceptor"
+manager: "JpaTransactionManager.rollback()"
+connection: "JDBC Connection.rollback()"
+db: "Rollback SQL trên Order DB"
+interceptor -> manager -> connection -> db
 ```
 
 Không có bước nào tự động gọi:
@@ -395,18 +400,26 @@ Nếu gửi trùng, dùng idempotency hoặc deduplication ở consumer.
 
 ### 9.1. State machine
 
-```mermaid
-stateDiagram-v2
-    [*] --> NEW
-    NEW --> PROCESSING: claim operation
-    PROCESSING --> COMPLETED: all steps succeeded
-    PROCESSING --> RETRY_PENDING: transient failure
-    RETRY_PENDING --> PROCESSING: retry
-    PROCESSING --> COMPENSATING: permanent failure
-    COMPENSATING --> CANCELLED: all compensations succeeded
-    COMPENSATING --> MANUAL_REVIEW: compensation exhausted
-    MANUAL_REVIEW --> COMPENSATING: operator retries
-    MANUAL_REVIEW --> CANCELLED: manual resolution
+```d2 title="9.1. State machine"
+direction: right
+n_NEW: "NEW"
+n_PROCESSING: "PROCESSING"
+n_COMPLETED: "COMPLETED"
+n_RETRY_PENDING: "RETRY_PENDING"
+n_COMPENSATING: "COMPENSATING"
+n_CANCELLED: "CANCELLED"
+n_MANUAL_REVIEW: "MANUAL_REVIEW"
+n_start: "Bắt đầu" { shape: circle }
+n_start -> n_NEW
+n_NEW -> n_PROCESSING: "claim operation"
+n_PROCESSING -> n_COMPLETED: "all steps succeeded"
+n_PROCESSING -> n_RETRY_PENDING: "transient failure"
+n_RETRY_PENDING -> n_PROCESSING: "retry"
+n_PROCESSING -> n_COMPENSATING: "permanent failure"
+n_COMPENSATING -> n_CANCELLED: "all compensations succeeded"
+n_COMPENSATING -> n_MANUAL_REVIEW: "compensation exhausted"
+n_MANUAL_REVIEW -> n_COMPENSATING: "operator retries"
+n_MANUAL_REVIEW -> n_CANCELLED: "manual resolution"
 ```
 
 Ý nghĩa trạng thái:
@@ -423,34 +436,29 @@ stateDiagram-v2
 
 ### 9.2. Luồng thành công
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant O as Order Orchestrator
-    participant DB as Order DB
-    participant P as Payment API
-    participant I as Inventory API
-    participant S as Shipping API
-
-    C->>O: process(orderId, requestId)
-    O->>DB: TX1: NEW → PROCESSING, create saga
-    DB-->>O: COMMIT
-
-    O->>P: authorize(idempotencyKey)
-    P-->>O: paymentRef
-    O->>DB: TX2: payment step → SUCCEEDED
-
-    O->>I: reserve(idempotencyKey)
-    I-->>O: reservationRef
-    O->>DB: TX3: inventory step → SUCCEEDED
-
-    O->>S: reserveShipment(idempotencyKey)
-    S-->>O: shipmentRef
-    O->>DB: TX4: shipping step → SUCCEEDED
-
-    O->>DB: TX5: PROCESSING → COMPLETED
-    DB-->>O: COMMIT
-    O-->>C: success
+```d2 title="9.2. Luồng thành công"
+shape: sequence_diagram
+n_C: "Client"
+n_O: "Order Orchestrator"
+n_DB: "Order DB"
+n_P: "Payment API"
+n_I: "Inventory API"
+n_S: "Shipping API"
+n_C -> n_O: "process(orderId, requestId)"
+n_O -> n_DB: "TX1: NEW → PROCESSING, create saga"
+n_DB -> n_O: "COMMIT" { style.stroke-dash: 3 }
+n_O -> n_P: "authorize(idempotencyKey)"
+n_P -> n_O: "paymentRef" { style.stroke-dash: 3 }
+n_O -> n_DB: "TX2: payment step → SUCCEEDED"
+n_O -> n_I: "reserve(idempotencyKey)"
+n_I -> n_O: "reservationRef" { style.stroke-dash: 3 }
+n_O -> n_DB: "TX3: inventory step → SUCCEEDED"
+n_O -> n_S: "reserveShipment(idempotencyKey)"
+n_S -> n_O: "shipmentRef" { style.stroke-dash: 3 }
+n_O -> n_DB: "TX4: shipping step → SUCCEEDED"
+n_O -> n_DB: "TX5: PROCESSING → COMPLETED"
+n_DB -> n_O: "COMMIT" { style.stroke-dash: 3 }
+n_O -> n_C: "success" { style.stroke-dash: 3 }
 ```
 
 Mỗi database transaction ngắn. Không transaction nào mở trong lúc chờ HTTP.
@@ -459,35 +467,29 @@ Mỗi database transaction ngắn. Không transaction nào mở trong lúc chờ
 
 Giả sử Payment và Inventory thành công nhưng Shipping thất bại:
 
-```mermaid
-sequenceDiagram
-    participant O as Orchestrator
-    participant DB as Order DB
-    participant P as Payment API
-    participant I as Inventory API
-    participant S as Shipping API
-
-    O->>P: authorize(payment-key)
-    P-->>O: success
-    O->>DB: payment = SUCCEEDED
-
-    O->>I: reserve(inventory-key)
-    I-->>O: success
-    O->>DB: inventory = SUCCEEDED
-
-    O->>S: reserveShipment(shipping-key)
-    S-->>O: permanent failure
-    O->>DB: saga = COMPENSATING
-
-    O->>I: release(inventory-compensation-key)
-    I-->>O: success
-    O->>DB: inventory = COMPENSATED
-
-    O->>P: voidAuthorization(payment-compensation-key)
-    P-->>O: success
-    O->>DB: payment = COMPENSATED
-
-    O->>DB: order = CANCELLED
+```d2 title="9.3. Luồng thất bại và compensation"
+shape: sequence_diagram
+n_O: "Orchestrator"
+n_DB: "Order DB"
+n_P: "Payment API"
+n_I: "Inventory API"
+n_S: "Shipping API"
+n_O -> n_P: "authorize(payment-key)"
+n_P -> n_O: "success" { style.stroke-dash: 3 }
+n_O -> n_DB: "payment = SUCCEEDED"
+n_O -> n_I: "reserve(inventory-key)"
+n_I -> n_O: "success" { style.stroke-dash: 3 }
+n_O -> n_DB: "inventory = SUCCEEDED"
+n_O -> n_S: "reserveShipment(shipping-key)"
+n_S -> n_O: "permanent failure" { style.stroke-dash: 3 }
+n_O -> n_DB: "saga = COMPENSATING"
+n_O -> n_I: "release(inventory-compensation-key)"
+n_I -> n_O: "success" { style.stroke-dash: 3 }
+n_O -> n_DB: "inventory = COMPENSATED"
+n_O -> n_P: "voidAuthorization(payment-compensation-key)"
+n_P -> n_O: "success" { style.stroke-dash: 3 }
+n_O -> n_DB: "payment = COMPENSATED"
+n_O -> n_DB: "order = CANCELLED"
 ```
 
 Compensation chạy theo thứ tự ngược vì các bước sau thường phụ thuộc vào kết quả của bước trước.
@@ -525,13 +527,15 @@ Vì vậy Saga cung cấp **business consistency**, không cung cấp physical a
 
 Distributed system luôn có trường hợp client không biết request đã thành công hay chưa:
 
-```text
-Order Service ── request ──► Payment Service
-Order Service ◄── timeout ── network
-
-Không biết:
-- Payment chưa nhận request; hoặc
-- Payment đã charge nhưng response bị mất.
+```d2 title="11. Idempotency: điều kiện bắt buộc để retry an toàn"
+shape: sequence_diagram
+order: "Order Service"
+network: Network
+payment: "Payment Service"
+order -> payment: request
+payment -> payment: "Có thể đã xử lý side effect"
+network -> order: timeout
+order.note: "Timeout không chứng minh Payment đã rollback hoặc chưa xử lý"
 ```
 
 Nếu retry bằng request mới, khách hàng có thể bị charge hai lần.
@@ -701,7 +705,7 @@ Code dưới đây minh họa transaction boundary. Nó không phải một fram
 
 ### 14.1. Orchestrator không mở long transaction
 
-```java
+```java source="long-transaction-external-api-rollback/01/OrderProcessOrchestrator.java"
 @Service
 @RequiredArgsConstructor
 public class OrderProcessOrchestrator {
@@ -739,6 +743,10 @@ public class OrderProcessOrchestrator {
 }
 ```
 
+<SourceRef project="long-transaction-external-api-rollback" file="01/OrderProcessOrchestrator.java" region="example" variant="button">
+  Xem OrderProcessOrchestrator.java cùng các ví dụ khác
+</SourceRef>
+
 Điểm cần nói trong phỏng vấn:
 
 - Orchestrator không giữ database transaction xuyên suốt flow.
@@ -748,7 +756,7 @@ public class OrderProcessOrchestrator {
 
 ### 14.2. Transaction service giữ các transaction ngắn
 
-```java
+```java source="long-transaction-external-api-rollback/02/OrderTransactionService.java"
 @Service
 @RequiredArgsConstructor
 public class OrderTransactionService {
@@ -814,6 +822,10 @@ public class OrderTransactionService {
     }
 }
 ```
+
+<SourceRef project="long-transaction-external-api-rollback" file="02/OrderTransactionService.java" region="example" variant="button">
+  Xem OrderTransactionService.java cùng các ví dụ khác
+</SourceRef>
 
 Repository claim nên dùng conditional update:
 
@@ -1008,14 +1020,21 @@ COMMIT;
 
 Worker hoặc CDC connector gửi event sau commit.
 
-```mermaid
-flowchart LR
-    A[Application] -->|1 local TX| B[(Orders)]
-    A -->|same local TX| C[(Outbox)]
-    C --> D[Outbox Publisher]
-    D --> E[Message Broker]
-    E --> F[Saga Worker]
-    F --> G[Remote APIs]
+```d2 title="15. Transactional Outbox giải quyết điều gì"
+direction: right
+n_A: "Application"
+n_B: "Orders" { shape: cylinder }
+n_C: "Outbox" { shape: cylinder }
+n_D: "Outbox Publisher"
+n_E: "Message Broker"
+n_F: "Saga Worker"
+n_G: "Remote APIs"
+n_A -> n_B: "1 local TX"
+n_A -> n_C: "same local TX"
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
 ```
 
 Outbox đảm bảo:
@@ -1071,17 +1090,25 @@ Inventory: release reservation
 Booking: release hold
 ```
 
-```mermaid
-flowchart TD
-    A[Start] --> B[Try Payment]
-    B -->|success| C[Try Inventory]
-    B -->|failure| X[Cancel completed Try steps]
-    C -->|success| D[Try Shipping]
-    C -->|failure| X
-    D -->|success| E[Confirm all]
-    D -->|failure| X
-    E --> F[Completed]
-    X --> G[Cancelled]
+```d2 title="Cancel"
+direction: down
+n_A: "Start"
+n_B: "Try Payment"
+n_C: "Try Inventory"
+n_X: "Cancel completed Try steps"
+n_D: "Try Shipping"
+n_E: "Confirm all"
+n_F: "Completed"
+n_G: "Cancelled"
+n_A -> n_B
+n_B -> n_C: "success"
+n_B -> n_X: "failure"
+n_C -> n_D: "success"
+n_C -> n_X: "failure"
+n_D -> n_E: "success"
+n_D -> n_X: "failure"
+n_E -> n_F
+n_X -> n_G
 ```
 
 TCC tốt hơn "thực hiện thật rồi hoàn tiền" vì reservation thường dễ hủy hơn một final side effect.
@@ -1118,18 +1145,17 @@ Participant ghi log và giữ resource ở trạng thái prepared.
 - Tất cả vote YES: coordinator gửi `COMMIT`.
 - Có một vote NO: coordinator gửi `ROLLBACK`.
 
-```mermaid
-sequenceDiagram
-    participant C as Coordinator
-    participant A as XA Resource A
-    participant B as XA Resource B
-
-    C->>A: PREPARE
-    A-->>C: YES
-    C->>B: PREPARE
-    B-->>C: YES
-    C->>A: COMMIT
-    C->>B: COMMIT
+```d2 title="Phase 2: Commit hoặc Rollback"
+shape: sequence_diagram
+n_C: "Coordinator"
+n_A: "XA Resource A"
+n_B: "XA Resource B"
+n_C -> n_A: "PREPARE"
+n_A -> n_C: "YES" { style.stroke-dash: 3 }
+n_C -> n_B: "PREPARE"
+n_B -> n_C: "YES" { style.stroke-dash: 3 }
+n_C -> n_A: "COMMIT"
+n_C -> n_B: "COMMIT"
 ```
 
 Trong Java, XA thường liên quan đến:
@@ -1209,7 +1235,7 @@ Nếu client retry, service trả lại operation cũ.
 
 Entity có `@Version`:
 
-```java
+```java source="long-transaction-external-api-rollback/03/OrderSagaEntity.java"
 @Entity
 public class OrderSagaEntity {
     @Id
@@ -1222,6 +1248,10 @@ public class OrderSagaEntity {
     private SagaStatus status;
 }
 ```
+
+<SourceRef project="long-transaction-external-api-rollback" file="03/OrderSagaEntity.java" region="example" variant="button">
+  Xem OrderSagaEntity.java cùng các ví dụ khác
+</SourceRef>
 
 Optimistic locking ngăn hai worker ghi đè trạng thái của nhau. Tuy nhiên nó không thay thế idempotency ở remote API.
 
@@ -1529,23 +1559,37 @@ Timeout chỉ nghĩa là caller không nhận được kết quả đúng hạn.
 
 ## 24. Cây quyết định trong phỏng vấn
 
-```mermaid
-flowchart TD
-    A[Flow có gọi resource bên ngoài?] -->|Không| B[Dùng local DB transaction]
-    A -->|Có| C{API có side effect?}
-    C -->|Không, chỉ read/validate| D[Gọi API trước hoặc ngoài transaction]
-    C -->|Có| E{API hỗ trợ reserve/confirm/cancel?}
-    E -->|Có| F[TCC hoặc Saga]
-    E -->|Không| G{Có compensating API?}
-    G -->|Có| H[Saga compensation]
-    G -->|Không| I{Side effect có thể dời sau commit?}
-    I -->|Có| J[Outbox + async worker]
-    I -->|Không| K[Redesign requirement hoặc manual reconciliation]
-    F --> L[Idempotency + persisted state + retry]
-    H --> L
-    J --> L
-    A --> M{Mọi resource hỗ trợ XA và cần atomicity mạnh?}
-    M -->|Có| N[Cân nhắc XA/2PC]
+```d2 title="24. Cây quyết định trong phỏng vấn"
+direction: down
+n_A: "Flow có gọi resource bên ngoài?"
+n_B: "Dùng local DB transaction"
+n_C: "API có side effect?" { shape: diamond }
+n_D: "Gọi API trước hoặc ngoài transaction"
+n_E: "API hỗ trợ reserve/confirm/cancel?" { shape: diamond }
+n_F: "TCC hoặc Saga"
+n_G: "Có compensating API?" { shape: diamond }
+n_H: "Saga compensation"
+n_I: "Side effect có thể dời sau commit?" { shape: diamond }
+n_J: "Outbox + async worker"
+n_K: "Redesign requirement hoặc manual\nreconciliation"
+n_L: "Idempotency + persisted state + retry"
+n_M: "Mọi resource hỗ trợ XA và cần\natomicity mạnh?" { shape: diamond }
+n_N: "Cân nhắc XA/2PC"
+n_A -> n_B: "Không"
+n_A -> n_C: "Có"
+n_C -> n_D: "Không, chỉ read/validate"
+n_C -> n_E: "Có"
+n_E -> n_F: "Có"
+n_E -> n_G: "Không"
+n_G -> n_H: "Có"
+n_G -> n_I: "Không"
+n_I -> n_J: "Có"
+n_I -> n_K: "Không"
+n_F -> n_L
+n_H -> n_L
+n_J -> n_L
+n_A -> n_M
+n_M -> n_N: "Có"
 ```
 
 Cách trình bày bằng lời:

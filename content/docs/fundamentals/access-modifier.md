@@ -174,13 +174,19 @@ module com.app {
 }
 ```
 
-```mermaid
-flowchart TD
-    Caller["Class ở module khác"] --> M{"package có exports?"}
-    M -->|không| Blocked["Không thấy — dù member là public"]
-    M -->|có| L2{"member là public/protected?"}
-    L2 -->|có| OK["Truy cập được"]
-    L2 -->|không| Blocked2["Bị chặn theo modifier thường"]
+```d2 title="7. JPMS — lớp kiểm soát thứ hai"
+direction: down
+n_Caller: "Class ở module khác"
+n_M: "package có exports?" { shape: diamond }
+n_Blocked: "Không thấy — dù member là public"
+n_L2: "member là public/protected?" { shape: diamond }
+n_OK: "Truy cập được"
+n_Blocked2: "Bị chặn theo modifier thường"
+n_Caller -> n_M
+n_M -> n_Blocked: "không"
+n_M -> n_L2: "có"
+n_L2 -> n_OK: "có"
+n_L2 -> n_Blocked2: "không"
 ```
 
 Hệ quả: trong thế giới module, "public" không còn nghĩa "mọi nơi". `exports ... to <module>` (qualified export) còn giới hạn ai được dùng. Reflection cũng bị chặn trừ khi `opens`.

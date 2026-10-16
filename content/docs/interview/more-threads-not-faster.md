@@ -260,11 +260,14 @@ Thread của bạn có thể scale, nhưng **tài nguyên phía sau** thì khôn
 | **Network/băng thông** | Tổng băng thông cố định; chia cho nhiều thread không tăng tổng |
 | **API bên thứ ba** | Rate limit; quá nhiều request song song → bị 429 / throttle |
 
-```text
-App server (100 thread)  ──►  DB connection pool (10 conn)  ──►  Database
-                              ▲
-                         CỔ CHAI THẬT nằm ở đây, không phải số thread
-   → Tăng thread từ 100 lên 200 không giúp gì: vẫn chỉ 10 query chạy được cùng lúc
+```d2 title="10. Thủ phạm #5: Cổ chai tài nguyên dùng chung"
+direction: right
+app: "App server: 100 threads"
+pool: "DB connection pool: 10 connections"
+db: "Database"
+wait: "90 threads chờ connection: thêm thread\nkhông tăng throughput DB"
+app -> pool -> db
+pool -> wait
 ```
 
 > [!WARNING]
@@ -310,28 +313,27 @@ Nguyên tắc thực hành:
 
 ## 12. Checklist chẩn đoán — vì sao không scale
 
-```text
-╭──────────────────────────────────────────────────────────────╮
-│ B1. Tác vụ CPU-bound hay I/O-bound?                          │
-│     • CPU-bound → số thread tối ưu ≈ số core. Quá đó = hại.   │
-│     • I/O-bound → cần nhiều thread hơn, nhưng coi chừng cổ chai│
-│                                                              │
-│ B2. Đo CPU utilization khi chạy nhiều thread:                │
-│     • CPU ~100% mà không nhanh hơn → context switch/Amdahl   │
-│     • CPU thấp mà vẫn chậm → đang CHỜ (lock? I/O? DB pool?)   │
-│                                                              │
-│ B3. Có vùng synchronized/lock nóng không?                    │
-│     • Có → lock contention (mục 7). Profile thời gian chờ lock│
-│                                                              │
-│ B4. Có tài nguyên dùng chung giới hạn không?                 │
-│     • DB connection pool / đĩa / mạng / rate limit (mục 10)   │
-│                                                              │
-│ B5. GC chiếm bao nhiêu %? Có OOM/thread creation fail không? │
-│     • GC cao hoặc tạo thread thất bại → quá nhiều thread (m9) │
-│                                                              │
-│ B6. Nghi false sharing? (CPU cao, không lock, vẫn chậm)      │
-│     • Kiểm tra biến nóng nằm chung cache line (mục 8)         │
-╰──────────────────────────────────────────────────────────────╯
+```d2 title="12. Checklist chẩn đoán — vì sao không scale"
+direction: down
+b1: "B1: CPU-bound hay I/O-bound?"
+cpu: "CPU-bound: tối ưu ≈ số core; quá đó =\nhại"
+io: "I/O-bound: nhiều thread hơn, coi chừng\ncổ chai"
+b2: "B2: Đo CPU utilization"
+high: "CPU ~100%, không nhanh hơn: context\nswitch / Amdahl"
+low: "CPU thấp, chậm: đang chờ lock / I/O / DB\npool"
+b3: "B3: Có synchronized / lock nóng? Profile\nthời gian chờ"
+b4: "B4: Tài nguyên chung giới hạn? DB pool /\nđĩa / mạng / rate limit"
+b5: "B5: GC cao / OOM / thread creation fail?\nCó thể quá nhiều thread"
+b6: "B6: CPU cao, không lock, vẫn chậm? Kiểm\ntra false sharing"
+b1 -> cpu: CPU
+b1 -> io: I/O
+cpu -> b2
+io -> b2
+b2 -> high: Cao
+b2 -> low: Thấp
+high -> b3
+low -> b3
+b3 -> b4 -> b5 -> b6
 ```
 
 > [!TIP]

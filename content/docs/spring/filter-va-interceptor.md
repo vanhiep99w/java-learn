@@ -8,6 +8,9 @@ description: "Phân biệt Servlet Filter, Spring MVC HandlerInterceptor và AOP
 > [!IMPORTANT]
 > Trong Spring, từ **interceptor** có hai nghĩa. `HandlerInterceptor` chặn HTTP handler trong Spring MVC. `MethodInterceptor` chặn method của Spring AOP. Bài này tập trung vào `Filter` và `HandlerInterceptor`, đồng thời phân biệt chúng với AOP để tránh nhầm lẫn.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Tổng quan: request đi qua những tầng nào?](#1-tổng-quan-request-đi-qua-những-tầng-nào)
@@ -112,7 +115,7 @@ Client ← Filter A ← Filter B ← DispatcherServlet ← Controller
 
 Cấu trúc này giải thích vì sao một filter có thể thực hiện logic trước và sau controller:
 
-```java
+```java source="filter-va-interceptor/01/TimingFilter.java"
 @Component
 @Order(20)
 public class TimingFilter implements Filter {
@@ -133,6 +136,10 @@ public class TimingFilter implements Filter {
     }
 }
 ```
+
+<SourceRef project="filter-va-interceptor" file="01/TimingFilter.java" region="example" variant="button">
+  Xem TimingFilter.java cùng các ví dụ khác
+</SourceRef>
 
 Nếu filter **không gọi** `chain.doFilter()`, chain bị dừng. Đây là cách một filter trả `401 Unauthorized`, xử lý CORS preflight hoặc redirect trước khi controller chạy.
 
@@ -206,7 +213,7 @@ Khác Filter, interceptor nhận `Object handler`. Với controller annotation-b
 
 ### 3.1. Ba callback chính
 
-```java
+```java source="filter-va-interceptor/02/AuditInterceptor.java"
 public class AuditInterceptor implements HandlerInterceptor {
 
     @Override
@@ -238,6 +245,10 @@ public class AuditInterceptor implements HandlerInterceptor {
     }
 }
 ```
+
+<SourceRef project="filter-va-interceptor" file="02/AuditInterceptor.java" region="example" variant="button">
+  Xem AuditInterceptor.java cùng các ví dụ khác
+</SourceRef>
 
 | Callback | Thời điểm | Mục đích phù hợp |
 |---|---|---|
@@ -271,18 +282,18 @@ public boolean preHandle(
 
 `DispatcherServlet` hỏi các `HandlerMapping` để tìm handler. `RequestMappingHandlerMapping` thường trả về `HandlerExecutionChain`: handler cộng với danh sách interceptor áp dụng cho path đó.
 
-```text
-GET /api/orders/42
-      │
-      ▼
-RequestMappingHandlerMapping
-      │
-      ├── chọn handler: OrderController.getById(Long)
-      └── ghép HandlerExecutionChain:
-          [TraceInterceptor, TenantInterceptor, AuditInterceptor]
-      │
-      ▼
-DispatcherServlet gọi preHandle theo thứ tự
+```d2 title="3.2. Interceptor chain được chọn thế nào"
+direction: down
+request: "GET /api/orders/42"
+mapping: "RequestMappingHandlerMapping"
+handler: "Chọn OrderController.getById(Long)"
+chain: "HandlerExecutionChain: TraceInterceptor,\nTenantInterceptor, AuditInterceptor"
+ds: "DispatcherServlet gọi preHandle theo thứ\ntự"
+request -> mapping
+mapping -> handler
+mapping -> chain
+handler -> ds
+chain -> ds
 ```
 
 Khi handler hoàn thành, callback đi ngược:
@@ -299,24 +310,41 @@ Nếu `TenantInterceptor.preHandle()` trả `false`, `AuditInterceptor` và cont
 
 Ví dụ ứng dụng có encoding filter, Spring Security, trace filter và hai MVC interceptor:
 
-```mermaid
-flowchart TD
-    A[Client request] --> B[CharacterEncodingFilter]
-    B --> C[TraceIdFilter]
-    C --> D[DelegatingFilterProxy]
-    D --> E[FilterChainProxy: Spring Security filters]
-    E --> F[DispatcherServlet]
-    F --> G[HandlerMapping chọn controller và interceptors]
-    G --> H[TraceInterceptor.preHandle]
-    H --> I[TenantInterceptor.preHandle]
-    I --> J[Controller method]
-    J --> K[TenantInterceptor.postHandle]
-    K --> L[TraceInterceptor.postHandle]
-    L --> M[Render view hoặc HttpMessageConverter ghi body]
-    M --> N[TenantInterceptor.afterCompletion]
-    N --> O[TraceInterceptor.afterCompletion]
-    O --> P[TraceIdFilter finally]
-    P --> Q[HTTP response]
+```d2 title="4. Luồng request end-to-end"
+direction: down
+n_A: "Client request"
+n_B: "CharacterEncodingFilter"
+n_C: "TraceIdFilter"
+n_D: "DelegatingFilterProxy"
+n_E: "FilterChainProxy: Spring Security\nfilters"
+n_F: "DispatcherServlet"
+n_G: "HandlerMapping chọn controller và\ninterceptors"
+n_H: "TraceInterceptor.preHandle"
+n_I: "TenantInterceptor.preHandle"
+n_J: "Controller method"
+n_K: "TenantInterceptor.postHandle"
+n_L: "TraceInterceptor.postHandle"
+n_M: "Render view hoặc HttpMessageConverter\nghi body"
+n_N: "TenantInterceptor.afterCompletion"
+n_O: "TraceInterceptor.afterCompletion"
+n_P: "TraceIdFilter finally"
+n_Q: "HTTP response"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H
+n_H -> n_I
+n_I -> n_J
+n_J -> n_K
+n_K -> n_L
+n_L -> n_M
+n_M -> n_N
+n_N -> n_O
+n_O -> n_P
+n_P -> n_Q
 ```
 
 Các điểm cần nhớ:
@@ -353,7 +381,7 @@ Spring Boot có nhiều cách đăng ký filter. Với filter quản lý bởi S
 
 Với filter Spring, ưu tiên kế thừa `OncePerRequestFilter`:
 
-```java
+```java source="filter-va-interceptor/03/TraceIdFilter.java"
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
@@ -371,6 +399,10 @@ public class TraceIdFilter extends OncePerRequestFilter {
     }
 }
 ```
+
+<SourceRef project="filter-va-interceptor" file="03/TraceIdFilter.java" region="example" variant="button">
+  Xem TraceIdFilter.java cùng các ví dụ khác
+</SourceRef>
 
 Class này đặt request attribute với tên riêng để phát hiện filter đã chạy. Nó cũng cung cấp hook rõ ràng cho async và error dispatch:
 
@@ -392,7 +424,7 @@ protected boolean shouldNotFilterErrorDispatch() {
 
 Dùng `FilterRegistrationBean` khi filter chỉ áp dụng cho một số URL, phải chọn dispatcher type, hoặc cần order rõ ràng so với các registration khác:
 
-```java
+```java source="filter-va-interceptor/04/FilterConfig.java"
 @Configuration
 public class FilterConfig {
 
@@ -414,6 +446,10 @@ public class FilterConfig {
     }
 }
 ```
+
+<SourceRef project="filter-va-interceptor" file="04/FilterConfig.java" region="example" variant="button">
+  Xem FilterConfig.java cùng các ví dụ khác
+</SourceRef>
 
 **Số order nhỏ chạy trước.** Hãy coi order là một phần của contract hệ thống, không phải chi tiết ngẫu nhiên. Ví dụ CORS phải chạy trước authentication để preflight không bị trả `401`.
 
@@ -466,7 +502,7 @@ Không log password, access token, cookie, dữ liệu thanh toán hoặc toàn 
 
 Đăng ký MVC interceptor qua `WebMvcConfigurer`. Cách này giữ mapping và thứ tự ở một nơi có thể review được:
 
-```java
+```java source="filter-va-interceptor/05/WebConfig.java"
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
@@ -495,6 +531,10 @@ public class WebConfig implements WebMvcConfigurer {
 }
 ```
 
+<SourceRef project="filter-va-interceptor" file="05/WebConfig.java" region="example" variant="button">
+  Xem WebConfig.java cùng các ví dụ khác
+</SourceRef>
+
 `addPathPatterns()` và `excludePathPatterns()` chỉ điều khiển interceptor này có được thêm vào `HandlerExecutionChain` hay không. Chúng không phải security rule. Một endpoint bị exclude khỏi audit interceptor vẫn cần được authorize bởi Spring Security nếu endpoint đó không public.
 
 Trong `preHandle`, kiểm tra `handler` trước khi cast. Một số handler có thể không phải `HandlerMethod`.
@@ -521,7 +561,7 @@ public boolean preHandle(
 
 Correlation ID là mã định danh liên kết log của cùng một request. Đây là use case đúng cho Filter vì ID cần có từ đầu request, bao gồm cả Spring Security và lỗi trước controller.
 
-```java
+```java source="filter-va-interceptor/06/CorrelationIdFilter.java"
 @Component
 @Order(10)
 public class CorrelationIdFilter extends OncePerRequestFilter {
@@ -550,11 +590,15 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 }
 ```
 
+<SourceRef project="filter-va-interceptor" file="06/CorrelationIdFilter.java" region="example" variant="button">
+  Xem CorrelationIdFilter.java cùng các ví dụ khác
+</SourceRef>
+
 `MDC` (Mapped Diagnostic Context) là map theo thread mà logging framework dùng để chèn field vào log. `finally` là bắt buộc: Tomcat tái sử dụng thread. Không clear MDC có thể khiến log của request B mang correlation ID của request A.
 
 Nếu audit cần tên controller và method, bổ sung một interceptor chuyên MVC thay vì cố suy đoán ở filter:
 
-```java
+```java source="filter-va-interceptor/07/EndpointAuditInterceptor.java"
 @Component
 public class EndpointAuditInterceptor implements HandlerInterceptor {
 
@@ -587,19 +631,31 @@ public class EndpointAuditInterceptor implements HandlerInterceptor {
 }
 ```
 
+<SourceRef project="filter-va-interceptor" file="07/EndpointAuditInterceptor.java" region="example" variant="button">
+  Xem EndpointAuditInterceptor.java cùng các ví dụ khác
+</SourceRef>
+
 ## 9. Authentication và authorization: đặt ở đâu?
 
 Không dùng `HandlerInterceptor` tự viết làm security framework mặc định. Spring Security thực hiện authentication và authorization bằng filter chain để nó có thể bảo vệ request **trước** DispatcherServlet và áp dụng nhất quán cho mọi endpoint.
 
-```text
-Servlet container
-  └── DelegatingFilterProxy
-        └── FilterChainProxy (Spring Security)
-              ├── SecurityContextHolderFilter
-              ├── CorsFilter
-              ├── BearerTokenAuthenticationFilter / BasicAuthenticationFilter
-              ├── ExceptionTranslationFilter
-              └── AuthorizationFilter
+```d2 title="9. Authentication và authorization: đặt ở đâu?"
+direction: right
+t0: "Servlet container"
+t1: "DelegatingFilterProxy"
+t0 -> t1
+t2: "FilterChainProxy (Spring Security)"
+t1 -> t2
+t3: "SecurityContextHolderFilter"
+t2 -> t3
+t4: "CorsFilter"
+t2 -> t4
+t5: "BearerTokenAuthenticationFilter / BasicAuthenticationFilter"
+t2 -> t5
+t6: "ExceptionTranslationFilter"
+t2 -> t6
+t7: "AuthorizationFilter"
+t2 -> t7
 ```
 
 Ví dụ resource server dùng JWT:
@@ -735,7 +791,7 @@ Hệ quả:
 
 `AsyncHandlerInterceptor` thêm callback `afterConcurrentHandlingStarted()`. Khi request chuyển sang async, callback này chạy trên thread ban đầu trước khi thread được giải phóng:
 
-```java
+```java source="filter-va-interceptor/08/TenantAsyncInterceptor.java"
 @Component
 public class TenantAsyncInterceptor implements AsyncHandlerInterceptor {
 
@@ -764,6 +820,10 @@ public class TenantAsyncInterceptor implements AsyncHandlerInterceptor {
     }
 }
 ```
+
+<SourceRef project="filter-va-interceptor" file="08/TenantAsyncInterceptor.java" region="example" variant="button">
+  Xem TenantAsyncInterceptor.java cùng các ví dụ khác
+</SourceRef>
 
 Nếu dùng `@Async`, `CompletableFuture` hoặc executor riêng, dùng `TaskDecorator` để copy có kiểm soát MDC/context sang task rồi clear trong `finally`. Với `SecurityContext`, dùng `DelegatingSecurityContextAsyncTaskExecutor` thay vì tự copy object authentication một cách tuỳ tiện.
 
@@ -828,24 +888,35 @@ Không lưu request context reactive vào `ThreadLocal`. Một reactive pipeline
 
 ## 15. Tóm tắt
 
-```text
-Filter
-  = tầng Servlet container
-  = bao quanh DispatcherServlet
-  = phù hợp cho HTTP transport, CORS, tracing, wrapping request/response
-
-HandlerInterceptor
-  = tầng Spring MVC
-  = chạy sau khi đã chọn controller handler
-  = phù hợp cho endpoint metadata, MVC audit, context theo route
-
-AOP MethodInterceptor
-  = tầng Spring bean method
-  = phù hợp cho transaction, cache, retry và business cross-cutting concern
-
-Spring Security
-  = filter chain chuyên dụng
-  = nơi mặc định cho authentication và authorization HTTP
+```d2 title="15. Tóm tắt"
+direction: right
+t0: "Filter"
+t1: "= tầng Servlet container"
+t0 -> t1
+t2: "= bao quanh DispatcherServlet"
+t0 -> t2
+t3: "= phù hợp cho HTTP transport, CORS, tracing, wrapping request/response"
+t0 -> t3
+t4: "HandlerInterceptor"
+t0 -> t4
+t5: "= tầng Spring MVC"
+t4 -> t5
+t6: "= chạy sau khi đã chọn controller handler"
+t4 -> t6
+t7: "= phù hợp cho endpoint metadata, MVC audit, context theo route"
+t4 -> t7
+t8: "AOP MethodInterceptor"
+t0 -> t8
+t9: "= tầng Spring bean method"
+t8 -> t9
+t10: "= phù hợp cho transaction, cache, retry và business cross-cutting concern"
+t8 -> t10
+t11: "Spring Security"
+t0 -> t11
+t12: "= filter chain chuyên dụng"
+t11 -> t12
+t13: "= nơi mặc định cho authentication và authorization HTTP"
+t11 -> t13
 ```
 
 > [!TIP]

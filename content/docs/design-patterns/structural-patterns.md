@@ -78,11 +78,15 @@ InputStream in =
 
 Vì sao không dùng kế thừa? Vì tổ hợp tính năng **bùng nổ**: `BufferedFileStream`, `GzipBufferedFileStream`, `EncryptedGzipBufferedFileStream`... Decorator cho phép **kết hợp runtime** thay vì tạo lớp cho mọi tổ hợp.
 
-```mermaid
-flowchart LR
-    F["FileInputStream"] --> G["GZIPInputStream (giải nén)"]
-    G --> B["BufferedInputStream (đệm)"]
-    B --> Client["client đọc"]
+```d2 title="3. Decorator — thêm hành vi động bằng cách bọc"
+direction: right
+n_F: "FileInputStream"
+n_G: "GZIPInputStream (giải nén)"
+n_B: "BufferedInputStream (đệm)"
+n_Client: "client đọc"
+n_F -> n_G
+n_G -> n_B
+n_B -> n_Client
 ```
 
 ```java
@@ -144,11 +148,15 @@ UserService proxy = (UserService) Proxy.newProxyInstance(
 | Bọc nhiều lớp? | thường 1 | có (chuỗi) | thường 1 |
 | Ví dụ JDK | `InputStreamReader` | `BufferedInputStream` | `Proxy.newProxyInstance` |
 
-```mermaid
-flowchart TD
-    Q{"Mục đích bọc?"} -->|interface không khớp| A["Adapter"]
-    Q -->|thêm tính năng| D["Decorator"]
-    Q -->|gác cổng / lazy / remote| P["Proxy"]
+```d2 title="5. Adapter vs Decorator vs Proxy — phân biệt dứt khoát"
+direction: down
+n_Q: "Mục đích bọc?" { shape: diamond }
+n_A: "Adapter"
+n_D: "Decorator"
+n_P: "Proxy"
+n_Q -> n_A: "interface không khớp"
+n_Q -> n_D: "thêm tính năng"
+n_Q -> n_P: "gác cổng / lazy / remote"
 ```
 
 > [!TIP]
@@ -199,12 +207,17 @@ class Directory implements FileSystemNode {             // composite
 // dir.size() tự cộng dồn cả cây — client không cần phân biệt file hay folder
 ```
 
-```mermaid
-flowchart TD
-    Root["Directory /"] --> A["Directory src/"]
-    Root --> B["File readme.md"]
-    A --> C["File Main.java"]
-    A --> D["File Util.java"]
+```d2 title="7. Composite — cây đệ quy phần tử/nhóm đồng nhất"
+direction: down
+n_Root: "Directory /"
+n_A: "Directory src/"
+n_B: "File readme.md"
+n_C: "File Main.java"
+n_D: "File Util.java"
+n_Root -> n_A
+n_Root -> n_B
+n_A -> n_C
+n_A -> n_D
 ```
 
 > [!TIP]

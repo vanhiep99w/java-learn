@@ -5,6 +5,9 @@ description: "Mổ xẻ Exception trong Java: cây Throwable (Error/Exception/Ru
 
 Exception handling tách luồng xử lý lỗi khỏi luồng thành công và cho phép lỗi được truyền qua nhiều tầng gọi. Thiết kế exception tốt phải thể hiện đúng loại thất bại, nơi chịu trách nhiệm xử lý và thông tin cần để chẩn đoán.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -28,19 +31,31 @@ Exception dành cho tình huống bất thường, không phải cơ chế đi�
 
 ## 2. Cây phân cấp Throwable — Error, Exception, RuntimeException
 
-```
-                    Object
-                      │
-                  Throwable
-                 ┌────┴────┐
-               Error    Exception
-                │       ┌────┴────────────────┐
-                │   RuntimeException    (checked exceptions)
-                │       │                     │
-           OutOfMemory  NullPointer      IOException
-           StackOverflow IllegalArgument  SQLException
-           LinkageError  IndexOutOf       FileNotFoundException
-                        ClassCast         InterruptedException
+```d2 title="2. Cây phân cấp Throwable — Error, Exception, RuntimeException"
+direction: right
+t0: "Object"
+t1: "│"
+t0 -> t1
+t2: "Throwable"
+t0 -> t2
+t3: "┌────┴────┐"
+t0 -> t3
+t4: "Error    Exception"
+t0 -> t4
+t5: "│       ┌────┴────────────────┐"
+t4 -> t5
+t6: "│   RuntimeException    (checked exceptions)"
+t4 -> t6
+t7: "│       │                     │"
+t4 -> t7
+t8: "OutOfMemory  NullPointer      IOException"
+t0 -> t8
+t9: "StackOverflow IllegalArgument  SQLException"
+t0 -> t9
+t10: "LinkageError  IndexOutOf       FileNotFoundException"
+t0 -> t10
+t11: "ClassCast         InterruptedException"
+t10 -> t11
 ```
 
 | Loại | Phải catch/declare? | Khi nào dùng | Ví dụ |
@@ -265,7 +280,7 @@ ifElseControl                avgt   10      3.2 ±  0.1   ns/op   ← 600x nhanh
 
 ### 6.2. Skip stack trace (khi cần performance)
 
-```java
+```java source="exception-handling/01/FastException.java"
 public class FastException extends RuntimeException {
     public FastException(String message) {
         super(message, null, true, false);  // writableStackTrace = false
@@ -277,6 +292,10 @@ public class FastException extends RuntimeException {
     }
 }
 ```
+
+<SourceRef project="exception-handling" file="01/FastException.java" region="example" variant="button">
+  Xem FastException.java cùng các ví dụ khác
+</SourceRef>
 
 Use case: exception dùng cho **control flow nội bộ** (vd: `break` khỏi deep recursion), không cần stack trace cho debug.
 
@@ -344,7 +363,7 @@ catch (OrderServiceException e) {
 
 ### 8.1. Base exception
 
-```java
+```java source="exception-handling/02/AppException.java"
 public abstract class AppException extends RuntimeException {
     private final String errorCode;       // "ORDER_NOT_FOUND", "PAYMENT_FAILED"
     private final HttpStatus httpStatus;  // map thẳng sang HTTP response
@@ -360,9 +379,13 @@ public abstract class AppException extends RuntimeException {
 }
 ```
 
+<SourceRef project="exception-handling" file="02/AppException.java" region="example" variant="button">
+  Xem AppException.java cùng các ví dụ khác
+</SourceRef>
+
 ### 8.2. Specific exceptions
 
-```java
+```java source="exception-handling/03/NotFoundException.java"
 public class NotFoundException extends AppException {
     public NotFoundException(String resource, Object id) {
         super(resource + "_NOT_FOUND",
@@ -377,6 +400,10 @@ public class BusinessException extends AppException {
     }
 }
 ```
+
+<SourceRef project="exception-handling" file="03/NotFoundException.java" region="example" variant="button">
+  Xem NotFoundException.java cùng các ví dụ khác
+</SourceRef>
 
 ### 8.3. Nguyên tắc
 
@@ -393,7 +420,7 @@ public class BusinessException extends AppException {
 
 ### 9.1. @ControllerAdvice + @ExceptionHandler
 
-```java
+```java source="exception-handling/04/GlobalExceptionHandler.java"
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -417,6 +444,10 @@ public class GlobalExceptionHandler {
     }
 }
 ```
+
+<SourceRef project="exception-handling" file="04/GlobalExceptionHandler.java" region="example" variant="button">
+  Xem GlobalExceptionHandler.java cùng các ví dụ khác
+</SourceRef>
 
 ### 9.2. ProblemDetail (RFC 7807) — Spring 6+
 

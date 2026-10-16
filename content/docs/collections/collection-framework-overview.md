@@ -32,17 +32,24 @@ Giá trị lớn nhất của Collection Framework không chỉ nằm ở các c
 
 Điểm gây bất ngờ nhất: **`Map` KHÔNG kế thừa `Collection`**. Có hai cây độc lập:
 
-```mermaid
-flowchart TD
-    It["Iterable&lt;T&gt;"] --> Col["Collection&lt;E&gt;"]
-    Col --> List["List&lt;E&gt;"]
-    Col --> Set["Set&lt;E&gt;"]
-    Col --> Queue["Queue&lt;E&gt;"]
-    Queue --> Deque["Deque&lt;E&gt;"]
-    Set --> SortedSet["SortedSet → NavigableSet"]
-
-    Map["Map&lt;K,V&gt; (cây RIÊNG, không phải Collection)"]
-    Map --> SortedMap["SortedMap → NavigableMap"]
+```d2 title="2. Hệ phân cấp interface — Collection vs Map"
+direction: down
+n_It: "Iterable<T>"
+n_Col: "Collection<E>"
+n_List: "List<E>"
+n_Set: "Set<E>"
+n_Queue: "Queue<E>"
+n_Deque: "Deque<E>"
+n_SortedSet: "SortedSet → NavigableSet"
+n_Map: "Map<K,V> (cây RIÊNG, không phải\nCollection)"
+n_SortedMap: "SortedMap → NavigableMap"
+n_It -> n_Col
+n_Col -> n_List
+n_Col -> n_Set
+n_Col -> n_Queue
+n_Queue -> n_Deque
+n_Set -> n_SortedSet
+n_Map -> n_SortedMap
 ```
 
 Vì sao `Map` đứng riêng? Vì `Collection` mô hình hoá "một nhóm phần tử **đơn**", còn `Map` là "ánh xạ **cặp** key→value". Ép `Map extends Collection` sẽ tạo ra mơ hồ: `add(E)` thêm gì — key, value, hay entry? Tuy vậy `Map` *kết nối* với Collection qua 3 view: `keySet()` (Set), `values()` (Collection), `entrySet()` (Set\<Entry\>).
@@ -184,17 +191,27 @@ immut.add(3);           // UnsupportedOperationException ngay lập tức
 
 ## 9. Bảng chọn cấu trúc phù hợp
 
-```mermaid
-flowchart TD
-    Start{"Cần ánh xạ key→value?"} -->|có| Map["Map: HashMap / TreeMap / LinkedHashMap"]
-    Start -->|không| Dup{"Cho phép trùng?"}
-    Dup -->|có| Order1{"Cần index/thứ tự?"}
-    Dup -->|không| Order2{"Cần thứ tự?"}
-    Order1 -->|có| ArrayList["ArrayList (mặc định)"]
-    Order1 -->|FIFO/LIFO| Deque["ArrayDeque"]
-    Order2 -->|không| HashSet["HashSet"]
-    Order2 -->|thứ tự chèn| LinkedHashSet["LinkedHashSet"]
-    Order2 -->|sắp xếp| TreeSet["TreeSet"]
+```d2 title="9. Bảng chọn cấu trúc phù hợp"
+direction: down
+n_Start: "Cần ánh xạ key→value?" { shape: diamond }
+n_Map: "Map: HashMap / TreeMap / LinkedHashMap"
+n_Dup: "Cho phép trùng?" { shape: diamond }
+n_Order1: "Cần index/thứ tự?" { shape: diamond }
+n_Order2: "Cần thứ tự?" { shape: diamond }
+n_ArrayList: "ArrayList (mặc định)"
+n_Deque: "ArrayDeque"
+n_HashSet: "HashSet"
+n_LinkedHashSet: "LinkedHashSet"
+n_TreeSet: "TreeSet"
+n_Start -> n_Map: "có"
+n_Start -> n_Dup: "không"
+n_Dup -> n_Order1: "có"
+n_Dup -> n_Order2: "không"
+n_Order1 -> n_ArrayList: "có"
+n_Order1 -> n_Deque: "FIFO/LIFO"
+n_Order2 -> n_HashSet: "không"
+n_Order2 -> n_LinkedHashSet: "thứ tự chèn"
+n_Order2 -> n_TreeSet: "sắp xếp"
 ```
 
 | Nhu cầu | Chọn | Độ phức tạp chính |

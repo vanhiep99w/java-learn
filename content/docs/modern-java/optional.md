@@ -95,11 +95,15 @@ opt.flatMap(User::findManager)          // findManager: User → Optional<User>
 //  nếu dùng map ở đây sẽ ra Optional<Optional<User>> — sai
 ```
 
-```mermaid
-flowchart LR
-    O["Optional&lt;User&gt;"] -->|"filter(active)"| F["Optional&lt;User&gt;"]
-    F -->|"map(getName): trả String"| M["Optional&lt;String&gt;"]
-    F -->|"flatMap(findMgr): trả Optional"| FM["Optional&lt;User&gt; (phẳng)"]
+```d2 title="4. Biến đổi: map / flatMap / filter"
+direction: right
+n_O: "Optional<User>"
+n_F: "Optional<User>"
+n_M: "Optional<String>"
+n_FM: "Optional<User> (phẳng)"
+n_O -> n_F: "filter(active)"
+n_F -> n_M: "map(getName): trả String"
+n_F -> n_FM: "flatMap(findMgr): trả Optional"
 ```
 
 > [!NOTE]

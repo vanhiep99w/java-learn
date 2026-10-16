@@ -44,13 +44,11 @@ Có ba thực thể khác nhau:
 | **Reference** | `R1` (nhãn minh họa) | Giá trị cho biết object nào đang được tham chiếu |
 | **Object** | `new User("An")` | Dữ liệu thật: object có field, header, và trạng thái riêng |
 
-```text
-Biến local trong method                 Object trên heap
-┌──────────────────┐                   ┌──────────────────────────┐
-│ user             │                   │ User                     │
-│ value = ref R1   │ ───────────────►  │   name = "An"            │
-└──────────────────┘                   └──────────────────────────┘
-             reference R1
+```d2 title="1. Ba khái niệm phải tách riêng"
+direction: right
+local: "Biến local user\nvalue = reference R1"
+user: "Heap: User {name = An}"
+local -> user: R1
 ```
 
 `user` không “chứa object”. Nó chứa một **reference value**. Object thật tồn tại độc lập cho đến khi không còn đường đi hợp lệ nào từ GC Roots tới nó.
@@ -112,16 +110,17 @@ void run() {
 }
 ```
 
-```text
-JVM stack của cùng một thread                         Heap
-┌──────────────────── frame run ──────────────────┐  ┌─────────────────────┐
-│ local = R1 ─────────────────────────────────────┼─►│ User                │
-└─────────────────────────────────────────────────┘  │ name = R2 ───────┐  │
-                                                     └──────────────────┼──┘
-┌────────────────── frame greet ──────────────────┐                    ▼
-│ user = R1 ──────────────────────────────────────┼────────────► ┌──────────┐
-│ name = R2 ──────────────────────────────────────┼────────────► │ "An"     │
-└─────────────────────────────────────────────────┘              └──────────┘
+```d2 title="3.1 Local variable và method parameter"
+direction: right
+stack: "JVM stack: cùng thread" {
+  run: "frame run" { local: "local = R1" }
+  greet: "frame greet" { user: "user = R1"; name: "name = R2" }
+}
+heap: Heap { user: "User: name = R2"; name: "String An" }
+stack.run.local -> heap.user
+stack.greet.user -> heap.user
+stack.greet.name -> heap.name
+heap.user -> heap.name: R2
 ```
 
 Khi `greet` return, frame `greet` bị pop và các slot `user`, `name` biến mất. Object không tự động biến mất chỉ vì một reference biến mất; nó chỉ đủ điều kiện GC nếu không còn **bất kỳ** path nào từ GC Roots.
@@ -142,14 +141,13 @@ User[] members = new User[2]; // array object trên heap
 members[0] = team.leader;     // reference element nằm trong array object
 ```
 
-```text
-stack                              heap
-team = R1 ───────────────────►  Team object
-                                 leader = R2 ────────────► User("An")
-
-members = R3 ─────────────────► User[] object
-                                 [0] = R2 ───────────────► cùng User("An")
-                                 [1] = null
+```d2 title="3.2 Instance field và array element"
+direction: right
+stack: Stack { team: "team = R1"; local: "localOwner = R2" }
+heap: Heap { team: "Team object"; user: "User object" }
+stack.team -> heap.team: R1
+heap.team -> heap.user: "owner = R2"
+stack.local -> heap.user: R2
 ```
 
 Đây là lý do một object có thể sống rất lâu: một collection, cache, static map hoặc object parent vẫn còn reference tới nó.
@@ -164,11 +162,13 @@ class UserCache {
 }
 ```
 
-```text
-GC Root (class UserCache)
-        │
-        ▼
-     CACHE map ──► entries ──► User objects
+```d2 title="3.3 Static field"
+direction: right
+root: "GC Root: class UserCache"
+cache: "static CACHE map"
+entries: "Entries"
+users: "User objects"
+root -> cache -> entries -> users
 ```
 
 `static` không có nghĩa object “không bao giờ bị GC”. Nó có nghĩa object vẫn reachable **chừng nào class và static field còn reachable**. Với class loader của application thông thường, điều này thường kéo dài hết vòng đời process. Đây là nguồn memory leak phổ biến nếu cache không có eviction.
@@ -181,18 +181,19 @@ Thay vì xem bộ nhớ như những object rời rạc, hãy xem nó là một 
 Order order = new Order(customer, items);
 ```
 
-```text
-GC Root: local variable `order`
-              │
-              ▼
-           Order
-          /     \
-         ▼       ▼
-   Customer     List<Item>
-                  │
-             ┌────┴────┐
-             ▼         ▼
-           Item      Item
+```d2 title="4. Từ biến Java đến object graph"
+direction: down
+root: "GC Root: local variable order"
+order: "Order"
+customer: "Customer"
+items: "List<Item>"
+i1: "Item 1"
+i2: "Item 2"
+root -> order
+order -> customer
+order -> items
+items -> i1
+items -> i2
 ```
 
 Khi local `order` không còn tồn tại sau khi method return, toàn bộ graph phía dưới **có thể** trở thành rác — nhưng chỉ khi không object nào trong graph còn được trỏ tới bởi một path khác từ GC Root.
@@ -203,18 +204,15 @@ Ví dụ, nếu `customer` đồng thời có trong `static Map`, `Customer` v�
 
 Khi chạy `new User("An")`, JVM cần cấp phát bộ nhớ cho object. Với HotSpot, object thường có cấu trúc khái niệm sau:
 
-```text
-┌──────────────────── Object trên heap ────────────────────┐
-│ Object header                                            │
-│  • Mark word: hash/GC age/trạng thái lock ...            │
-│  • Klass pointer: metadata của class User                │
-├──────────────────────────────────────────────────────────┤
-│ Instance fields                                          │
-│  • name: reference R2 ────────────────────────────────► String object
-│  • age : primitive int 30                                │
-├──────────────────────────────────────────────────────────┤
-│ Padding để đáp ứng alignment                             │
-└──────────────────────────────────────────────────────────┘
+```d2 title="5. Object được tạo và có layout ra sao?"
+direction: right
+object: "Object trên heap" {
+  header: "Object header: Mark word (hash / GC age / lock)\nKlass pointer: metadata class User"
+  fields: "Instance fields" { name: "name = R2"; age: "age = int 30" }
+  padding: "Padding: đáp ứng alignment"
+}
+string: "String object"
+object.fields.name -> string: R2
 ```
 
 - **Object header** chứa metadata phục vụ JVM, không phải field bạn khai báo.
@@ -243,14 +241,16 @@ Một số GC Roots thường gặp:
 | JNI reference | Object bị native code giữ |
 | Internal JVM structures | Class loader, synchronized monitor, JIT structures |
 
-```text
-GC Root
-  │
-  ├──► static CACHE ───► User A       => sống
-  │
-  └──► local order ────► Item B       => sống khi method đang chạy
-
-Object C không có path từ GC Root     => eligible for GC
+```d2 title="6.1 GC Roots và reachability"
+direction: down
+root: "GC Root"
+cache: "static CACHE"
+a: "User A: sống"
+local: "local order"
+b: "Item B: sống khi method đang chạy"
+c: "Object C: không có path từ root →\neligible for GC"
+root -> cache -> a
+root -> local -> b
 ```
 
 “Eligible for GC” không có nghĩa bị thu hồi ngay lập tức. Thời điểm GC chạy và collector nào thu hồi là quyết định của JVM.
@@ -279,14 +279,19 @@ second = null;
 
 Nhiều collector hiện đại copy hoặc compact object sống để giảm phân mảnh. Vì vậy một object có thể chuyển từ vùng heap cũ sang vùng mới trong lúc GC.
 
-```text
-Trước GC:
-local user = R1 ───────► [User ở vùng heap A]
-
-GC copy/compact:
-local user = R1 ───────► [User ở vùng heap B]
-                             ▲
-                      JVM đã cập nhật reference/metadata cần thiết
+```d2 title="6.3 Moving GC: object đổi chỗ nhưng reference vẫn hợp lệ"
+direction: right
+before: "Trước GC" {
+  ref: "local user = R1"
+  object: "User ở vùng heap A"
+  ref -> object
+}
+after: "Sau compacting GC" {
+  ref: "local user = R1 (reference được cập nhật)"
+  object: "Cùng User ở vùng heap B"
+  ref -> object
+}
+before.object -> after.object: "Object di chuyển; JVM cập nhật reference"
 ```
 
 JVM đảm bảo Java code không thấy object bị “mất địa chỉ”. Tùy collector, JVM dùng kỹ thuật như cập nhật reference khi compact, forwarding pointer, hay read/write barrier để giữ việc truy cập an toàn trong và sau GC.
@@ -328,14 +333,20 @@ mutate(user);    // user.name là "Bình"
 reassign(user);  // user vẫn trỏ User("Bình")
 ```
 
-```text
-Gọi mutate(user) hoặc reassign(user):
-
-caller frame:    user      = R1 ──► User("An")
-method frame:    parameter = R1 ──► cùng User("An")
-
-`parameter.name = ...`  → đổi object R1 trỏ tới
-`parameter = R2`        → chỉ đổi slot parameter trong method frame
+```d2 title="8. Reference trong lời gọi method: liên hệ pass-by-value"
+direction: right
+caller: "Caller: user = R1"
+param: "Parameter: bản sao R1"
+object: "User object tại R1"
+newobject: "Object mới tại R2"
+mutate: "mutate: đổi state object dùng chung"
+reassign: "reassign: chỉ đổi parameter local sang\nR2"
+caller -> param: "copy reference value"
+caller -> object
+param -> object
+mutate -> object
+reassign -> newobject
+param -> newobject: "chỉ sau reassign" { style.stroke-dash: 3 }
 ```
 
 Để đào sâu riêng chủ đề này, xem [Java luôn Pass-by-Value](/interview/java-pass-by-value-vs-pass-by-reference/).
@@ -425,20 +436,16 @@ Không. Nó là identity hash code và có thể dùng để log/phân biệt ob
 
 ## 12. Cheat sheet
 
-```text
-Biến       = một slot có thể giữ giá trị
-Reference  = giá trị trỏ/định vị object; không nhất thiết là raw address
-Object     = dữ liệu thật gồm header + fields, thường ở heap
-
-Local ref/parameter  → thường ở stack frame
-Field/array ref      → nằm trong object/mảng trên heap
-Static ref           → gắn với class, thường là GC Root
-
-GC Roots → trace reference graph → giữ object reachable
-Không reachable → eligible for GC
-GC có thể di chuyển object; JVM giữ reference hợp lệ
-
-Java truyền object reference BY VALUE, không pass-by-reference
+```d2 title="12. Cheat sheet"
+direction: down
+root: "GC Root"
+cache: "static CACHE"
+a: "User A: sống"
+local: "local order"
+b: "Item B: sống khi method đang chạy"
+c: "Object C: không có path từ root →\neligible for GC"
+root -> cache -> a
+root -> local -> b
 ```
 
 **Ba nguyên tắc để trả lời phỏng vấn:**

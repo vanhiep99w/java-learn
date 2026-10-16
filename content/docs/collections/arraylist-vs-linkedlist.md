@@ -108,11 +108,17 @@ public class LinkedList<E> {
 }
 ```
 
-```
-first                                                    last
-  │                                                       │
-  ▼                                                       ▼
-[prev|A|next] ⇄ [prev|B|next] ⇄ [prev|C|next] ⇄ [prev|D|next]
+```d2 title="4. LinkedList — doubly linked list bên trong"
+direction: right
+first: "first"
+last: "last"
+a: "prev | A | next"
+b: "prev | B | next"
+c: "prev | C | next"
+d: "prev | D | next"
+first -> a
+a <-> b <-> c <-> d
+last -> d
 ```
 
 - `addFirst`/`addLast`/`add(node đã biết)` = chỉnh vài con trỏ → **O(1)** (khi bạn **đã ở** node đó).
@@ -144,13 +150,19 @@ first                                                    last
 
 Đây là lý do sâu xa nhất. CPU đọc RAM theo **cache line** (~64 byte) và **prefetch** các vùng liền kề.
 
-```
-ArrayList (mảng reference liền mạch):
-  [ref][ref][ref][ref][ref] ...   ← CPU prefetch cả block, duyệt tuyến tính = hit cache
-
-LinkedList (node rải khắp heap):
-  node A @0x1000 ─next─▶ node B @0x8F40 ─next─▶ node C @0x2210 ...
-  mỗi bước = nhảy địa chỉ ngẫu nhiên → cache MISS → chờ RAM (~100x chậm hơn cache)
+```d2 title="6. Cache locality — vì sao LinkedList thường thua"
+direction: right
+array: "ArrayList: mảng reference liền mạch"
+prefetch: "CPU prefetch cả block: cache hit"
+linked: "LinkedList: node rải khắp heap"
+a: "Node A @0x1000"
+b: "Node B @0x8F40"
+c: "Node C @0x2210"
+miss: "Pointer chasing: cache MISS, chờ RAM\n(~100x chậm hơn cache)"
+array -> prefetch
+linked -> a
+a -> b -> c: next
+c -> miss
 ```
 
 - Duyệt `ArrayList`: truy cập tuần tự, prefetcher đoán đúng → gần như toàn cache hit.
@@ -182,12 +194,17 @@ for (String s : list) {
 }
 ```
 
-```mermaid
-flowchart LR
-    A["iterator() → lưu expectedModCount"] --> B["next()/hasNext()"]
-    B --> C{"modCount == expectedModCount?"}
-    C -->|có| D["tiếp tục"]
-    C -->|không| E["ném ConcurrentModificationException"]
+```d2 title="7. modCount & fail-fast iterator"
+direction: right
+n_A: "iterator() → lưu expectedModCount"
+n_B: "next()/hasNext()"
+n_C: "modCount == expectedModCount?" { shape: diamond }
+n_D: "tiếp tục"
+n_E: "ném ConcurrentModificationException"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "có"
+n_C -> n_E: "không"
 ```
 
 > [!NOTE]

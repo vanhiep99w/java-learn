@@ -36,12 +36,17 @@ Phần này tập trung vào cách `ConcurrentHashMap` giảm contention, sau đ
 
 Java 7 chia map thành **16 Segment**, mỗi segment là một mini-HashMap riêng với một `ReentrantLock`:
 
-```
-ConcurrentHashMap (Java 7)
-├── Segment[0]  ← ReentrantLock + HashEntry[]
-├── Segment[1]  ← ReentrantLock + HashEntry[]
-├── ...
-└── Segment[15] ← ReentrantLock + HashEntry[]
+```d2 title="2.1. Java 7 — Segment (mini-HashMap)"
+direction: right
+t0: "ConcurrentHashMap (Java 7)"
+t1: "Segment[0]  ← ReentrantLock + HashEntry[]"
+t0 -> t1
+t2: "Segment[1]  ← ReentrantLock + HashEntry[]"
+t0 -> t2
+t3: "..."
+t0 -> t3
+t4: "Segment[15] ← ReentrantLock + HashEntry[]"
+t0 -> t4
 ```
 
 Tối đa **16 thread** ghi song song (một thread/segment). Đọc dùng **volatile** read — không cần lock.
@@ -52,17 +57,20 @@ Tối đa **16 thread** ghi song song (một thread/segment). Đọc dùng **vol
 
 JDK 8 loại bỏ `Segment`, dùng trực tiếp **mảng `Node<K,V>[]`** (giống HashMap) nhưng lock ở cấp **từng bin** (phần tử đầu tiên của chain):
 
-```mermaid
-flowchart LR
-    subgraph "Node[] table"
-        B0["bin 0"]
-        B1["bin 1"]
-        B2["bin 2"]
-        BN["bin n-1"]
-    end
-    T1[Thread A] -->|"lock bin 2"| B2
-    T2[Thread B] -->|"lock bin 0"| B0
-    T3[Thread C] -->|"CAS vào bin rỗng"| B1
+```d2 title="2.2. Java 8+ — Bin-level lock"
+direction: right
+n_group1: "Node[] table" {
+  n_B0: "bin 0"
+  n_B1: "bin 1"
+  n_B2: "bin 2"
+  n_BN: "bin n-1"
+}
+n_T1: "Thread A"
+n_T2: "Thread B"
+n_T3: "Thread C"
+n_T1 -> n_group1.n_B2: "lock bin 2"
+n_T2 -> n_group1.n_B0: "lock bin 0"
+n_T3 -> n_group1.n_B1: "CAS vào bin rỗng"
 ```
 
 - Bin **rỗng** → dùng **CAS** (không lock gì cả)
@@ -137,27 +145,42 @@ Tại sao cần hash ≥ 0? Vì hash **âm** được dành riêng cho node đ�
 
 Đây là trái tim của `ConcurrentHashMap`. Flow đầy đủ:
 
-```mermaid
-flowchart TD
-    A["putVal(hash, key, value)"] --> B{"table == null?"}
-    B -->|có| INIT["initTable() — CAS sizeCtl"]
-    B -->|không| C["tính index: i = (n-1) & hash"]
-    INIT --> C
-    C --> D{"tabAt(i) == null?"}
-    D -->|"bin rỗng"| CAS["CAS đặt Node mới vào bin"]
-    CAS -->|thành công| DONE["addCount, return"]
-    CAS -->|thất bại| C
-    D -->|"có node"| E{"node.hash == MOVED?"}
-    E -->|có| HELP["helpTransfer() — giúp resize"]
-    HELP --> C
-    E -->|không| LOCK["synchronized(firstNode)"]
-    LOCK --> F{"linked list hay tree?"}
-    F -->|list| G["duyệt chain, thêm/update node"]
-    F -->|tree| H["putTreeVal()"]
-    G --> CHECK["binCount >= TREEIFY? → treeifyBin"]
-    H --> CHECK
-    CHECK --> UNLOCK["unlock, addCount"]
-    UNLOCK --> DONE
+```d2 title="5. putVal() — CAS + synchronized từng bin"
+direction: down
+n_A: "putVal(hash, key, value)"
+n_B: "table == null?" { shape: diamond }
+n_INIT: "initTable() — CAS sizeCtl"
+n_C: "tính index: i = (n-1) & hash"
+n_D: "tabAt(i) == null?" { shape: diamond }
+n_CAS: "CAS đặt Node mới vào bin"
+n_DONE: "addCount, return"
+n_E: "node.hash == MOVED?" { shape: diamond }
+n_HELP: "helpTransfer() — giúp resize"
+n_LOCK: "synchronized(firstNode)"
+n_F: "linked list hay tree?" { shape: diamond }
+n_G: "duyệt chain, thêm/update node"
+n_H: "putTreeVal()"
+n_CHECK: "binCount >= TREEIFY? → treeifyBin"
+n_UNLOCK: "unlock, addCount"
+n_A -> n_B
+n_B -> n_INIT: "có"
+n_B -> n_C: "không"
+n_INIT -> n_C
+n_C -> n_D
+n_D -> n_CAS: "bin rỗng"
+n_CAS -> n_DONE: "thành công"
+n_CAS -> n_C: "thất bại"
+n_D -> n_E: "có node"
+n_E -> n_HELP: "có"
+n_HELP -> n_C
+n_E -> n_LOCK: "không"
+n_LOCK -> n_F
+n_F -> n_G: "list"
+n_F -> n_H: "tree"
+n_G -> n_CHECK
+n_H -> n_CHECK
+n_CHECK -> n_UNLOCK
+n_UNLOCK -> n_DONE
 ```
 
 Source code rút gọn (JDK 17):
@@ -217,12 +240,22 @@ static final <K,V> boolean casTabAt(Node<K,V>[] tab, int i, Node<K,V> c, Node<K,
 
 ### 5.2. Concurrency level: 1 bin = 1 lock
 
-```
-Ví dụ: map có 64 bin, 16 threads cùng put:
-  Thread 1 → bin[3]  ─┐
-  Thread 2 → bin[7]   │ Tất cả chạy song song!
-  Thread 3 → bin[15]  │ (khác bin → khác lock)
-  Thread 4 → bin[3]  ─┘ CHỈ thread 1 & 4 cạnh tranh (cùng bin[3])
+```d2 title="5.2. Concurrency level: 1 bin = 1 lock"
+direction: right
+t1: "Thread 1"
+t2: "Thread 2"
+t3: "Thread 3"
+t4: "Thread 4"
+b3: "bin[3]: chỉ Thread 1 và 4 cạnh tranh"
+b7: "bin[7]: lock riêng"
+b15: "bin[15]: lock riêng"
+parallel: "64 bin, 16 threads: khác bin chạy song\nsong"
+t1 -> b3
+t4 -> b3
+t2 -> b7
+t3 -> b15
+parallel -> b7: khác lock
+parallel -> b15: khác lock
 ```
 
 Lock granularity = **N bins** (N = table.length, mặc định 16 → grow theo load). So với JDK 7 ConcurrentHashMap dùng **16 segments cố định**, JDK 8+ có granularity **tỉ lệ với table size** — tốt hơn nhiều.
@@ -242,22 +275,21 @@ int stride = (NCPU > 1) ? (n >>> 3) / NCPU : n;
 if (stride < MIN_TRANSFER_STRIDE) stride = MIN_TRANSFER_STRIDE;
 ```
 
-```mermaid
-sequenceDiagram
-    participant T1 as Thread 1
-    participant T2 as Thread 2
-    participant Tab as table[]
-    participant Next as nextTable[]
-
-    T1->>Tab: put() vượt threshold
-    T1->>Next: tạo nextTable (gấp đôi)
-    T1->>Tab: nhận chunk [48..63], bắt đầu migrate
-    T2->>Tab: put() thấy MOVED
-    T2->>Tab: helpTransfer() — nhận chunk [32..47]
-    T1->>Tab: migrate bin 48: đặt ForwardingNode
-    T2->>Tab: migrate bin 32: đặt ForwardingNode
-    Note over T1,T2: Song song migrate, không block nhau
-    T1->>Tab: hoàn tất → table = nextTable
+```d2 title="6. Transfer (resize) — concurrent migration từng bin"
+shape: sequence_diagram
+n_T1: "Thread 1"
+n_T2: "Thread 2"
+n_Tab: "table[]"
+n_Next: "nextTable[]"
+n_T1 -> n_Tab: "put() vượt threshold"
+n_T1 -> n_Next: "tạo nextTable (gấp đôi)"
+n_T1 -> n_Tab: "nhận chunk [48..63], bắt đầu migrate"
+n_T2 -> n_Tab: "put() thấy MOVED"
+n_T2 -> n_Tab: "helpTransfer() — nhận chunk [32..47]"
+n_T1 -> n_Tab: "migrate bin 48: đặt ForwardingNode"
+n_T2 -> n_Tab: "migrate bin 32: đặt ForwardingNode"
+n_T1.note1: "Thread 1 / Thread 2: Song song\nmigrate, không block nhau"
+n_T1 -> n_Tab: "hoàn tất → table = nextTable"
 ```
 
 Khi một bin được migrate xong, head của nó được thay bằng `ForwardingNode`. Mọi thread khác `get()` qua bin này sẽ **tự động chuyển hướng** tìm ở `nextTable`:

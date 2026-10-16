@@ -5,6 +5,9 @@ description: "Mổ xẻ vòng đời Spring Bean: từ BeanDefinition scanning �
 
 Spring Bean Lifecycle mô tả các giai đoạn từ lúc container đọc bean definition, tạo instance, inject dependency, chạy callback khởi tạo cho đến khi hủy bean. Thứ tự này quyết định thời điểm một bean thực sự sẵn sàng để sử dụng.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -63,27 +66,39 @@ Instantiate → Populate → Initialize → Use → Destroy
 
 Khi cần debug startup, circular dependency hoặc AOP proxy, dùng phiên bản chi tiết dưới đây:
 
-```mermaid
-flowchart TD
-    subgraph P[Container preparation — bean instance chưa tồn tại]
-        A["1. BeanDefinition Loading<br/>(scan @Component, @Bean, XML)"] --> B["2. BeanFactoryPostProcessor<br/>(modify definitions)"]
-    end
-
-    subgraph L[Bean lifecycle]
-        C["3. Instantiate<br/>(constructor / factory method)"] --> D["4. Populate Properties<br/>(@Autowired, @Value injection)"]
-        D --> E["5. Aware callbacks<br/>(BeanNameAware, BeanFactoryAware...)"]
-        E --> F["6. BeanPostProcessor.beforeInitialization"]
-        F --> G["7. @PostConstruct"]
-        G --> H["8. InitializingBean.afterPropertiesSet()"]
-        H --> I["9. Custom init-method"]
-        I --> J["10. BeanPostProcessor.afterInitialization<br/>(thường tạo AOP proxy)"]
-        J --> K["11. Use — bean ready"]
-        K --> L1["12. @PreDestroy"]
-        L1 --> M["13. DisposableBean.destroy()"]
-        M --> N["14. Custom destroy-method"]
-    end
-
-    B --> C
+```d2 title="2.2. Luồng đầy đủ: container preparation + bean lifecycle"
+direction: down
+n_P: "Container preparation — bean instance\nchưa tồn tại" {
+  n_A: "1. BeanDefinition Loading\n(scan @Component, @Bean, XML)"
+  n_B: "2. BeanFactoryPostProcessor\n(modify definitions)"
+}
+n_L: "Bean lifecycle" {
+  n_C: "3. Instantiate\n(constructor / factory method)"
+  n_D: "4. Populate Properties\n(@Autowired, @Value injection)"
+  n_E: "5. Aware callbacks\n(BeanNameAware, BeanFactoryAware...)"
+  n_F: "6.\nBeanPostProcessor.beforeInitialization"
+  n_G: "7. @PostConstruct"
+  n_H: "8.\nInitializingBean.afterPropertiesSet()"
+  n_I: "9. Custom init-method"
+  n_J: "10.\nBeanPostProcessor.afterInitialization\n(thường tạo AOP proxy)"
+  n_K: "11. Use — bean ready"
+  n_L1: "12. @PreDestroy"
+  n_M: "13. DisposableBean.destroy()"
+  n_N: "14. Custom destroy-method"
+}
+n_P.n_A -> n_P.n_B
+n_L.n_C -> n_L.n_D
+n_L.n_D -> n_L.n_E
+n_L.n_E -> n_L.n_F
+n_L.n_F -> n_L.n_G
+n_L.n_G -> n_L.n_H
+n_L.n_H -> n_L.n_I
+n_L.n_I -> n_L.n_J
+n_L.n_J -> n_L.n_K
+n_L.n_K -> n_L.n_L1
+n_L.n_L1 -> n_L.n_M
+n_L.n_M -> n_L.n_N
+n_P.n_B -> n_L.n_C
 ```
 
 **`Initialize` trong bản rút gọn bao gồm steps 5–10**. Đây là lý do hai cách biểu diễn không mâu thuẫn: một cách nhóm các callback kỹ thuật dưới một pha, cách còn lại bung chúng ra để thấy thứ tự chính xác.
@@ -118,7 +133,7 @@ Sources:
 
 ## 4. BeanFactoryPostProcessor — sửa definition trước instantiation
 
-```java
+```java source="bean-lifecycle/01/CustomBFPP.java"
 @Component
 public class CustomBFPP implements BeanFactoryPostProcessor {
     @Override
@@ -130,6 +145,10 @@ public class CustomBFPP implements BeanFactoryPostProcessor {
     }
 }
 ```
+
+<SourceRef project="bean-lifecycle" file="01/CustomBFPP.java" region="example" variant="button">
+  Xem CustomBFPP.java cùng các ví dụ khác
+</SourceRef>
 
 **Built-in BFPPs quan trọng:**
 
@@ -156,7 +175,7 @@ public class CustomBFPP implements BeanFactoryPostProcessor {
 
 ### 5.2. Dependency Injection types
 
-```java
+```java source="bean-lifecycle/02/OrderService.java"
 // 1. Constructor injection (RECOMMENDED):
 @Service
 public class OrderService {
@@ -177,6 +196,10 @@ public void setClient(PaymentClient client) { this.client = client; }
 private PaymentClient paymentClient;  // null trong constructor!
 ```
 
+<SourceRef project="bean-lifecycle" file="02/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
+
 > [!TIP]
 > **Constructor injection** đảm bảo: dependencies non-null khi constructor xong, bean immutable (final fields), dễ test (truyền mock qua constructor). Field injection ẩn dependencies + null trong constructor.
 
@@ -196,7 +219,7 @@ public interface BeanPostProcessor {
 
 **Flow cho MỖI bean**: injection → `before*` → init callbacks → `after*`
 
-```java
+```java source="bean-lifecycle/03/LoggingBPP.java"
 @Component
 public class LoggingBPP implements BeanPostProcessor {
     @Override
@@ -209,6 +232,10 @@ public class LoggingBPP implements BeanPostProcessor {
     }
 }
 ```
+
+<SourceRef project="bean-lifecycle" file="03/LoggingBPP.java" region="example" variant="button">
+  Xem LoggingBPP.java cùng các ví dụ khác
+</SourceRef>
 
 **Built-in BPPs quan trọng:**
 
@@ -226,7 +253,7 @@ public class LoggingBPP implements BeanPostProcessor {
 
 Ba cách định nghĩa initialization logic — chạy theo thứ tự:
 
-```java
+```java source="bean-lifecycle/04/CacheService.java"
 @Service
 public class CacheService implements InitializingBean {
     @Autowired
@@ -251,6 +278,10 @@ public class CacheService implements InitializingBean {
     }
 }
 ```
+
+<SourceRef project="bean-lifecycle" file="04/CacheService.java" region="example" variant="button">
+  Xem CacheService.java cùng các ví dụ khác
+</SourceRef>
 
 | Method | Thứ tự | Coupling | Use case |
 |--------|--------|---------|----------|
@@ -294,7 +325,7 @@ Caller → ProxySubclass(extends TargetClass) → MethodInterceptor → super.me
 
 ### 8.3. Self-invocation problem
 
-```java
+```java source="bean-lifecycle/05/UserService.java"
 @Service
 public class UserService {
     @Transactional
@@ -307,6 +338,10 @@ public class UserService {
 }
 ```
 
+<SourceRef project="bean-lifecycle" file="05/UserService.java" region="example" variant="button">
+  Xem UserService.java cùng các ví dụ khác
+</SourceRef>
+
 ```
 Caller → Proxy.register() → Target.register() → Target.createUser() ← NO PROXY!
                                                    ↑ direct call, AOP skipped
@@ -314,7 +349,7 @@ Caller → Proxy.register() → Target.register() → Target.createUser() ← NO
 
 **Giải pháp:**
 
-```java
+```java source="bean-lifecycle/06/RegistrationService.java"
 // 1. Inject self (circular, cần CGLIB):
 @Autowired private UserService self;
 public void register(User user) {
@@ -331,13 +366,17 @@ public class RegistrationService {
 }
 ```
 
+<SourceRef project="bean-lifecycle" file="06/RegistrationService.java" region="example" variant="button">
+  Xem RegistrationService.java cùng các ví dụ khác
+</SourceRef>
+
 ---
 
 ## 9. Circular Dependency — three-level cache
 
 ### 9.1. Vấn đề
 
-```java
+```java source="bean-lifecycle/07/A.java"
 @Service
 class A {
     @Autowired B b;    // A cần B
@@ -349,6 +388,10 @@ class B {
 }
 // Chicken-and-egg: tạo A cần B, tạo B cần A → deadlock?
 ```
+
+<SourceRef project="bean-lifecycle" file="07/A.java" region="example" variant="button">
+  Xem A.java cùng các ví dụ khác
+</SourceRef>
 
 ### 9.2. Three-level cache giải quyết (singleton only)
 
@@ -400,26 +443,25 @@ protected Object getEarlyBeanReference(String name, RootBeanDefinition mbd, Obje
 5. Quay lại A: inject B (đã sẵn sàng) → A fully initialized → vào cache level 1
 ```
 
-```mermaid
-sequenceDiagram
-    participant C as Container
-    participant L3 as Level 3 (Factory)
-    participant L2 as Level 2 (Early)
-    participant L1 as Level 1 (Final)
-
-    C->>C: Create A (constructor)
-    C->>L3: put factory(A)
-    C->>C: Need B for A → Create B
-    C->>L3: put factory(B)
-    C->>C: Need A for B → lookup A
-    C->>L3: get factory(A) → early ref A
-    L3->>L2: promote A to level 2
-    C->>C: Inject early A into B
-    C->>C: B fully init
-    C->>L1: put B
-    C->>C: Inject B into A
-    C->>C: A fully init
-    C->>L1: put A
+```d2 title="9.2. Three-level cache giải quyết (singleton only)"
+shape: sequence_diagram
+n_C: "Container"
+n_L3: "Level 3 (Factory)"
+n_L2: "Level 2 (Early)"
+n_L1: "Level 1 (Final)"
+n_C -> n_C: "Create A (constructor)"
+n_C -> n_L3: "put factory(A)"
+n_C -> n_C: "Need B for A → Create B"
+n_C -> n_L3: "put factory(B)"
+n_C -> n_C: "Need A for B → lookup A"
+n_C -> n_L3: "get factory(A) → early ref A"
+n_L3 -> n_L2: "promote A to level 2"
+n_C -> n_C: "Inject early A into B"
+n_C -> n_C: "B fully init"
+n_C -> n_L1: "put B"
+n_C -> n_C: "Inject B into A"
+n_C -> n_C: "A fully init"
+n_C -> n_L1: "put A"
 ```
 
 ### 9.3. Khi nào circular dependency KHÔNG giải quyết được?
@@ -466,7 +508,7 @@ public class OrderService {
 
 **Fix: scoped proxy hoặc ObjectFactory**
 
-```java
+```java source="bean-lifecycle/08/ShoppingCart.java"
 // 1. Scoped proxy:
 @Component
 @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -484,6 +526,10 @@ public class OrderService {
     }
 }
 ```
+
+<SourceRef project="bean-lifecycle" file="08/ShoppingCart.java" region="example" variant="button">
+  Xem ShoppingCart.java cùng các ví dụ khác
+</SourceRef>
 
 ---
 

@@ -82,17 +82,27 @@ protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundE
 }
 ```
 
-```mermaid
-flowchart TD
-    A["AppClassLoader nhận request load 'com.example.Foo'"] --> B["Delegate lên PlatformClassLoader"]
-    B --> C["Delegate lên BootstrapClassLoader"]
-    C --> D{"Bootstrap tìm thấy?"}
-    D -->|có| E["Trả về class (java.lang.*, java.util.*, ...)"]
-    D -->|không| F{"PlatformClassLoader tìm thấy?"}
-    F -->|có| G["Trả về class (java.sql.*, javax.*, ...)"]
-    F -->|không| H{"AppClassLoader tìm thấy?"}
-    H -->|có| I["Trả về class (classpath của app)"]
-    H -->|không| J["ClassNotFoundException"]
+```d2 title="3. Parent Delegation Model — tìm class từ trên xuống"
+direction: down
+n_A: "AppClassLoader nhận request load\n'com.example.Foo'"
+n_B: "Delegate lên PlatformClassLoader"
+n_C: "Delegate lên BootstrapClassLoader"
+n_D: "Bootstrap tìm thấy?" { shape: diamond }
+n_E: "Trả về class (java.lang.*,\njava.util.*, ...)"
+n_F: "PlatformClassLoader tìm thấy?" { shape: diamond }
+n_G: "Trả về class (java.sql.*, javax.*,\n...)"
+n_H: "AppClassLoader tìm thấy?" { shape: diamond }
+n_I: "Trả về class (classpath của app)"
+n_J: "ClassNotFoundException"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E: "có"
+n_D -> n_F: "không"
+n_F -> n_G: "có"
+n_F -> n_H: "không"
+n_H -> n_I: "có"
+n_H -> n_J: "không"
 ```
 
 **Vì sao delegation từ dưới lên?**

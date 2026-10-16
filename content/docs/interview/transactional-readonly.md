@@ -62,22 +62,15 @@ Nhiều người tin đoạn này sẽ ném exception hoặc bị chặn. Thực
 
 Khi Spring mở transaction với `readOnly=true`, nó tác động ở 2 tầng:
 
-```text
-@Transactional(readOnly=true)
-        │
-        ├──► Tầng Hibernate (JPA):
-        │      session.setDefaultReadOnly(true)
-        │      FlushMode = MANUAL
-        │      → TẮT automatic dirty checking flush
-        │      → entity load lên KHÔNG bị so sánh/auto-ghi lúc commit
-        │      → không giữ snapshot để so → nhẹ bộ nhớ + nhanh hơn
-        │
-        └──► Tầng JDBC:
-               Connection.setReadOnly(true)   ← chỉ là HINT
-               → driver/DB CÓ THỂ:
-                   • định tuyến tới read replica
-                   • tối ưu (bỏ undo log, khóa nhẹ hơn)
-                   • HOẶC lờ đi hoàn toàn (nhiều DB không cấm ghi)
+```d2 title="4. readOnly=true THỰC SỰ làm gì?"
+direction: down
+annotation: "@Transactional(readOnly=true)"
+hibernate: "Hibernate (JPA):\nsession.setDefaultReadOnly(true),\nFlushMode = MANUAL"
+effect: "Tắt automatic dirty checking flush:\nentity không auto-ghi lúc commit; không\ngiữ snapshot → nhẹ bộ nhớ"
+jdbc: "JDBC: Connection.setReadOnly(true) chỉ\nlà HINT"
+db: "Driver / DB có thể định tuyến read\nreplica, tối ưu undo log / khóa, HOẶC lờ\nđi (không cấm ghi)"
+annotation -> hibernate -> effect
+annotation -> jdbc -> db
 ```
 
 ### Dirty checking là gì (và vì sao tắt nó tiết kiệm)?
@@ -106,12 +99,17 @@ public void f() {
 
 **(2) DB không tôn trọng `setReadOnly`.** `Connection.setReadOnly(true)` chỉ là gợi ý. Nhiều DB (vd MySQL với một số cấu hình) **không thực sự cấm ghi** trên connection read-only — chúng chỉ coi đó là gợi ý tối ưu/định tuyến. PostgreSQL thì nghiêm hơn (có thể báo lỗi `cannot execute UPDATE in a read-only transaction` nếu transaction được set read-only ở tầng DB), nhưng hành vi **phụ thuộc DB + driver + cấu hình**.
 
-```text
-repo.save() ──► Hibernate flush tường minh ──► UPDATE gửi xuống DB
-                                                   │
-                                  DB có cấm không? ─┤
-                                                   ├─ PostgreSQL (tx read-only thật): có thể lỗi
-                                                   └─ MySQL (mặc định): thường vẫn ghi OK
+```d2 title="5. Vì sao vẫn UPDATE được dù readOnly=true"
+direction: down
+save: "repo.save()"
+flush: "Hibernate flush tường minh"
+update: "UPDATE gửi xuống DB"
+check: "DB có cấm không?"
+pg: "PostgreSQL: tx read-only thật có thể lỗi"
+mysql: "MySQL mặc định: thường vẫn ghi OK"
+save -> flush -> update -> check
+check -> pg
+check -> mysql
 ```
 
 > [!TIP]
@@ -145,11 +143,13 @@ Dù không chặn ghi, `readOnly=true` mang lại giá trị thật:
 3. **Method không public / final** — CGLIB không proxy được → annotation bị bỏ qua.
 4. **Gọi từ cùng class / không qua bean proxy** — như self-invocation.
 
-```text
-Tx read-write A (mở từ ngoài)
-   └── gọi method B @Transactional(readOnly=true) [REQUIRED]
-          → B tham gia tx A (không tạo tx mới)
-          → readOnly=true của B BỊ BỎ QUA, tx vẫn read-write
+```d2 title="7. Khi readOnly âm thầm KHÔNG có tác dụng"
+direction: right
+a: "Tx read-write A mở từ ngoài"
+b: "Method B: @Transactional(readOnly=true),\nREQUIRED"
+join: "B tham gia tx A, không tạo tx mới"
+result: "readOnly của B bị bỏ qua; tx vẫn\nread-write"
+a -> b -> join -> result
 ```
 
 > [!WARNING]
@@ -182,24 +182,30 @@ Nếu yêu cầu là **đảm bảo không thể ghi** (vd service báo cáo, re
 
 ## 9. Checklist chẩn đoán
 
-```text
-╭──────────────────────────────────────────────────────────────╮
-│ "readOnly=true mà vẫn ghi được" — vì sao?                     │
-│                                                              │
-│ B1. Có gọi save()/flush()/executeUpdate() tường minh không?  │
-│     → Có → đó là lý do; readOnly chỉ tắt AUTO-flush          │
-│                                                              │
-│ B2. Method có đang tham gia tx read-write bao ngoài không?   │
-│     → Có (REQUIRED) → readOnly bị bỏ qua                     │
-│                                                              │
-│ B3. Có self-invocation / method non-public/final không?      │
-│     → Có → @Transactional bị bỏ qua hoàn toàn               │
-│                                                              │
-│ B4. DB có thực sự tôn trọng setReadOnly không?               │
-│     → MySQL thường KHÔNG cấm; PostgreSQL có thể cấm          │
-│                                                              │
-│ KẾT LUẬN: cần chặn ghi thật → dùng DB user read-only/replica │
-╰──────────────────────────────────────────────────────────────╯
+```d2 title="9. Checklist chẩn đoán"
+direction: down
+start: "readOnly=true mà vẫn ghi được?"
+b1: "B1: Có save / flush / executeUpdate\ntường minh?"
+e1: "Có: chỉ tắt AUTO-flush"
+b2: "B2: Tham gia tx read-write bao ngoài?"
+e2: "Có (REQUIRED): readOnly bị bỏ qua"
+b3: "B3: Self-invocation / method non-public\nhoặc final?"
+e3: "Có: advice có thể không áp dụng (tùy\nproxy / cấu hình)"
+b4: "B4: DB tôn trọng setReadOnly?"
+e4: "MySQL thường không cấm; PostgreSQL có\nthể cấm"
+end: "Cần chặn ghi thật: DB user read-only /\nreplica"
+start -> b1
+b1 -> e1: Có
+b1 -> b2: Không
+b2 -> e2: Có
+b2 -> b3: Không
+b3 -> e3: Có
+b3 -> b4: Không
+b4 -> e4
+e1 -> end
+e2 -> end
+e3 -> end
+e4 -> end
 ```
 
 ---

@@ -10,6 +10,9 @@ Tài liệu này trình bày một quy trình chẩn đoán có thể lặp lạ
 > [!IMPORTANT]
 > Mọi con số như batch size, kích thước pool hay ngưỡng slow query chỉ là điểm khởi đầu. Hãy đo trên dữ liệu và workload gần production, sau đó so sánh trước và sau cùng một kịch bản.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Phân biệt JPA Hibernate và Spring Data JPA](#1-phân-biệt-jpa-hibernate-và-spring-data-jpa)
@@ -84,20 +87,16 @@ Các cấu hình có tiền tố `hibernate.*`, `SessionFactory`, `Statistics`, 
 
 **Spring Data JPA** xây abstraction repository phía trên JPA. `JpaRepository`, derived query, `@Query`, `Specification` và `@EntityGraph` trên repository giúp giảm code lặp. Cuối cùng, repository vẫn gọi `EntityManager`, và Hibernate vẫn là bên sinh SQL nếu ứng dụng chọn Hibernate làm provider.
 
-```text
-Application service
-       │
-       ▼
-Spring Data JPA repository     ← abstraction tiện dụng
-       │
-       ▼
-Jakarta Persistence API       ← hợp đồng chuẩn
-       │
-       ▼
-Hibernate ORM                 ← provider sinh SQL và quản lý entity
-       │
-       ▼
-JDBC driver → connection pool → database
+```d2 title="Spring Data JPA"
+direction: down
+app: "Application service"
+repo: "Spring Data JPA repository: abstraction\ntiện dụng"
+jpa: "Jakarta Persistence API: hợp đồng chuẩn"
+hibernate: "Hibernate ORM: provider sinh SQL và quản\nlý entity"
+jdbc: "JDBC driver"
+pool: "Connection pool"
+db: "Database"
+app -> repo -> jpa -> hibernate -> jdbc -> pool -> db
 ```
 
 > [!NOTE]
@@ -122,24 +121,37 @@ So sánh hai lần chạy chỉ có ý nghĩa khi workload, dữ liệu, connect
 
 ### Luồng chẩn đoán
 
-```mermaid
-flowchart TD
-    A[Endpoint hoặc job chậm] --> B[Đo latency và số SQL]
-    B --> C{Nhiều SQL nhỏ lặp lại}
-    C -->|Có| D[Kiểm tra N cộng 1 và flush trong vòng lặp]
-    C -->|Không| E{Một vài SQL chậm}
-    E -->|Có| F[Lấy bind value và chạy execution plan]
-    E -->|Không| G{Chờ connection cao}
-    G -->|Có| H[Kiểm tra pool transaction và truy vấn bị treo]
-    G -->|Không| I[Kiểm tra hydrate dirty checking cache và GC]
-    D --> J[Áp dụng thay đổi nhỏ nhất]
-    F --> J
-    H --> J
-    I --> J
-    J --> K[Chạy lại cùng workload]
-    K --> L{Chỉ số mục tiêu tốt hơn}
-    L -->|Không| B
-    L -->|Có| M[Ghi nhận regression test và monitor]
+```d2 title="Luồng chẩn đoán"
+direction: down
+n_A: "Endpoint hoặc job chậm"
+n_B: "Đo latency và số SQL"
+n_C: "Nhiều SQL nhỏ lặp lại" { shape: diamond }
+n_D: "Kiểm tra N cộng 1 và flush trong vòng\nlặp"
+n_E: "Một vài SQL chậm" { shape: diamond }
+n_F: "Lấy bind value và chạy execution plan"
+n_G: "Chờ connection cao" { shape: diamond }
+n_H: "Kiểm tra pool transaction và truy vấn\nbị treo"
+n_I: "Kiểm tra hydrate dirty checking cache\nvà GC"
+n_J: "Áp dụng thay đổi nhỏ nhất"
+n_K: "Chạy lại cùng workload"
+n_L: "Chỉ số mục tiêu tốt hơn" { shape: diamond }
+n_M: "Ghi nhận regression test và monitor"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "Có"
+n_C -> n_E: "Không"
+n_E -> n_F: "Có"
+n_E -> n_G: "Không"
+n_G -> n_H: "Có"
+n_G -> n_I: "Không"
+n_D -> n_J
+n_F -> n_J
+n_H -> n_J
+n_I -> n_J
+n_J -> n_K
+n_K -> n_L
+n_L -> n_B: "Không"
+n_L -> n_M: "Có"
 ```
 
 Thứ tự hữu ích nhất thường là: **đếm SQL → xem SQL và bind value → đo database → xem transaction và pool → mới cân nhắc cache**.
@@ -183,7 +195,7 @@ Không nên dùng `spring.jpa.show-sql=true` làm cơ chế logging chính. Nó 
 
 Hibernate `Statistics` cung cấp counter ở mức `SessionFactory`: số statement được prepare, entity được load, cache hit, flush và transaction. Counter này rất hữu ích để phát hiện regression về số query.
 
-```java
+```java source="hibernate-performance-troubleshooting/01/HibernateStatsReader.java"
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -211,6 +223,10 @@ public class HibernateStatsReader {
 }
 ```
 
+<SourceRef project="hibernate-performance-troubleshooting" file="01/HibernateStatsReader.java" region="example" variant="button">
+  Xem HibernateStatsReader.java cùng các ví dụ khác
+</SourceRef>
+
 `generate_statistics` tạo thêm công việc trên hot path. Hãy bật khi test, benchmark hoặc điều tra; chỉ giữ lâu dài sau khi đã đo overhead phù hợp với hệ thống.
 
 Statistics là số liệu toàn cục của một `SessionFactory`. Hai request hoặc hai test chạy song song có thể làm counter lẫn nhau. Muốn đo theo request, nên kết hợp trace, JDBC instrumentation hoặc một datasource proxy đã được đội dự án phê duyệt.
@@ -219,14 +235,21 @@ Statistics là số liệu toàn cục của một `SessionFactory`. Hai request
 
 Một request chậm cần được tách thành các khoảng thời gian:
 
-```text
-request latency
-├── chờ thread
-├── chờ connection từ pool
-├── database parse plan execute và lock wait
-├── truyền rows qua mạng
-├── Hibernate hydrate entity và dirty checking
-└── serialize response
+```d2 title="Quan sát từ ứng dụng đến cơ sở dữ liệu"
+direction: down
+request: "Request latency"
+thread: "Chờ thread"
+connection: "Chờ connection từ pool"
+db: "Database: parse, plan, execute, lock\nwait"
+network: "Truyền rows qua mạng"
+hibernate: "Hibernate: hydrate entity, dirty\nchecking"
+serialize: "Serialize response"
+request -> thread
+request -> connection
+request -> db
+request -> network
+request -> hibernate
+request -> serialize
 ```
 
 Log SQL chỉ trả lời Hibernate đã gửi gì. Metric của pool trả lời request chờ connection bao lâu. Slow-query log và execution plan trả lời database tốn thời gian ở đâu. Trace giúp nối các mảnh này theo cùng một request.
@@ -237,7 +260,7 @@ Các phần tiếp theo dùng hai entity tối giản: một khách hàng có nh
 
 ### Entity và quan hệ
 
-```java
+```java source="hibernate-performance-troubleshooting/02/PurchaseOrder.java"
 package com.example.order;
 
 import jakarta.persistence.Entity;
@@ -285,7 +308,11 @@ public class PurchaseOrder {
 }
 ```
 
-```java
+<SourceRef project="hibernate-performance-troubleshooting" file="02/PurchaseOrder.java" region="example" variant="button">
+  Xem PurchaseOrder.java cùng các ví dụ khác
+</SourceRef>
+
+```java source="hibernate-performance-troubleshooting/03/Customer.java"
 package com.example.order;
 
 import jakarta.persistence.Entity;
@@ -310,6 +337,10 @@ public class Customer {
     }
 }
 ```
+
+<SourceRef project="hibernate-performance-troubleshooting" file="03/Customer.java" region="example" variant="button">
+  Xem Customer.java cùng các ví dụ khác
+</SourceRef>
 
 `LAZY` là chiến lược tải, không phải cam kết rằng association sẽ không bao giờ được query. Khi code gọi `order.getCustomer().getName()`, Hibernate có thể khởi tạo proxy bằng một câu `SELECT` khác.
 
@@ -650,7 +681,7 @@ spring:
 
 Entity phải được chọn rõ ràng:
 
-```java
+```java source="hibernate-performance-troubleshooting/04/ProductCatalogItem.java"
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.Entity;
 import org.hibernate.annotations.Cache;
@@ -663,6 +694,10 @@ public class ProductCatalogItem {
     // fields
 }
 ```
+
+<SourceRef project="hibernate-performance-troubleshooting" file="04/ProductCatalogItem.java" region="example" variant="button">
+  Xem ProductCatalogItem.java cùng các ví dụ khác
+</SourceRef>
 
 `READ_WRITE` là chiến lược concurrency của Hibernate nhằm phối hợp update và cache entry. Dữ liệu bất biến phù hợp hơn với `READ_ONLY`, có overhead thấp hơn. Hỗ trợ chiến lược cụ thể phụ thuộc cache provider.
 
@@ -860,7 +895,7 @@ Một thay đổi hiệu năng chưa hoàn tất nếu không có phép đo lặ
 
 Có thể dùng Hibernate statistics trong integration test để khóa số query ở một use case ổn định:
 
-```java
+```java source="hibernate-performance-troubleshooting/05/OrderQueryCountTest.java"
 @SpringBootTest
 @Transactional
 class OrderQueryCountTest {
@@ -885,6 +920,10 @@ class OrderQueryCountTest {
     }
 }
 ```
+
+<SourceRef project="hibernate-performance-troubleshooting" file="05/OrderQueryCountTest.java" region="example" variant="button">
+  Xem OrderQueryCountTest.java cùng các ví dụ khác
+</SourceRef>
 
 Ngưỡng `2` chỉ là ví dụ; hãy đặt theo contract của use case, kể cả count query nếu dùng `Page`. Không chạy test thống kê song song vì counter thuộc toàn `SessionFactory`. Dữ liệu test cũng phải đủ đa dạng để N+1 thực sự lộ ra.
 

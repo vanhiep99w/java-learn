@@ -185,13 +185,19 @@ Cơ chế:
 2. Kẻ tấn công gửi một stream chứa object của các class **có sẵn trên classpath** (không phải class bạn mong đợi).
 3. Khi deserialize, chuỗi các `readObject`/getter/`finalize`... của các class này được "xâu chuỗi" (**gadget chain**) để cuối cùng gọi tới `Runtime.exec(...)`.
 
-```mermaid
-flowchart LR
-    A["dữ liệu độc<br/>(0xACED...)"] --> B["readObject() chạy"]
-    B --> C["gadget 1: readObject<br/>của class X có sẵn"]
-    C --> D["gadget 2: gọi method Y"]
-    D --> E["...chuỗi gadget..."]
-    E --> F["Runtime.exec('rm -rf' / reverse shell)"]
+```d2 title="7. Deserialization là lỗ hổng bảo mật — gadget chain"
+direction: right
+n_A: "dữ liệu độc\n(0xACED...)"
+n_B: "readObject() chạy"
+n_C: "gadget 1: readObject\ncủa class X có sẵn"
+n_D: "gadget 2: gọi method Y"
+n_E: "...chuỗi gadget..."
+n_F: "Runtime.exec('rm -rf' / reverse shell)"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
 ```
 
 > [!WARNING]

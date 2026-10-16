@@ -38,16 +38,25 @@ Không có chiến lược luôn tốt hơn. Quyết định phụ thuộc vào 
 | Tốt khi | Contention **cao**, critical section dài | Contention **thấp**, thao tác ngắn |
 | Ví dụ Java | `synchronized`, `ReentrantLock` | `AtomicInteger`, `StampedLock`, `@Version` |
 
-```mermaid
-flowchart TD
-    subgraph Pessimistic
-    P1["acquire lock"] --> P2["làm việc (người khác CHỜ)"] --> P3["release lock"]
-    end
-    subgraph Optimistic
-    O1["đọc giá trị + version"] --> O2["tính toán (không khóa)"] --> O3{"version còn nguyên?"}
-    O3 -->|có| O4["commit (CAS thành công)"]
-    O3 -->|không| O1
-    end
+```d2 title="2. Hai triết lý: bi quan vs lạc quan"
+direction: down
+n_Pessimistic: "Pessimistic" {
+  n_P1: "acquire lock"
+  n_P2: "làm việc (người khác CHỜ)"
+  n_P3: "release lock"
+}
+n_Optimistic: "Optimistic" {
+  n_O1: "đọc giá trị + version"
+  n_O2: "tính toán (không khóa)"
+  n_O3: "version còn nguyên?" { shape: diamond }
+  n_O4: "commit (CAS thành công)"
+}
+n_Pessimistic.n_P1 -> n_Pessimistic.n_P2
+n_Pessimistic.n_P2 -> n_Pessimistic.n_P3
+n_Optimistic.n_O1 -> n_Optimistic.n_O2
+n_Optimistic.n_O2 -> n_Optimistic.n_O3
+n_Optimistic.n_O3 -> n_Optimistic.n_O4: "có"
+n_Optimistic.n_O3 -> n_Optimistic.n_O1: "không"
 ```
 
 > [!NOTE]
@@ -191,12 +200,17 @@ double distanceFromOrigin() {
 }
 ```
 
-```mermaid
-flowchart TD
-    A["tryOptimisticRead() → stamp"] --> B["đọc field (không khóa)"]
-    B --> C{"validate(stamp)?"}
-    C -->|"true (không ai ghi)"| D["dùng giá trị đã đọc — nhanh, 0 contention"]
-    C -->|"false (có ghi xen)"| E["readLock() bi quan rồi đọc lại"]
+```d2 title="7. StampedLock — optimistic read trong JDK"
+direction: down
+n_A: "tryOptimisticRead() → stamp"
+n_B: "đọc field (không khóa)"
+n_C: "validate(stamp)?" { shape: diamond }
+n_D: "dùng giá trị đã đọc — nhanh, 0\ncontention"
+n_E: "readLock() bi quan rồi đọc lại"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "true (không ai ghi)"
+n_C -> n_E: "false (có ghi xen)"
 ```
 
 - Khi **đọc nhiều, ghi hiếm**: optimistic read gần như luôn `validate` thành công → đọc **không tốn đồng bộ nào**, nhanh hơn cả `ReadWriteLock`.
@@ -243,12 +257,17 @@ WHERE id = ? AND version = ?    -- version PHẢI khớp giá trị lúc đọc
 
 ## 9. Chọn loại nào theo mức contention
 
-```mermaid
-flowchart TD
-    A{"Mức tranh chấp (contention)?"} -->|"thấp, thao tác ngắn"| O["Optimistic: Atomic*, StampedLock optimistic, @Version"]
-    A -->|"cao, hoặc critical section dài"| P["Pessimistic: synchronized / ReentrantLock"]
-    A -->|"ghi cực nhiều vào counter"| L["LongAdder (striped)"]
-    A -->|"đọc nhiều ghi hiếm"| R["StampedLock / ReadWriteLock"]
+```d2 title="9. Chọn loại nào theo mức contention"
+direction: down
+n_A: "Mức tranh chấp (contention)?" { shape: diamond }
+n_O: "Optimistic: Atomic*, StampedLock\noptimistic, @Version"
+n_P: "Pessimistic: synchronized /\nReentrantLock"
+n_L: "LongAdder (striped)"
+n_R: "StampedLock / ReadWriteLock"
+n_A -> n_O: "thấp, thao tác ngắn"
+n_A -> n_P: "cao, hoặc critical section dài"
+n_A -> n_L: "ghi cực nhiều vào counter"
+n_A -> n_R: "đọc nhiều ghi hiếm"
 ```
 
 | Tình huống | Lựa chọn |

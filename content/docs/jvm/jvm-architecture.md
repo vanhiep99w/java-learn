@@ -39,15 +39,22 @@ Hiểu các thành phần và luồng thực thi giúp liên kết hiện tượ
 
 ## 2. JVM tổng quan — từ .java đến machine code
 
-```mermaid
-flowchart TD
-    A[".java source"] -->|"javac"| B[".class bytecode"]
-    B -->|"ClassLoader"| C["Runtime Data Areas"]
-    C -->|"Interpreter"| D["Execute bytecode"]
-    D -->|"Hot method detected"| E["JIT Compiler (C1/C2)"]
-    E -->|"Native code"| F["Code Cache"]
-    F -->|"Direct execution"| G["CPU"]
-    D -->|"Cold path"| G
+```d2 title="2. JVM tổng quan — từ .java đến machine code"
+direction: down
+n_A: ".java source"
+n_B: ".class bytecode"
+n_C: "Runtime Data Areas"
+n_D: "Execute bytecode"
+n_E: "JIT Compiler (C1/C2)"
+n_F: "Code Cache"
+n_G: "CPU"
+n_A -> n_B: "javac"
+n_B -> n_C: "ClassLoader"
+n_C -> n_D: "Interpreter"
+n_D -> n_E: "Hot method detected"
+n_E -> n_F: "Native code"
+n_F -> n_G: "Direct execution"
+n_D -> n_G: "Cold path"
 ```
 
 | Component | Vai trò |
@@ -65,21 +72,13 @@ flowchart TD
 
 ### 3.1. Ba ClassLoader mặc định
 
-```
-┌─────────────────────────────────────┐
-│     Bootstrap ClassLoader           │ ← java.lang.*, java.util.* (rt.jar / modules)
-│     (native code, null parent)      │
-└─────────────────┬───────────────────┘
-                  │ delegate up
-┌─────────────────┴───────────────────┐
-│     Platform ClassLoader            │ ← java.sql.*, javax.*, JDK extensions
-│     (jdk.internal.loader)           │
-└─────────────────┬───────────────────┘
-                  │ delegate up
-┌─────────────────┴───────────────────┐
-│     Application ClassLoader         │ ← classpath (your code, libs)
-│   (sun.misc.Launcher$AppClassLoader)│
-└─────────────────────────────────────┘
+```d2 title="3.1. Ba ClassLoader mặc định"
+direction: up
+bootstrap: "Bootstrap ClassLoader\nnative code, null parent\njava.lang.*, java.util.* (modules /\nrt.jar)"
+platform: "Platform ClassLoader\njdk.internal.loader\njava.sql.*, javax.*, extensions"
+app: "Application ClassLoader\nclasspath: code + libraries"
+app -> platform: "delegate up"
+platform -> bootstrap: "delegate up"
 ```
 
 ### 3.2. Parent Delegation Model
@@ -179,25 +178,20 @@ class Singleton {
 
 ## 5. Runtime Data Areas — memory layout
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         JVM Process                         │
-├──────────────────────────┬──────────────────────────────────┤
-│     SHARED (all threads) │          PER-THREAD              │
-├──────────────────────────┼──────────────────────────────────┤
-│  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │      HEAP        │    │  │   JVM Stack          │        │
-│  │  (objects, GC)   │    │  │   (frame per method) │        │
-│  └──────────────────┘    │  └──────────────────────┘        │
-│  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │   Metaspace      │    │  │   PC Register        │        │
-│  │  (class metadata)│    │  │   (current bytecode) │        │
-│  └──────────────────┘    │  └──────────────────────┘        │
-│  ┌──────────────────┐    │  ┌──────────────────────┐        │
-│  │   Code Cache     │    │  │   Native Method Stack│        │
-│  │  (JIT compiled)  │    │  │   (JNI calls)        │        │
-│  └──────────────────┘    │  └──────────────────────┘        │
-└──────────────────────────┴──────────────────────────────────┘
+```d2 title="5. Runtime Data Areas — memory layout"
+direction: right
+jvm: "JVM Process" {
+  shared: "Shared: all threads" {
+    heap: "Heap: objects, GC"
+    meta: "Metaspace: class metadata"
+    code: "Code Cache: JIT compiled code"
+  }
+  thread: Per-thread {
+    stack: "JVM Stack: frame per method"
+    pc: "PC Register: current bytecode"
+    native: "Native Method Stack: JNI calls"
+  }
+}
 ```
 
 | Area | Nội dung | Tuning |
@@ -212,14 +206,12 @@ class Singleton {
 
 Mỗi method invocation = 1 **frame** pushed lên JVM stack:
 
-```
-┌───────────────────────────────┐
-│         Stack Frame           │
-├───────────────────────────────┤
-│  Local Variable Array         │ ← [0]=this, [1]=param1, [2]=local1 ...
-│  Operand Stack                │ ← stack-based computation
-│  Frame Data                   │ ← constant pool ref, exception table
-└───────────────────────────────┘
+```d2 title="5.1. Stack Frame"
+frame: "Stack Frame (một method call)" {
+  local: "Local Variable Array\nslot 0: this; slot 1: tham số / local; ..."
+  operand: "Operand Stack\nvùng tính toán tạm: push / pop"
+  data: "Frame Data\nconstant pool ref, return address, exception table"
+}
 ```
 
 ---
@@ -293,15 +285,18 @@ Một ứng dụng bình thường dùng **cả hai**, không phải chọn mộ
 
 Cần tách ba lần “biên dịch/thực thi” thường bị gọi lẫn là “Java được compile”.
 
-```text
-.java source
-  └─ javac (khi build; trước lúc application chạy)
-       └─ .class bytecode
-            └─ HotSpot Interpreter (lúc runtime; từng bytecode instruction)
-                 hoặc
-            └─ HotSpot JIT C1/C2 (lúc runtime; chỉ code nóng)
-                 └─ native machine code trong Code Cache
-                      └─ CPU thực thi trực tiếp
+```d2 title="7.1. Ba loại code: source, bytecode và native machine code"
+direction: down
+source: ".java source"
+javac: "javac: build time"
+bytecode: ".class bytecode"
+interpreter: "HotSpot Interpreter: runtime, từng\nbytecode instruction"
+jit: "HotSpot JIT C1/C2: runtime, chỉ code\nnóng"
+native: "Native machine code trong Code Cache"
+cpu: "CPU thực thi trực tiếp"
+source -> javac -> bytecode
+bytecode -> interpreter
+bytecode -> jit -> native -> cpu
 ```
 
 | Thành phần | Input → Output | Khi chạy | Có làm cho mọi method không? |
@@ -380,26 +375,19 @@ Không nên coi `-XX:CompileThreshold=10000` là luật cố định “đúng 1
 
 Với tiered compilation mặc định, lifecycle điển hình của hot method là:
 
-```text
-(1) Class được load; method có bytecode
-             │
-             ▼
-(2) Interpreter chạy các lần gọi đầu
-    └─ thu thập counter/profile
-             │
-             ├── vẫn cold ───────────────► tiếp tục interpreter
-             │
-             ▼
-(3) C1 compile nhanh (thường level 1–3)
-    └─ native code tối ưu cơ bản; có thể tiếp tục thu profile
-             │
-             ▼
-(4) C2 compile chậm hơn (level 4)
-    └─ native code tối ưu mạnh theo profile
-             │
-             ├── assumption còn đúng ───► tiếp tục chạy C2 code
-             │
-             └── assumption sai ────────► deoptimization → interpreter/C1 → có thể recompile
+```d2 title="7.4. Một method đi qua các trạng thái nào?"
+direction: down
+load: "1. Class loaded: method có bytecode"
+interp: "2. Interpreter chạy các lần đầu: counter\n/ profile"
+c1: "3. C1 compile nhanh, level 1–3: native\ncode tối ưu cơ bản, có thể thu profile"
+c2: "4. C2 compile level 4: tối ưu mạnh theo\nprofile"
+deopt: "Assumption sai: deoptimization về\ninterpreter / C1, có thể recompile"
+load -> interp
+interp -> interp: "vẫn cold"
+interp -> c1 -> c2
+c2 -> c2: "assumption đúng"
+c2 -> deopt
+deopt -> interp
 ```
 
 Ví dụ một API chạy lâu:
@@ -467,12 +455,16 @@ JDK 8+ mặc định dùng **Tiered Compilation** — 5 levels:
 | 3 | C1 | Full profile | Nhanh | Cơ bản + profiling |
 | 4 | **C2** (server) | Dùng profile data | **Nhanh nhất** | **Aggressive** |
 
-```mermaid
-flowchart LR
-    I["Level 0<br/>Interpreter"] -->|"quick compile"| C1["Level 3<br/>C1 + profile"]
-    C1 -->|"hot enough"| C2["Level 4<br/>C2 optimized"]
-    I -->|"trivial method"| L1["Level 1<br/>C1 no profile"]
-    C2 -->|"deopt"| I
+```d2 title="8. Tiered Compilation — C1 & C2 pipeline"
+direction: right
+n_I: "Level 0\nInterpreter"
+n_C1: "Level 3\nC1 + profile"
+n_C2: "Level 4\nC2 optimized"
+n_L1: "Level 1\nC1 no profile"
+n_I -> n_C1: "quick compile"
+n_C1 -> n_C2: "hot enough"
+n_I -> n_L1: "trivial method"
+n_C2 -> n_I: "deopt"
 ```
 
 **C1** (Client Compiler):

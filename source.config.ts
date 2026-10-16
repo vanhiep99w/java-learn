@@ -1,5 +1,7 @@
 import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
 import { visit } from 'unist-util-visit';
+import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { remarkSourceReferences } from './scripts/source-references.mjs';
 
 const admonitionTypeMap: Record<string, string> = {
   note: 'info',
@@ -71,6 +73,11 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: [remarkGithubCallouts, remarkMermaid],
+    remarkPlugins: [
+      remarkGithubCallouts,
+      remarkSourceReferences,
+      remarkMermaid,
+      [remarkD2, { cacheDir: '.next/cache/docs-kit/d2', defaultCaption: 'Sơ đồ' }],
+    ],
   },
 });

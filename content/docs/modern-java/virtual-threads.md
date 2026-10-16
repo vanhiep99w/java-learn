@@ -194,15 +194,21 @@ Tuy nhiên, **không được suy diễn rằng mọi hàm “có vẻ blocking�
 
 ## Khi nào nên chọn Virtual Thread, Platform Thread hoặc Reactive?
 
-```text
-Task có phần lớn thời gian chờ I/O?
-│
-├─ Có
-│  ├─ Request/response thông thường, API blocking? ──► Virtual Threads
-│  └─ Cần stream liên tục + backpressure xuyên pipeline? ──► Cân nhắc Reactive
-│
-└─ Không, chủ yếu chạy CPU
-   └─ Giới hạn parallelism theo số core ──► Platform-thread pool / ForkJoinPool phù hợp
+```d2 title="Khi nào nên chọn Virtual Thread, Platform Thread hoặc Reactive?"
+direction: down
+io: "Task phần lớn chờ I/O?"
+blocking: "Request/response thông thường, API\nblocking?"
+virtual: "Virtual Threads"
+stream: "Stream liên tục + backpressure xuyên\npipeline?"
+reactive: "Cân nhắc Reactive"
+cpu: "Chủ yếu chạy CPU"
+pool: "Giới hạn parallelism theo số core:\nPlatform-thread pool / ForkJoinPool"
+io -> blocking: Có
+blocking -> virtual
+io -> stream: Có
+stream -> reactive
+io -> cpu: Không
+cpu -> pool
 ```
 
 Reactive và Virtual Threads không đối nghịch về mặt kỹ thuật. Reactive có giá trị khi cần một protocol backpressure hoặc pipeline streaming phức tạp. Virtual Threads đặc biệt hữu ích khi reactive trước đây chỉ được dùng để tránh việc blocking làm cạn servlet thread pool.
@@ -486,13 +492,17 @@ Virtual threads làm việc tạo task rẻ. Structured Concurrency giải quy�
 
 Ví dụ nghiệp vụ: một request dashboard cần gọi user service và order service song song. Nếu user service fail, thường không có lý do để order service tiếp tục chạy.
 
-```text
-handleDashboard request
-├── fetchUser
-└── fetchOrders
-
-Nếu request cha timeout/cancel hoặc một subtask fail:
-→ các subtask cùng scope phải được cancel và được join trước khi cha rời scope.
+```d2 title="Structured Concurrency: dùng khi một request tách thành nhiều subtask"
+direction: right
+t0: "handleDashboard request"
+t1: "fetchUser"
+t0 -> t1
+t2: "fetchOrders"
+t0 -> t2
+t3: "Nếu request cha timeout/cancel hoặc một subtask fail:"
+t0 -> t3
+t4: "→ các subtask cùng scope phải được cancel và được join trước khi cha rời scope."
+t0 -> t4
 ```
 
 `StructuredTaskScope` là **preview API**. JDK 21 dùng constructor và `ShutdownOnFailure`; JDK 25 đã đổi sang factory `StructuredTaskScope.open(...)` và joiner. Vì API preview không ổn định, chỉ copy code đúng với JDK đang chạy và bật preview ở compile lẫn runtime.

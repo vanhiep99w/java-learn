@@ -5,6 +5,9 @@ description: "Mổ xẻ chi tiết cơ chế transaction trong Spring: AOP proxy
 
 Spring Transaction cung cấp abstraction thống nhất để xác định ranh giới transaction trên JDBC, JPA và các công nghệ dữ liệu khác. `@Transactional` là metadata; việc begin, commit và rollback do infrastructure của Spring thực hiện.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -37,13 +40,18 @@ Propagation, isolation, rollback rule và read-only đều được diễn giả
 
 Spring Transaction dựa trên **AOP (Aspect-Oriented Programming)**. Khi bạn đặt `@Transactional` lên method hoặc class, Spring **không sửa bytecode** của method đó. Thay vào đó, nó tạo một **proxy object** bao quanh bean:
 
-```
-Caller ──▶ Proxy ──▶ Target (bean thật)
-              │
-              ├── begin transaction
-              ├── invoke target method
-              ├── commit (nếu thành công)
-              └── rollback (nếu exception)
+```d2 title="2. Spring Transaction nhìn từ 10.000 feet — AOP Proxy"
+direction: down
+caller: "Caller"
+proxy: "Proxy: transaction advice"
+begin: "Begin transaction"
+target: "Invoke target method: bean thật"
+outcome: "Kết quả?"
+commit: "Commit nếu thành công"
+rollback: "Rollback nếu exception"
+caller -> proxy -> begin -> target -> outcome
+outcome -> commit: success
+outcome -> rollback: exception
 ```
 
 Khi `ApplicationContext` khởi tạo bean, `BeanPostProcessor` (cụ thể là `InfrastructureAdvisorAutoProxyCreator`) quét class. Nếu phát hiện method/class có `@Transactional`, nó **thay thế bean gốc bằng proxy** trong container. Mọi nơi inject bean đó sẽ nhận **proxy**, không phải object gốc.
@@ -156,7 +164,7 @@ public class TransferService$$EnhancerBySpringCGLIB extends TransferService {
 
 Khi proxy chặn một method call, nó delegate cho `TransactionInterceptor` — class thực sự xử lý transaction lifecycle. Đây là source (đã rút gọn) từ Spring Framework:
 
-```java
+```java source="spring-transaction/01/TransactionInterceptor.java"
 // TransactionInterceptor extends TransactionAspectSupport
 public Object invoke(MethodInvocation invocation) throws Throwable {
     // lấy target class thật (không phải proxy class)
@@ -172,6 +180,10 @@ public Object invoke(MethodInvocation invocation) throws Throwable {
         });
 }
 ```
+
+<SourceRef project="spring-transaction" file="01/TransactionInterceptor.java" region="example" variant="button">
+  Xem TransactionInterceptor.java cùng các ví dụ khác
+</SourceRef>
 
 Logic chính nằm trong `TransactionAspectSupport.invokeWithinTransaction()`:
 
@@ -212,20 +224,31 @@ protected Object invokeWithinTransaction(Method method, Class<?> targetClass,
 
 Flow nội bộ của `TransactionInterceptor`:
 
-```mermaid
-flowchart TD
-    A["Proxy nhận method call"] --> B["Đọc @Transactional attributes<br/>(propagation, isolation, rollbackFor...)"]
-    B --> C["determineTransactionManager()"]
-    C --> D["createTransactionIfNecessary()<br/>→ getTransaction(definition)"]
-    D --> E["Gọi target method thật"]
-    E --> F{"Exception?"}
-    F -->|"không"| G["commitTransactionAfterReturning()"]
-    F -->|"có"| H{"rollbackOn(ex)?"}
-    H -->|"có — RuntimeException/Error"| I["rollback()"]
-    H -->|"không — checked exception"| J["commit() — ⚠️ bất ngờ!"]
-    G --> K["cleanupTransactionInfo()"]
-    I --> K
-    J --> K
+```d2 title="4. TransactionInterceptor — trái tim của @Transactional"
+direction: down
+n_A: "Proxy nhận method call"
+n_B: "Đọc @Transactional attributes\n(propagation, isolation,\nrollbackFor...)"
+n_C: "determineTransactionManager()"
+n_D: "createTransactionIfNecessary()\n→ getTransaction(definition)"
+n_E: "Gọi target method thật"
+n_F: "Exception?" { shape: diamond }
+n_G: "commitTransactionAfterReturning()"
+n_H: "rollbackOn(ex)?" { shape: diamond }
+n_I: "rollback()"
+n_J: "commit() — ⚠️ bất ngờ!"
+n_K: "cleanupTransactionInfo()"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G: "không"
+n_F -> n_H: "có"
+n_H -> n_I: "có — RuntimeException/Error"
+n_H -> n_J: "không — checked exception"
+n_G -> n_K
+n_I -> n_K
+n_J -> n_K
 ```
 
 > [!WARNING]
@@ -248,13 +271,19 @@ public interface PlatformTransactionManager extends TransactionManager {
 
 ### 5.1. Hierarchy — implementation cho từng công nghệ
 
-```
-PlatformTransactionManager
-├── DataSourceTransactionManager     ← JDBC / MyBatis
-├── JpaTransactionManager            ← JPA / Hibernate
-├── HibernateTransactionManager      ← Hibernate thuần (không qua JPA)
-├── JtaTransactionManager            ← Distributed transaction (XA)
-└── R2dbcTransactionManager          ← Reactive (WebFlux + R2DBC — implement ReactiveTransactionManager)
+```d2 title="5.1. Hierarchy — implementation cho từng công nghệ"
+direction: right
+t0: "PlatformTransactionManager"
+t1: "DataSourceTransactionManager     ← JDBC / MyBatis"
+t0 -> t1
+t2: "JpaTransactionManager            ← JPA / Hibernate"
+t0 -> t2
+t3: "HibernateTransactionManager      ← Hibernate thuần (không qua JPA)"
+t0 -> t3
+t4: "JtaTransactionManager            ← Distributed transaction (XA)"
+t0 -> t4
+t5: "R2dbcTransactionManager          ← Reactive (WebFlux + R2DBC — implement ReactiveTransactionManager)"
+t0 -> t5
 ```
 
 ### 5.2. DataSourceTransactionManager — dùng JDBC
@@ -334,7 +363,7 @@ Vì vậy khi dùng JPA:
 
 Đây là class **ẩn** mà mọi thứ phụ thuộc vào, nhưng ít dev biết tới. Nó quản lý **toàn bộ transaction state** qua `ThreadLocal`:
 
-```java
+```java source="spring-transaction/02/TransactionSynchronizationManager.java"
 // Rút gọn từ TransactionSynchronizationManager
 public abstract class TransactionSynchronizationManager {
 
@@ -364,6 +393,10 @@ public abstract class TransactionSynchronizationManager {
 }
 ```
 
+<SourceRef project="spring-transaction" file="02/TransactionSynchronizationManager.java" region="example" variant="button">
+  Xem TransactionSynchronizationManager.java cùng các ví dụ khác
+</SourceRef>
+
 ### 6.1. Vì sao ThreadLocal?
 
 Mỗi HTTP request trong Spring MVC chạy trên **một thread**. `ThreadLocal` đảm bảo:
@@ -372,18 +405,22 @@ Mỗi HTTP request trong Spring MVC chạy trên **một thread**. `ThreadLocal`
 2. **Mọi DAO/Repository trong cùng thread dùng cùng connection** — cùng transaction
 3. **Không cần truyền connection qua tham số** — Spring tự lấy từ ThreadLocal
 
-```
-Thread-1 (Request A):
-  ThreadLocal → { DataSource → Connection_1, EMF → EntityManager_1 }
-  │
-  ├── ServiceA.transfer()       → dùng Connection_1
-  ├── AccountRepo.debit()       → dùng Connection_1  ← cùng connection!
-  └── AuditRepo.log()           → dùng Connection_1  ← cùng transaction!
-
-Thread-2 (Request B):
-  ThreadLocal → { DataSource → Connection_2, EMF → EntityManager_2 }
-  │
-  └── ServiceB.query()          → dùng Connection_2  ← hoàn toàn tách biệt
+```d2 title="6.1. Vì sao ThreadLocal?"
+direction: right
+a: "Thread 1 / Request A" {
+  local: "ThreadLocal: DataSource → Connection_1\nEMF → EntityManager_1"
+  service: "ServiceA.transfer()"
+  account: "AccountRepo.debit()"
+  audit: "AuditRepo.log()"
+  service -> local: "cùng Connection_1"
+  account -> local: "cùng Connection_1"
+  audit -> local: "cùng transaction"
+}
+b: "Thread 2 / Request B: tách biệt" {
+  local: "ThreadLocal: DataSource → Connection_2\nEMF → EntityManager_2"
+  service: "ServiceB.query()"
+  service -> local: Connection_2
+}
 ```
 
 ### 6.2. DataSourceUtils — cầu nối giữa JdbcTemplate và ThreadLocal
@@ -512,19 +549,30 @@ Tóm lại **4 giai đoạn**:
 
 ### 8.2. REQUIRED — flow nội bộ
 
-```mermaid
-flowchart TD
-    A["Method B gọi với REQUIRED"] --> B{"Có TX đang active?"}
-    B -->|"có"| C["Tham gia TX hiện tại<br/>(dùng cùng Connection từ ThreadLocal)"]
-    B -->|"không"| D["Tạo TX mới<br/>(getConnection, setAutoCommit false, bind ThreadLocal)"]
-    C --> E["Thực thi method B"]
-    D --> E
-    E --> F{"Exception?"}
-    F -->|"không"| G{"B là người tạo TX?"}
-    G -->|"có (outer)"| H["COMMIT"]
-    G -->|"không (inner, tham gia)"| I["Chỉ return — outer sẽ commit"]
-    F -->|"có"| J["Mark TX là rollback-only"]
-    J --> K["Rethrow exception lên outer"]
+```d2 title="8.2. REQUIRED — flow nội bộ"
+direction: down
+n_A: "Method B gọi với REQUIRED"
+n_B: "Có TX đang active?" { shape: diamond }
+n_C: "Tham gia TX hiện tại\n(dùng cùng Connection từ ThreadLocal)"
+n_D: "Tạo TX mới\n(getConnection, setAutoCommit false,\nbind ThreadLocal)"
+n_E: "Thực thi method B"
+n_F: "Exception?" { shape: diamond }
+n_G: "B là người tạo TX?" { shape: diamond }
+n_H: "COMMIT"
+n_I: "Chỉ return — outer sẽ commit"
+n_J: "Mark TX là rollback-only"
+n_K: "Rethrow exception lên outer"
+n_A -> n_B
+n_B -> n_C: "có"
+n_B -> n_D: "không"
+n_C -> n_E
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G: "không"
+n_G -> n_H: "có (outer)"
+n_G -> n_I: "không (inner, tham gia)"
+n_F -> n_J: "có"
+n_J -> n_K
 ```
 
 **Cạm bẫy `rollback-only`**: khi method B (inner) ném exception và bị catch bởi method A (outer):
@@ -779,7 +827,7 @@ public void transfer(Long fromId, Long toId, BigDecimal amount) {
 
 Quay lại bug mở đầu. Đây là vấn đề phổ biến nhất với `@Transactional`:
 
-```java
+```java source="spring-transaction/03/OrderService.java"
 @Service
 public class OrderService {
 
@@ -794,22 +842,20 @@ public class OrderService {
 }
 ```
 
+<SourceRef project="spring-transaction" file="03/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
+
 ### 11.1. Tại sao self-invocation bỏ qua proxy?
 
-```
-Bên ngoài gọi → Proxy → Target:
-
-    controller.orderService.batchProcess()
-                  │
-                  ▼
-            [CGLIB Proxy]     ← batchProcess() không có @Transactional → proxy gọi thẳng target
-                  │
-                  ▼
-            [Target Bean]
-                  │
-                  ├── this.processOrder()     ← "this" là TARGET, không phải proxy!
-                  │     (gọi method trực tiếp, không qua proxy interceptor)
-                  │     → @Transactional bị bỏ qua
+```d2 title="11.1. Tại sao self-invocation bỏ qua proxy?"
+direction: down
+controller: "controller.orderService.batchProcess()"
+proxy: "CGLIB proxy: batchProcess không có\n@Transactional, gọi thẳng target"
+target: "Target bean"
+inner: "this.processOrder(): this là TARGET,\nkhông phải proxy"
+result: "Gọi trực tiếp, không qua proxy\ninterceptor → @Transactional bị bỏ qua"
+controller -> proxy -> target -> inner -> result
 ```
 
 `this` trong Java **luôn** trỏ đến object thật (target), không phải proxy. Khi target gọi method của chính nó, lời gọi **không** đi ra ngoài proxy rồi quay lại — nó đi **thẳng nội bộ**.
@@ -818,7 +864,7 @@ Bên ngoài gọi → Proxy → Target:
 
 **Cách 1: Tách service (khuyên dùng)**
 
-```java
+```java source="spring-transaction/04/OrderService.java"
 @Service
 public class OrderService {
     @Autowired
@@ -837,6 +883,10 @@ public class OrderProcessor {
     public void processOrder(Order order) { ... }
 }
 ```
+
+<SourceRef project="spring-transaction" file="04/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
 
 **Cách 2: Inject chính mình (self-injection)**
 
@@ -1005,7 +1055,7 @@ Khi cần **kiểm soát tường minh** hơn `@Transactional`:
 
 ### 14.1. TransactionTemplate (imperative)
 
-```java
+```java source="spring-transaction/05/TransferService.java"
 @Service
 public class TransferService {
     private final TransactionTemplate txTemplate;
@@ -1032,6 +1082,10 @@ public class TransferService {
 }
 ```
 
+<SourceRef project="spring-transaction" file="05/TransferService.java" region="example" variant="button">
+  Xem TransferService.java cùng các ví dụ khác
+</SourceRef>
+
 `TransactionTemplate` internals:
 
 ```java
@@ -1052,7 +1106,7 @@ public <T> T execute(TransactionCallback<T> action) {
 
 ### 14.2. TransactionOperator (reactive — WebFlux)
 
-```java
+```java source="spring-transaction/06/ReactiveTransferService.java"
 @Service
 public class ReactiveTransferService {
     private final TransactionalOperator txOperator;
@@ -1069,6 +1123,10 @@ public class ReactiveTransferService {
     }
 }
 ```
+
+<SourceRef project="spring-transaction" file="06/ReactiveTransferService.java" region="example" variant="button">
+  Xem ReactiveTransferService.java cùng các ví dụ khác
+</SourceRef>
 
 ### 14.3. Khi nào dùng programmatic?
 
@@ -1151,14 +1209,21 @@ public void updatePayment(Order order, PaymentResult result) {
 
 **Cỗ máy trong 7 dòng:**
 
-```
-1. @Transactional → Spring tạo Proxy (CGLIB/JDK) bao quanh bean
-2. Proxy delegate cho TransactionInterceptor → đọc metadata annotation
-3. TransactionInterceptor → gọi PlatformTransactionManager.getTransaction()
-4. TxManager lấy Connection từ pool → setAutoCommit(false) → bind vào ThreadLocal
-5. Mọi DAO/Repository trong cùng thread lấy Connection từ ThreadLocal → cùng TX
-6. Method thành công → commit; RuntimeException/Error → rollback; checked exception → COMMIT (⚠️)
-7. Unbind Connection khỏi ThreadLocal → trả về pool
+```d2 title="17. Tóm tắt — Cheat sheet & 7 nguyên tắc"
+direction: right
+t0: "1. @Transactional → Spring tạo Proxy (CGLIB/JDK) bao quanh bean"
+t1: "2. Proxy delegate cho TransactionInterceptor → đọc metadata annotation"
+t0 -> t1
+t2: "3. TransactionInterceptor → gọi PlatformTransactionManager.getTransaction()"
+t0 -> t2
+t3: "4. TxManager lấy Connection từ pool → setAutoCommit(false) → bind vào ThreadLocal"
+t0 -> t3
+t4: "5. Mọi DAO/Repository trong cùng thread lấy Connection từ ThreadLocal → cùng TX"
+t0 -> t4
+t5: "6. Method thành công → commit; RuntimeException/Error → rollback; checked exception → COMMIT (⚠️)"
+t0 -> t5
+t6: "7. Unbind Connection khỏi ThreadLocal → trả về pool"
+t0 -> t6
 ```
 
 | Thao tác | Ai chịu trách nhiệm | Cơ chế |

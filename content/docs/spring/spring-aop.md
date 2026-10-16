@@ -8,6 +8,9 @@ Spring AOP giúp tách những logic lặp lại ở nhiều nơi — logging, �
 > [!IMPORTANT]
 > Spring AOP là **proxy-based AOP**. Nó chỉ chặn lời gọi method đi qua proxy của một Spring bean; không tự sửa bytecode của class như AspectJ weaving. Vì vậy, annotation hay aspect chỉ là cấu hình — proxy mới là nơi advice thực sự chạy.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. AOP giải quyết vấn đề gì?](#1-aop-giải-quyết-vấn-đề-gì)
@@ -37,7 +40,7 @@ Spring AOP giúp tách những logic lặp lại ở nhiều nơi — logging, �
 
 Giả sử mọi service đều cần log thời gian chạy. Cách viết trực tiếp sẽ làm business method bị lặp `try/finally`:
 
-```java
+```java source="spring-aop/01/OrderService.java"
 @Service
 public class OrderService {
     public Order placeOrder(CreateOrderCommand command) {
@@ -50,6 +53,10 @@ public class OrderService {
     }
 }
 ```
+
+<SourceRef project="spring-aop" file="01/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
 
 Một lần thì không sao. Nhưng hàng chục service đều có logging, audit, kiểm tra quyền và transaction thì code nghiệp vụ bị che khuất. Các concern này **cắt ngang** nhiều module, thay vì thuộc riêng một use case.
 
@@ -105,20 +112,19 @@ Trong Spring AOP, join point thực tế chỉ là **method execution trên Spri
 - **Proxy** là object Spring đặt trước target. Caller gọi proxy, proxy chạy advice rồi mới gọi target.
 - **Weaving** là hành động ghép aspect vào chương trình. Spring AOP làm việc này lúc khởi tạo bean bằng proxy; AspectJ có thể weave ở compile time hoặc class-load time.
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant P as Spring AOP Proxy
-    participant A as Advice chain
-    participant T as Target bean
-
-    C->>P: orderService.placeOrder(command)
-    P->>A: tìm advice khớp method
-    A->>A: before / around logic
-    A->>T: gọi placeOrder() thật
-    T-->>A: return hoặc throw
-    A-->>P: after / error logic
-    P-->>C: return hoặc rethrow
+```d2 title="2.2. Target, proxy và weaving"
+shape: sequence_diagram
+n_C: "Caller"
+n_P: "Spring AOP Proxy"
+n_A: "Advice chain"
+n_T: "Target bean"
+n_C -> n_P: "orderService.placeOrder(command)"
+n_P -> n_A: "tìm advice khớp method"
+n_A -> n_A: "before / around logic"
+n_A -> n_T: "gọi placeOrder() thật"
+n_T -> n_A: "return hoặc throw" { style.stroke-dash: 3 }
+n_A -> n_P: "after / error logic" { style.stroke-dash: 3 }
+n_P -> n_C: "return hoặc rethrow" { style.stroke-dash: 3 }
 ```
 
 Proxy có thể là JDK Dynamic Proxy (dựa trên interface) hoặc CGLIB proxy (subclass ở runtime). Việc chọn và interceptor chain được giải thích sâu hơn trong [Spring Proxy](/spring/spring-proxy).
@@ -129,18 +135,29 @@ Khi ApplicationContext tạo bean, một `BeanPostProcessor` tìm các advisor/a
 
 Luồng của một lần gọi có thể tóm tắt như sau:
 
-```mermaid
-flowchart TD
-    A[ApplicationContext tạo target bean] --> B[AutoProxyCreator tìm advisor phù hợp]
-    B --> C{Có pointcut khớp?}
-    C -->|Không| D[Đăng ký target bean gốc]
-    C -->|Có| E[Tạo proxy + interceptor chain]
-    E --> F[Caller inject/nhận proxy]
-    F --> G[Caller gọi method]
-    G --> H[Proxy chạy advice theo thứ tự]
-    H --> I[Target method]
-    I --> J[Advice hoàn tất theo chiều ngược lại]
-    J --> K[Trả kết quả hoặc ném lại exception]
+```d2 title="3. Spring AOP chạy một lời gọi method như thế nào?"
+direction: down
+n_A: "ApplicationContext tạo target bean"
+n_B: "AutoProxyCreator tìm advisor phù hợp"
+n_C: "Có pointcut khớp?" { shape: diamond }
+n_D: "Đăng ký target bean gốc"
+n_E: "Tạo proxy + interceptor chain"
+n_F: "Caller inject/nhận proxy"
+n_G: "Caller gọi method"
+n_H: "Proxy chạy advice theo thứ tự"
+n_I: "Target method"
+n_J: "Advice hoàn tất theo chiều ngược lại"
+n_K: "Trả kết quả hoặc ném lại exception"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "Không"
+n_C -> n_E: "Có"
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H
+n_H -> n_I
+n_I -> n_J
+n_J -> n_K
 ```
 
 Hai điểm quyết định hành vi:
@@ -187,7 +204,7 @@ public class AopConfig {
 
 Ví dụ dưới đây đo thời gian mọi public method trong package `com.example.app.service`:
 
-```java
+```java source="spring-aop/02/PerformanceAspect.java"
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -211,6 +228,10 @@ public class PerformanceAspect {
     }
 }
 ```
+
+<SourceRef project="spring-aop" file="02/PerformanceAspect.java" region="example" variant="button">
+  Xem PerformanceAspect.java cùng các ví dụ khác
+</SourceRef>
 
 `joinPoint.proceed()` là lệnh chuyển quyền điều khiển sang advice tiếp theo, hoặc sang target method nếu không còn advice nào. `finally` đảm bảo thời gian vẫn được log khi target ném exception.
 
@@ -338,7 +359,7 @@ Các designator hay dùng:
 
 Đặt pointcut có tên để tránh copy chuỗi expression và để code nói rõ ý định:
 
-```java
+```java source="spring-aop/03/ObservabilityAspect.java"
 @Aspect
 @Component
 public class ObservabilityAspect {
@@ -355,6 +376,10 @@ public class ObservabilityAspect {
     }
 }
 ```
+
+<SourceRef project="spring-aop" file="03/ObservabilityAspect.java" region="example" variant="button">
+  Xem ObservabilityAspect.java cùng các ví dụ khác
+</SourceRef>
 
 Toán tử `&&`, `||` và `!` kết hợp pointcut. Giữ expression theo package/layer ngắn, rồi thêm annotation opt-out khi cần. Một chuỗi pointcut dài, chồng nhiều wildcard và điều kiện phủ định thường khó review hơn một aspect nhỏ tách theo mục đích.
 
@@ -382,22 +407,21 @@ Kết quả quay ra:
 Target → Transaction.commit/rollback → Audit.after → Trace.after
 ```
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant T as Trace @Order(10)
-    participant A as Audit @Order(20)
-    participant X as Transaction advisor
-    participant S as Service
-
-    C->>T: invoke
-    T->>A: proceed
-    A->>X: proceed
-    X->>S: proceed
-    S-->>X: result
-    X-->>A: commit then result
-    A-->>T: audit then result
-    T-->>C: log latency then result
+```d2 title="8. Thứ tự nhiều aspect"
+shape: sequence_diagram
+n_C: "Caller"
+n_T: "Trace @Order(10)"
+n_A: "Audit @Order(20)"
+n_X: "Transaction advisor"
+n_S: "Service"
+n_C -> n_T: "invoke"
+n_T -> n_A: "proceed"
+n_A -> n_X: "proceed"
+n_X -> n_S: "proceed"
+n_S -> n_X: "result" { style.stroke-dash: 3 }
+n_X -> n_A: "commit then result" { style.stroke-dash: 3 }
+n_A -> n_T: "audit then result" { style.stroke-dash: 3 }
+n_T -> n_C: "log latency then result" { style.stroke-dash: 3 }
 ```
 
 Không nên dựa vào thứ tự đăng ký bean nếu các advisor cùng precedence. Hãy đặt `@Order` khi thứ tự thay đổi semantics. Ví dụ, kiểm tra quyền thường phải nằm ngoài transaction để request bị từ chối không mở connection; audit “success” phải chạy sau khi biết target thành công.
@@ -433,7 +457,7 @@ public class UserService {
 
 Aspect lấy annotation đã bind, actor từ security context và ghi event **sau khi target return thành công**:
 
-```java
+```java source="spring-aop/04/AuditAspect.java"
 @Aspect
 @Component
 @RequiredArgsConstructor
@@ -456,6 +480,10 @@ public class AuditAspect {
     }
 }
 ```
+
+<SourceRef project="spring-aop" file="04/AuditAspect.java" region="example" variant="button">
+  Xem AuditAspect.java cùng các ví dụ khác
+</SourceRef>
 
 `@AfterReturning` phù hợp nếu audit event nghĩa là “operation đã return thành công”. Nhưng “return thành công” chưa chắc đã là “transaction đã commit”: event có thể được publish trước khi transaction advisor commit, tuỳ thứ tự chain.
 
@@ -536,7 +564,7 @@ Trước khi thêm một aspect, kiểm tra:
 
 Một test integration nhỏ nên xác nhận advice chạy thật qua Spring proxy, không chỉ unit test method trong aspect:
 
-```java
+```java source="spring-aop/05/PerformanceAspectTest.java"
 @SpringBootTest
 class PerformanceAspectTest {
 
@@ -552,6 +580,10 @@ class PerformanceAspectTest {
     }
 }
 ```
+
+<SourceRef project="spring-aop" file="05/PerformanceAspectTest.java" region="example" variant="button">
+  Xem PerformanceAspectTest.java cùng các ví dụ khác
+</SourceRef>
 
 Nếu `new OrderService(...)` trong test, test chỉ kiểm tra target. Nó không chứng minh AOP đã được cấu hình đúng.
 

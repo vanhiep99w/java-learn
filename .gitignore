@@ -19,3 +19,8 @@ __pycache__/
 
 # Next.js
 next-env.d.ts
+
+# Generated documentation assets
+/public/source-examples/
+.cache/
+*.tsbuildinfo

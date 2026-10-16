@@ -5,6 +5,9 @@ description: "Mổ xẻ JMM: visibility & ordering, happens-before chain, CPU ca
 
 Java Memory Model (JMM) định nghĩa các bảo đảm về visibility, ordering và atomicity khi nhiều thread cùng làm việc với bộ nhớ. Đây là hợp đồng cho phép code Java giữ semantics nhất quán dù JVM và CPU thực hiện nhiều tối ưu khác nhau.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -37,22 +40,15 @@ Từ các quy tắc đó có thể giải thích chính xác vai trò của `vol
 
 JMM **không** mô tả kiến trúc phần cứng cụ thể. Nó là **hợp đồng trừu tượng**:
 
-```
-┌──────────────────────────────────────────────────────┐
-│                   Lập trình viên                     │
-│  "Nếu tôi dùng volatile/synchronized/final đúng,     │
-│   JVM đảm bảo visibility và ordering cho tôi."       │
-├──────────────────────────────────────────────────────┤
-│                   JMM (Specification)                │
-│  Quy tắc happens-before, final field semantics       │
-├──────────────────────────────────────────────────────┤
-│              JVM Implementation (HotSpot)            │
-│  Chèn memory barrier, cấm JIT reorder vi phạm JMM    │
-├──────────────────────────────────────────────────────┤
-│                  Hardware (CPU)                      │
-│  Mỗi kiến trúc (x86-TSO, ARM-weak) có memory model   │
-│  riêng — JVM phải "bù" bằng barrier phù hợp          │
-└──────────────────────────────────────────────────────┘
+```d2 title="2. JMM là gì — hợp đồng giữa lập trình viên và JVM"
+direction: down
+dev: "Lập trình viên: dùng volatile /\nsynchronized / final đúng → visibility\nvà ordering"
+jmm: "JMM (specification): happens-before,\nfinal field semantics"
+jvm: "JVM implementation (HotSpot): chèn\nmemory barrier, cấm JIT reorder vi phạm\nJMM"
+cpu: "Hardware: x86-TSO / ARM-weak có memory\nmodel riêng; JVM bù bằng barrier phù hợp"
+dev -> jmm: hợp đồng
+jmm -> jvm: triển khai
+jvm -> cpu: barrier
 ```
 
 > [!NOTE]
@@ -100,24 +96,21 @@ JMM **không** đảm bảo ghi/đọc `long` và `double` là atomic trên mọ
 
 ### 4.1. Kiến trúc cache phân tầng
 
-```
-          Core 0              Core 1              Core 2              Core 3
-        ┌────────┐          ┌────────┐          ┌────────┐          ┌────────┐
-        │ L1 $d  │          │ L1 $d  │          │ L1 $d  │          │ L1 $d  │
-        │ L1 $i  │          │ L1 $i  │          │ L1 $i  │          │ L1 $i  │
-        └───┬────┘          └───┬────┘          └───┬────┘          └───┬────┘
-            │                   │                   │                   │
-        ┌───┴────┐          ┌───┴────┐          ┌───┴────┐          ┌───┴────┐
-        │  L2 $  │          │  L2 $  │          │  L2 $  │          │  L2 $  │
-        └───┬────┘          └───┬────┘          └───┬────┘          └───┬────┘
-            └────────┬──────────┴──────────┬────────┘                   │
-                 ┌───┴────────────────┐  ┌─┴──────────────────┐         │
-                 │     L3 $ (shared)  │  │   L3 $ (shared)    │         │
-                 └────────┬───────────┘  └─────────┬──────────┘         │
-                          └──────────┬─────────────┘                    │
-                                 ┌───┴───┐                              │
-                                 │ DRAM  │ ← Main Memory                │
-                                 └───────┘
+```d2 title="4.1. Kiến trúc cache phân tầng"
+direction: down
+cores: "Cache riêng từng core" {
+  c0: "Core 0" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+  c1: "Core 1" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+  c2: "Core 2" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+}
+cores.c3: "Core 3" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+cores.c3.l2 -> ram
+l3: "L3 shared (có thể nhiều cụm)"
+ram: "RAM / DRAM: main memory"
+cores.c0.l2 -> l3
+cores.c1.l2 -> l3
+cores.c2.l2 -> l3
+l3 -> ram
 ```
 
 ### 4.2. MESI protocol — trạng thái cache line
@@ -381,7 +374,7 @@ Nhưng **không bao giờ** code bên trong bị dời ra ngoài. Đây là thu�
 
 Nếu object được construct **đúng** (constructor không để `this` leak), JMM đảm bảo: mọi thread nhìn thấy reference tới object sẽ **chắc chắn** nhìn thấy giá trị final field đã được gán trong constructor — **không cần** volatile hay synchronized.
 
-```java
+```java source="jmm/01/Config.java"
 public class Config {
     private final int timeout;
     private final String host;
@@ -394,6 +387,10 @@ public class Config {
     // mọi thread đọc config.timeout sẽ thấy giá trị đúng.
 }
 ```
+
+<SourceRef project="jmm" file="01/Config.java" region="example" variant="button">
+  Xem Config.java cùng các ví dụ khác
+</SourceRef>
 
 ### 10.2. Freeze action — cơ chế bên dưới
 
@@ -409,7 +406,7 @@ ref = new Config(42, "host"); // publish reference
 
 ### 10.3. Khi final field semantics bị PHÁ
 
-```java
+```java source="jmm/02/Broken.java"
 public class Broken {
     private final int value;
 
@@ -424,6 +421,10 @@ public class Broken {
 }
 ```
 
+<SourceRef project="jmm" file="02/Broken.java" region="example" variant="button">
+  Xem Broken.java cùng các ví dụ khác
+</SourceRef>
+
 Nếu `this` escape trước constructor kết thúc, freeze action **chưa chạy** → thread khác có thể thấy `value = 0` (default value). Đây là lý do quy tắc: **KHÔNG bao giờ để `this` escape trong constructor**.
 
 > [!WARNING]
@@ -435,7 +436,7 @@ Nếu `this` escape trước constructor kết thúc, freeze action **chưa ch�
 
 ### 11.1. Pattern (sai) trước Java 5
 
-```java
+```java source="jmm/03/Singleton.java"
 public class Singleton {
     private static Singleton instance;          // KHÔNG volatile
 
@@ -451,6 +452,10 @@ public class Singleton {
     }
 }
 ```
+
+<SourceRef project="jmm" file="03/Singleton.java" region="example" variant="button">
+  Xem Singleton.java cùng các ví dụ khác
+</SourceRef>
 
 ### 11.2. Vì sao sai?
 
@@ -468,7 +473,7 @@ Thread B ở bước `(1)` thấy `instance != null` (reference đã gán), retu
 
 ### 11.3. Fix đúng
 
-```java
+```java source="jmm/04/Singleton.java"
 // Cách 1: volatile (Java 5+)
 private static volatile Singleton instance;
 // volatile write tại (3) tạo HB → thread B đọc volatile thấy object đầy đủ
@@ -493,6 +498,10 @@ public enum Singleton {
 }
 ```
 
+<SourceRef project="jmm" file="04/Singleton.java" region="example" variant="button">
+  Xem Singleton.java cùng các ví dụ khác
+</SourceRef>
+
 > [!TIP]
 > **Holder pattern** là cách được ưa chuộng nhất cho singleton lazy init: không cần synchronization ở read path, JVM class loading mechanism đảm bảo thread-safety miễn phí. Enum singleton đơn giản nhất nhưng không cho phép lazy init phức tạp.
 
@@ -504,7 +513,7 @@ Unit test bình thường **không** phát hiện được bug JMM vì chúng ch
 
 ### 12.1. Test visibility bug từ mục 1
 
-```java
+```java source="jmm/05/VisibilityTest.java"
 @JCStressTest
 @Outcome(id = "0", expect = ACCEPTABLE_INTERESTING, desc = "Visibility failure!")
 @Outcome(id = "42", expect = ACCEPTABLE, desc = "Correct")
@@ -529,6 +538,10 @@ public class VisibilityTest {
     }
 }
 ```
+
+<SourceRef project="jmm" file="05/VisibilityTest.java" region="example" variant="button">
+  Xem VisibilityTest.java cùng các ví dụ khác
+</SourceRef>
 
 Chạy: `java -jar jcstress.jar -t VisibilityTest`
 

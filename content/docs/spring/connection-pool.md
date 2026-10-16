@@ -58,28 +58,23 @@ Pool **giới hạn** connection count, **queue** excess requests → bảo vệ
 
 ## 3. HikariCP Architecture — tổng quan kiến trúc
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         HikariCP                            │
-├─────────────────────────────────────────────────────────────┤
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │              ConcurrentBag                            │  │
-│  │  ┌─────┐ ┌──────┐ ┌─────┐ ┌───────┐ ... ┌─────┐       │  │
-│  │  │Conn1│ │Conn2 │ │Conn3│ │Conn4  │     │ConnN│       │  │
-│  │  │ IDLE│ │IN_USE│ │IDLE │ │REMOVED│     │ IDLE│       │  │
-│  │  └─────┘ └──────┘ └─────┘ └───────┘     └─────┘       │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────────────────┐       │
-│  │ Housekeeping    │  │ Connection Add Thread       │       │
-│  │ (ScheduledTask) │  │ (creates new connections)   │       │
-│  └─────────────────┘  └─────────────────────────────┘       │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  ProxyConnection / ProxyStatement / ProxyResultSet  │    │
-│  │  (intercept close() → return to pool)               │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="3. HikariCP Architecture — tổng quan kiến trúc"
+direction: down
+pool: HikariCP {
+  bag: ConcurrentBag {
+    c1: "Conn1: IDLE"
+    c2: "Conn2: IN_USE"
+    c3: "Conn3: IDLE"
+    c4: "Conn4: REMOVED"
+    cn: "... ConnN: IDLE"
+  }
+  housekeeping: "Housekeeping: ScheduledTask"
+  add: "Connection Add Thread: tạo connection mới"
+  proxy: "ProxyConnection / ProxyStatement / ProxyResultSet"
+  add -> bag: add
+  housekeeping -> bag: maintain
+  proxy -> bag: "close(): return to pool"
+}
 ```
 
 ---
@@ -177,15 +172,20 @@ public T removeLast() {
 
 ## 6. Connection Lifecycle — từ creation đến eviction
 
-```mermaid
-stateDiagram-v2
-    [*] --> NOT_IN_USE: create
-    NOT_IN_USE --> IN_USE: borrow
-    IN_USE --> NOT_IN_USE: requite (return)
-    NOT_IN_USE --> REMOVED: maxLifetime reached
-    NOT_IN_USE --> REMOVED: idle timeout
-    IN_USE --> REMOVED: connection broken
-    REMOVED --> [*]: close physical connection
+```d2 title="6. Connection Lifecycle — từ creation đến eviction"
+direction: right
+n_NOT_IN_USE: "NOT_IN_USE"
+n_IN_USE: "IN_USE"
+n_REMOVED: "REMOVED"
+n_start: "Bắt đầu" { shape: circle }
+n_end: "Kết thúc" { shape: circle }
+n_start -> n_NOT_IN_USE: "create"
+n_NOT_IN_USE -> n_IN_USE: "borrow"
+n_IN_USE -> n_NOT_IN_USE: "requite (return)"
+n_NOT_IN_USE -> n_REMOVED: "maxLifetime reached"
+n_NOT_IN_USE -> n_REMOVED: "idle timeout"
+n_IN_USE -> n_REMOVED: "connection broken"
+n_REMOVED -> n_end: "close physical connection"
 ```
 
 | State | Ý nghĩa |

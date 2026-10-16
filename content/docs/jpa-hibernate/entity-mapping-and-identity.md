@@ -8,6 +8,9 @@ Entity mapping là quá trình mô tả cách một object Java tương ứng v�
 > [!NOTE]
 > Bài viết dùng annotation thuộc package `jakarta.persistence`. Nếu dự án còn import `javax.persistence`, đó là API JPA cũ trước Jakarta EE 9; ý tưởng mapping tương tự nhưng không nên trộn hai namespace trong cùng ứng dụng.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Ba lớp cần phân biệt](#1-ba-lớp-cần-phân-biệt)
@@ -64,12 +67,17 @@ Trong một ứng dụng Spring Boot, ba cái tên thường xuất hiện cùng
 
 **Portable** nghĩa là code chỉ dựa trên hợp đồng Jakarta Persistence và có thể đổi provider với ít thay đổi. `@Entity` là chuẩn Jakarta Persistence. `@NaturalId` là tính năng riêng của Hibernate. `JpaRepository` thuộc Spring Data JPA và cuối cùng vẫn gọi `EntityManager`.
 
-```mermaid
-flowchart LR
-    A["Product Java object"] -->|"@Entity, @Column, @Id"| B["Jakarta Persistence contract"]
-    C["JpaRepository"] -->|"gọi persist hoặc merge"| B
-    B -->|"provider triển khai"| D["Hibernate ORM"]
-    D -->|"SQL theo dialect"| E[(Database)]
+```d2 title="1. Ba lớp cần phân biệt"
+direction: right
+n_A: "Product Java object"
+n_B: "Jakarta Persistence contract"
+n_C: "JpaRepository"
+n_D: "Hibernate ORM"
+n_E: "Database" { shape: cylinder }
+n_A -> n_B: "@Entity, @Column, @Id"
+n_C -> n_B: "gọi persist hoặc merge"
+n_B -> n_D: "provider triển khai"
+n_D -> n_E: "SQL theo dialect"
 ```
 
 > [!IMPORTANT]
@@ -89,7 +97,7 @@ Một entity portable theo Jakarta Persistence nên:
 - Không khai báo class, persistent field hoặc persistent method là `final` theo hợp đồng portable.
 - Giữ persistent state trong field hoặc JavaBeans property được provider truy cập.
 
-```java
+```java source="entity-mapping-and-identity/01/Customer.java"
 @Entity
 public class Customer {
     @Id
@@ -106,6 +114,10 @@ public class Customer {
     }
 }
 ```
+
+<SourceRef project="entity-mapping-and-identity" file="01/Customer.java" region="example" variant="button">
+  Xem Customer.java cùng các ví dụ khác
+</SourceRef>
 
 Hibernate có thể persist một số mô hình ít chặt hơn đặc tả, nhưng class hoặc accessor `final` có thể làm mất khả năng tạo lazy proxy. Nếu không chủ đích phụ thuộc Hibernate, hãy giữ mô hình portable.
 
@@ -169,7 +181,7 @@ Ví dụ sau dùng surrogate key dạng sequence, natural key `sku`, enum dạng
 
 ### 3.1. Entity Product
 
-```java
+```java source="entity-mapping-and-identity/02/Product.java"
 package com.example.catalog;
 
 import jakarta.persistence.Access;
@@ -274,6 +286,10 @@ enum ProductStatus {
     DISCONTINUED
 }
 ```
+
+<SourceRef project="entity-mapping-and-identity" file="02/Product.java" region="example" variant="button">
+  Xem Product.java cùng các ví dụ khác
+</SourceRef>
 
 `@Version` không phải một phần của primary key. Nó lưu số phiên bản để Hibernate phát hiện hai transaction cùng cập nhật một row; câu `UPDATE` sẽ kèm điều kiện version cũ.
 
@@ -396,7 +412,7 @@ Với file lớn, object storage thường phù hợp hơn database; entity ch�
 
 `AttributeConverter<X, Y>` biến domain type `X` thành kiểu cột `Y`. Ví dụ lưu một value object `EmailAddress` thành `varchar`:
 
-```java
+```java source="entity-mapping-and-identity/03/EmailAddress.java"
 public record EmailAddress(String value) {
     public EmailAddress {
         if (value == null || !value.contains("@")) {
@@ -421,6 +437,10 @@ public class EmailAddressConverter
     }
 }
 ```
+
+<SourceRef project="entity-mapping-and-identity" file="03/EmailAddress.java" region="example" variant="button">
+  Xem EmailAddress.java cùng các ví dụ khác
+</SourceRef>
 
 Converter phù hợp với mapping một cột. Nếu value object cần nhiều cột, dùng `@Embeddable`. Không dựa vào converter cho primary key, version, association hoặc field đã có `@Enumerated`; các trường hợp này có quy tắc mapping riêng.
 
@@ -538,7 +558,7 @@ private String sku;
 
 `@EmbeddedId` gom key thành một value object. Đây thường là mô hình dễ đọc hơn:
 
-```java
+```java source="entity-mapping-and-identity/04/OrderLineId.java"
 @Embeddable
 public class OrderLineId implements Serializable {
     @Column(name = "order_id")
@@ -582,13 +602,17 @@ public class OrderLine {
 }
 ```
 
+<SourceRef project="entity-mapping-and-identity" file="04/OrderLineId.java" region="example" variant="button">
+  Xem OrderLineId.java cùng các ví dụ khác
+</SourceRef>
+
 Primary-key class bắt buộc có `equals()` và `hashCode()` nhất quán với phép so sánh của các cột database. Jakarta Persistence 3.2 cho phép một số primary-key class là `record`; nếu ứng dụng chạy stack cũ hơn, class thường có constructor không tham số vẫn tương thích rộng hơn.
 
 ### 6.2. IdClass
 
 `@IdClass` giữ từng phần key trực tiếp trên entity, còn class key lặp lại cùng tên và kiểu:
 
-```java
+```java source="entity-mapping-and-identity/05/OrderLineId.java"
 public class OrderLineId implements Serializable {
     private Long orderId;
     private Integer lineNo;
@@ -609,6 +633,10 @@ public class OrderLine {
     private Integer lineNo;
 }
 ```
+
+<SourceRef project="entity-mapping-and-identity" file="05/OrderLineId.java" region="example" variant="button">
+  Xem OrderLineId.java cùng các ví dụ khác
+</SourceRef>
 
 Tên và type của field trong `IdClass` phải khớp với các field `@Id` trên entity. Sự lặp lại này dễ drift khi refactor.
 
@@ -727,7 +755,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 Đặt transaction boundary ở service để một use case có persistence context rõ ràng:
 
-```java
+```java source="entity-mapping-and-identity/06/ProductService.java"
 @Service
 @Transactional(readOnly = true)
 public class ProductService {
@@ -756,6 +784,10 @@ public class ProductService {
 }
 ```
 
+<SourceRef project="entity-mapping-and-identity" file="06/ProductService.java" region="example" variant="button">
+  Xem ProductService.java cùng các ví dụ khác
+</SourceRef>
+
 Check `findBySku()` giúp thông báo lỗi đẹp nhưng không chống race condition. Hai transaction vẫn có thể cùng thấy “chưa tồn tại”; unique constraint `uk_product_sku` ở database mới là hàng rào cuối cùng.
 
 ### 8.2. save không đồng nghĩa với INSERT ngay lập tức
@@ -767,23 +799,22 @@ Check `findBySku()` giúp thông báo lỗi đẹp nhưng không chống race co
 
 `persist()` chuyển entity thành managed, nhưng `INSERT` thường chờ đến flush hoặc commit. Ngoại lệ đáng chú ý là `IDENTITY`: provider thường phải insert sớm để lấy generated id từ database.
 
-```mermaid
-sequenceDiagram
-    participant S as Service
-    participant R as JpaRepository
-    participant EM as EntityManager
-    participant H as Hibernate
-    participant DB as Database
-
-    S->>R: save(new Product)
-    R->>EM: persist(entity)
-    EM->>H: entity trở thành managed
-    Note over H: SEQUENCE hoặc UUID có thể có id trước INSERT
-    S-->>S: tiếp tục business logic
-    S->>EM: transaction commit
-    EM->>H: flush
-    H->>DB: INSERT product ...
-    DB-->>H: thành công hoặc constraint violation
+```d2 title="8.2. save không đồng nghĩa với INSERT ngay lập tức"
+shape: sequence_diagram
+n_S: "Service"
+n_R: "JpaRepository"
+n_EM: "EntityManager"
+n_H: "Hibernate"
+n_DB: "Database"
+n_S -> n_R: "save(new Product)"
+n_R -> n_EM: "persist(entity)"
+n_EM -> n_H: "entity trở thành managed"
+n_H.note1: "SEQUENCE hoặc UUID có thể có id trước\nINSERT"
+n_S -> n_S: "tiếp tục business logic" { style.stroke-dash: 3 }
+n_S -> n_EM: "transaction commit"
+n_EM -> n_H: "flush"
+n_H -> n_DB: "INSERT product ..."
+n_DB -> n_H: "thành công hoặc constraint violation" { style.stroke-dash: 3 }
 ```
 
 `saveAndFlush()` ép đồng bộ sớm hơn nhưng không commit transaction. Chỉ dùng khi phần logic tiếp theo thực sự cần SQL đã chạy, ví dụ cần bắt constraint violation trước một bước khác. Lạm dụng flush làm giảm batching và tăng round-trip.
@@ -865,7 +896,7 @@ Equality phải giữ ý nghĩa hợp lý khi object chuyển trạng thái. Đ�
 
 Một `@DataJpaTest` với database thật hoặc Testcontainers cho độ tin cậy cao hơn H2 khi production dùng dialect khác. Test tối thiểu nên persist, flush, clear rồi load lại:
 
-```java
+```java source="entity-mapping-and-identity/07/ProductMappingTest.java"
 @DataJpaTest
 class ProductMappingTest {
 
@@ -893,6 +924,10 @@ class ProductMappingTest {
     }
 }
 ```
+
+<SourceRef project="entity-mapping-and-identity" file="07/ProductMappingTest.java" region="example" variant="button">
+  Xem ProductMappingTest.java cùng các ví dụ khác
+</SourceRef>
 
 Sau khi bổ sung implementation theo business key ở mục 7.2, kiểm thử equality riêng khỏi database:
 

@@ -37,14 +37,21 @@ Hiểu từng phạm vi giúp dùng `final` để thể hiện ý định thiế
 | **method** | Không cho **override** | JIT devirtualize + inline dễ hơn |
 | **class** | Không cho **kế thừa** | Đóng kín type, tối ưu, an toàn invariant |
 
-```mermaid
-flowchart TD
-    F[final] --> V["variable/field<br/>cấm gán lại"]
-    F --> M["method<br/>cấm override"]
-    F --> C["class<br/>cấm kế thừa"]
-    V --> V2["+ final field: bảo đảm JMM"]
-    M --> M2["+ JIT devirtualization"]
-    C --> C2["+ String, record, enum đều final"]
+```d2 title="2. Ba cấp độ của final"
+direction: down
+n_F: "final"
+n_V: "variable/field\ncấm gán lại"
+n_M: "method\ncấm override"
+n_C: "class\ncấm kế thừa"
+n_V2: "+ final field: bảo đảm JMM"
+n_M2: "+ JIT devirtualization"
+n_C2: "+ String, record, enum đều final"
+n_F -> n_V
+n_F -> n_M
+n_F -> n_C
+n_V -> n_V2
+n_M -> n_M2
+n_C -> n_C2
 ```
 
 ---
@@ -96,14 +103,15 @@ final int[] arr = {1, 2, 3};
 arr[0] = 99;            // ✅ OK — sửa phần tử
 ```
 
-```
-final List<String> list
-         │
-         ▼ reference KHÓA (không trỏ chỗ khác)
-   ┌───────────────┐
-   │ ArrayList     │  ← nội dung VẪN sửa được (add/remove/set)
-   │ ["a","b"]     │
-   └───────────────┘
+```d2 title="4. final ≠ immutable — sai lầm phổ biến nhất"
+direction: right
+list: "final List<String> list"
+object: "ArrayList object (heap)"
+items: "elementData: thêm / xóa / thay đổi phần\ntử được"
+other: "ArrayList khác (không được gán lại list)"
+list -> object: "reference cố định"
+object -> items
+list -> other: "CẤM gán lại" { style.stroke-dash: 3 }
 ```
 
 | | `final` | immutable |

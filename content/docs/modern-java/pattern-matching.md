@@ -94,11 +94,15 @@ if (!(o instanceof String s)) return;
 System.out.println(s.length());   // ✅ s trong scope! vì nhánh kia đã return
 ```
 
-```mermaid
-flowchart TD
-    A["o instanceof String s"] -->|true| B["s khả dụng (đã chắc là String)"]
-    A -->|"!(...) return"| C["thoát sớm"]
-    B --> D["phần còn lại: s sống nếu nhánh false đã thoát"]
+```d2 title="3. Pattern matching for instanceof & flow scoping"
+direction: down
+n_A: "o instanceof String s"
+n_B: "s khả dụng (đã chắc là String)"
+n_C: "thoát sớm"
+n_D: "phần còn lại: s sống nếu nhánh false\nđã thoát"
+n_A -> n_B: "true"
+n_A -> n_C: "!(...) return"
+n_B -> n_D
 ```
 
 > [!NOTE]

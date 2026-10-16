@@ -89,32 +89,28 @@ Hành vi quan sát được rất "ma quái":
 
 Nhiều người hình dung bộ nhớ như một bảng trắng dùng chung mà ai cũng nhìn thấy tức thì:
 
-```text
-❌ Mô hình sai (mô hình "bộ nhớ phẳng"):
-
-   Thread A  ──ghi stop=true──►  ┌─────────────┐
-                                 │  stop=true  │  ◄── Thread B đọc → thấy true ngay
-                                 └─────────────┘
-        "Ghi là thấy, đơn giản mà!"
+```d2 title="4. Hiểu lầm cốt lõi: \"ghi xong là thread khác thấy ngay\""
+direction: right
+a: "Thread A"
+memory: "stop = true"
+b: "Thread B"
+wrong: "Mô hình SAI: ghi là thấy ngay, bộ nhớ\nphẳng"
+a -> memory: "ghi stop=true"
+memory -> b: "giả định thấy ngay"
+wrong -> memory { style.stroke-dash: 3 }
 ```
 
 Thực tế phần cứng và compiler hiện đại **không hề** hoạt động như vậy. Mô hình đúng có nhiều tầng đệm mà mỗi thread nhìn qua đó:
 
-```text
-✅ Mô hình đúng (có cache + reorder):
-
-   Thread A (core 0)              Thread B (core 1)
-   ┌──────────────┐              ┌──────────────┐
-   │ thanh ghi    │              │ thanh ghi    │  ◄── B có thể giữ stop trong
-   │ store buffer │              │  stop=false  │      thanh ghi suốt vòng lặp
-   │ L1/L2 cache  │              │ L1/L2 cache  │
-   └──────┬───────┘              └──────┬───────┘
-          │ (chưa chắc flush)           │ (chưa chắc reload)
-          ▼                             ▼
-   ┌────────────────────────────────────────────┐
-   │            BỘ NHỚ CHÍNH (RAM)               │
-   │   stop = false  →  (lúc nào đó) true        │
-   └────────────────────────────────────────────┘
+```d2 title="4. Hiểu lầm cốt lõi: \"ghi xong là thread khác thấy ngay\""
+direction: right
+a: "Thread A, core 0: thanh ghi, store\nbuffer, L1/L2 cache"
+b: "Thread B, core 1: thanh ghi stop=false,\nL1/L2 cache"
+ram: "RAM: stop=false → lúc nào đó true"
+loop: "B có thể giữ stop trong thanh ghi suốt\nvòng lặp"
+a -> ram: "chưa chắc flush"
+b -> ram: "chưa chắc reload"
+b -> loop
 ```
 
 Khi A ghi `stop = true`, giá trị đó có thể nằm trong **store buffer** hay **cache L1 của core 0** một lúc trước khi xuống RAM. Trong khi đó B (chạy trên core khác) có thể đang đọc từ **cache của nó** hoặc thậm chí từ **một thanh ghi** giữ sẵn `false`. Không có gì ép hai bên đồng bộ — **trừ khi bạn yêu cầu rõ ràng**.

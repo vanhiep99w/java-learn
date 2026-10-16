@@ -44,10 +44,12 @@ Ví dụ quen thuộc nhất là chuyển tiền giữa hai tài khoản. Reques
 - Nếu chỉ chậm do một thread đang làm việc lâu, tối ưu hoặc giảm phạm vi critical section có thể đủ.
 - Nếu đã có vòng chờ, tăng số thread, tăng timeout, hoặc restart một request không phá được nguyên nhân. Cần giải phóng một bên và sửa thiết kế lock.
 
-```mermaid
-flowchart LR
-    T1["Thread 1\ngiữ Account A"] -->|"chờ khóa B"| T2["Thread 2\ngiữ Account B"]
-    T2 -->|"chờ khóa A"| T1
+```d2 title="1. Tổng quan"
+direction: right
+n_T1: "Thread 1\ngiữ Account A"
+n_T2: "Thread 2\ngiữ Account B"
+n_T1 -> n_T2: "chờ khóa B"
+n_T2 -> n_T1: "chờ khóa A"
 ```
 
 ## 2. Deadlock là gì và không phải là gì
@@ -64,11 +66,14 @@ Cách mô hình hóa đơn giản nhất là **wait-for graph**:
 - Có cạnh `A → B` khi A đang chờ lock do B giữ.
 - Graph có cycle thì tồn tại deadlock.
 
-```mermaid
-flowchart TD
-    A["T1 giữ L1"] -->|"đợi L2 do T2 giữ"| B["T2 giữ L2"]
-    B -->|"đợi L3 do T3 giữ"| C["T3 giữ L3"]
-    C -->|"đợi L1 do T1 giữ"| A
+```d2 title="Mô hình wait-for graph"
+direction: down
+n_A: "T1 giữ L1"
+n_B: "T2 giữ L2"
+n_C: "T3 giữ L3"
+n_A -> n_B: "đợi L2 do T2 giữ"
+n_B -> n_C: "đợi L3 do T3 giữ"
+n_C -> n_A: "đợi L1 do T1 giữ"
 ```
 
 Mô hình này dùng được ở mọi tầng. `jstack` hiển thị thông tin lock của Java thread. Database hiển thị transaction và row/index lock. Cả hai đều cần được đọc như một graph thay vì từng dòng log rời rạc.

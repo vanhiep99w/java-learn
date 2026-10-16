@@ -5,6 +5,9 @@ description: "Mổ xẻ chi tiết cơ chế auto-configuration trong Spring Boo
 
 Spring Boot Auto-Configuration tự động đăng ký bean dựa trên classpath, property và các bean đã tồn tại trong application context. Cơ chế này cung cấp cấu hình mặc định có điều kiện và cho phép ứng dụng ghi đè khi cần.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -79,7 +82,7 @@ String[] packages = AutoConfigurationPackages.get(beanFactory);
 
 ### 3.1. Entry point
 
-```java
+```java source="spring-boot-autoconfiguration/01/AutoConfigurationImportSelector.java"
 // Rút gọn từ AutoConfigurationImportSelector
 public class AutoConfigurationImportSelector implements DeferredImportSelector {
 
@@ -96,9 +99,13 @@ public class AutoConfigurationImportSelector implements DeferredImportSelector {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="01/AutoConfigurationImportSelector.java" region="example" variant="button">
+  Xem AutoConfigurationImportSelector.java cùng các ví dụ khác
+</SourceRef>
+
 ### 3.2. AutoConfigurationGroup — flow chính
 
-```java
+```java source="spring-boot-autoconfiguration/02/AutoConfigurationGroup.java"
 // Rút gọn từ AutoConfigurationImportSelector.AutoConfigurationGroup
 private static class AutoConfigurationGroup implements DeferredImportSelector.Group {
 
@@ -116,6 +123,10 @@ private static class AutoConfigurationGroup implements DeferredImportSelector.Gr
     }
 }
 ```
+
+<SourceRef project="spring-boot-autoconfiguration" file="02/AutoConfigurationGroup.java" region="example" variant="button">
+  Xem AutoConfigurationGroup.java cùng các ví dụ khác
+</SourceRef>
 
 ### 3.3. getAutoConfigurationEntry() — 5 bước filter
 
@@ -206,19 +217,26 @@ public interface DeferredImportSelector extends ImportSelector {
 
 `AutoConfigurationImportSelector` implement `DeferredImportSelector` → Spring **hoãn** xử lý nó đến **cuối cùng** trong `ConfigurationClassParser`:
 
-```mermaid
-flowchart TD
-    A["ConfigurationClassParser.parse()"] --> B["1. Parse user @Configuration classes<br/>(từ @SpringBootApplication base package)"]
-    B --> C["2. Parse @Import classes thường"]
-    C --> D["3. Xử lý @ComponentScan → tìm thêm @Configuration"]
-    D --> E["4. Đệ quy parse mọi @Configuration mới tìm được"]
-    E --> F["5. ⭐ CUỐI CÙNG: xử lý DeferredImportSelector<br/>→ AutoConfigurationImportSelector<br/>→ parse auto-config classes"]
-    F --> G["Auto-config class kiểm tra @ConditionalOnMissingBean<br/>→ user bean ĐÃ đăng ký → skip ✅"]
+```d2 title="4.2. Giải pháp: DeferredImportSelector"
+direction: down
+n_A: "ConfigurationClassParser.parse()"
+n_B: "1. Parse user @Configuration classes\n(từ @SpringBootApplication base\npackage)"
+n_C: "2. Parse @Import classes thường"
+n_D: "3. Xử lý @ComponentScan → tìm thêm\n@Configuration"
+n_E: "4. Đệ quy parse mọi @Configuration mới\ntìm được"
+n_F: "5. ⭐ CUỐI CÙNG: xử lý\nDeferredImportSelector\n→ AutoConfigurationImportSelector\n→ parse auto-config classes"
+n_G: "Auto-config class kiểm tra\n@ConditionalOnMissingBean\n→ user bean ĐÃ đăng ký → skip ✅"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
 ```
 
 ### 4.3. Source code — ConfigurationClassParser
 
-```java
+```java source="spring-boot-autoconfiguration/03/ConfigurationClassParser.java"
 // Rút gọn từ ConfigurationClassParser
 public void parse(Set<BeanDefinitionHolder> configCandidates) {
     // 1) Parse tất cả configuration class thường
@@ -242,6 +260,10 @@ public void process() {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="03/ConfigurationClassParser.java" region="example" variant="button">
+  Xem ConfigurationClassParser.java cùng các ví dụ khác
+</SourceRef>
+
 > [!IMPORTANT]
 > **Thứ tự này là cốt lõi**: User `@Configuration` parse trước → user bean đăng ký BeanDefinition trước → auto-config parse sau → `@ConditionalOnMissingBean` thấy user bean đã có → skip. Đây là lý do "user bean luôn thắng auto-config bean".
 
@@ -251,7 +273,7 @@ public void process() {
 
 ### 5.1. Interface nền tảng
 
-```java
+```java source="spring-boot-autoconfiguration/04/Condition.java"
 @FunctionalInterface
 public interface Condition {
     boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
@@ -267,9 +289,13 @@ public interface ConditionContext {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="04/Condition.java" region="example" variant="button">
+  Xem Condition.java cùng các ví dụ khác
+</SourceRef>
+
 ### 5.2. SpringBootCondition — base class cho Boot's @Conditional
 
-```java
+```java source="spring-boot-autoconfiguration/05/SpringBootCondition.java"
 // Mọi @ConditionalOn... của Spring Boot extend SpringBootCondition:
 public abstract class SpringBootCondition implements Condition {
 
@@ -295,6 +321,10 @@ public abstract class SpringBootCondition implements Condition {
         ConditionContext context, AnnotatedTypeMetadata metadata);
 }
 ```
+
+<SourceRef project="spring-boot-autoconfiguration" file="05/SpringBootCondition.java" region="example" variant="button">
+  Xem SpringBootCondition.java cùng các ví dụ khác
+</SourceRef>
 
 ### 5.3. @ConditionalOnClass — internals
 
@@ -376,7 +406,7 @@ Phase 2 (REGISTER_BEAN): @Conditional trên @Bean METHOD
     → Class đã pass → evaluate từng @Bean method riêng
 ```
 
-```java
+```java source="spring-boot-autoconfiguration/06/DataSourceAutoConfiguration.java"
 @Configuration
 @ConditionalOnClass(DataSource.class)         // ← Phase 1: class-level
 @ConditionalOnProperty("spring.datasource.url")  // ← Phase 1: class-level
@@ -393,6 +423,10 @@ public class DataSourceAutoConfiguration {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="06/DataSourceAutoConfiguration.java" region="example" variant="button">
+  Xem DataSourceAutoConfiguration.java cùng các ví dụ khác
+</SourceRef>
+
 ### 6.2. Filter phase — trước cả parsing (optimization)
 
 `AutoConfigurationImportFilter` chạy **trước** khi class được parse bởi `ConfigurationClassParser`:
@@ -404,14 +438,21 @@ configurations = getConfigurationClassFilter().filter(configurations);
 
 Filter này chỉ check `@ConditionalOnClass` và `@ConditionalOnWebApplication` — những condition **rẻ** (chỉ cần ClassLoader, không cần BeanFactory). Mục đích: loại nhanh ~50-70% auto-config class mà classpath không match → **tránh load/parse class vô ích** → startup nhanh hơn.
 
-```mermaid
-flowchart TD
-    A["~150 auto-config class names<br/>(từ .imports file)"] --> B["Filter phase<br/>@ConditionalOnClass check<br/>(chỉ ClassLoader, rất nhanh)"]
-    B -->|"~60 class pass"| C["ConfigurationClassParser<br/>parse class → evaluate<br/>class-level @Conditional"]
-    B -->|"~90 class fail<br/>(class không trên classpath)"| X["Skip — không load class"]
-    C -->|"~40 class pass"| D["Evaluate @Bean method-level<br/>@ConditionalOnMissingBean, etc."]
-    C -->|"~20 class fail"| Y["Skip — không đăng ký bean"]
-    D --> E["~30-50 auto-config bean<br/>thực sự được tạo"]
+```d2 title="6.2. Filter phase — trước cả parsing (optimization)"
+direction: down
+n_A: "~150 auto-config class names\n(từ .imports file)"
+n_B: "Filter phase\n@ConditionalOnClass check\n(chỉ ClassLoader, rất nhanh)"
+n_C: "ConfigurationClassParser\nparse class → evaluate\nclass-level @Conditional"
+n_X: "Skip — không load class"
+n_D: "Evaluate @Bean method-level\n@ConditionalOnMissingBean, etc."
+n_Y: "Skip — không đăng ký bean"
+n_E: "~30-50 auto-config bean\nthực sự được tạo"
+n_A -> n_B
+n_B -> n_C: "~60 class pass"
+n_B -> n_X: "~90 class fail\n(class không trên classpath)"
+n_C -> n_D: "~40 class pass"
+n_C -> n_Y: "~20 class fail"
+n_D -> n_E
 ```
 
 > [!TIP]
@@ -449,7 +490,7 @@ public class HibernateJpaAutoConfiguration { ... }
 
 ### 7.3. Sorting internals
 
-```java
+```java source="spring-boot-autoconfiguration/07/AutoConfigurationSorter.java"
 // AutoConfigurationSorter — sắp xếp auto-config classes
 public List<String> getInPriorityOrder(Collection<String> classNames) {
     // 1) Xây dependency graph từ @AutoConfigureBefore/@AutoConfigureAfter
@@ -468,6 +509,10 @@ public List<String> getInPriorityOrder(Collection<String> classNames) {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="07/AutoConfigurationSorter.java" region="example" variant="button">
+  Xem AutoConfigurationSorter.java cùng các ví dụ khác
+</SourceRef>
+
 > [!WARNING]
 > `@AutoConfigureOrder` quyết định thứ tự giữa các auto-config class **với nhau** — KHÔNG ảnh hưởng thứ tự so với user's `@Configuration`. User config **luôn** được parse trước auto-config (nhờ `DeferredImportSelector`). `@Order` trên auto-config class **không có tác dụng** — phải dùng `@AutoConfigureOrder`.
 
@@ -479,7 +524,7 @@ public List<String> getInPriorityOrder(Collection<String> classNames) {
 
 ### 8.1. Source code (rút gọn)
 
-```java
+```java source="spring-boot-autoconfiguration/08/DataSourceAutoConfiguration.java"
 @AutoConfiguration(before = SqlInitializationAutoConfiguration.class)
 @ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
 @ConditionalOnMissingBean(type = "io.r2dbc.spi.ConnectionFactory")
@@ -512,24 +557,43 @@ public class DataSourceAutoConfiguration {
 }
 ```
 
+<SourceRef project="spring-boot-autoconfiguration" file="08/DataSourceAutoConfiguration.java" region="example" variant="button">
+  Xem DataSourceAutoConfiguration.java cùng các ví dụ khác
+</SourceRef>
+
 ### 8.2. Evaluation flow
 
-```mermaid
-flowchart TD
-    A["DataSourceAutoConfiguration<br/>loaded from .imports file"] --> B{"@ConditionalOnClass<br/>DataSource.class có?"}
-    B -->|"không (no JDBC)"| X1["SKIP toàn bộ class"]
-    B -->|"có"| C{"@ConditionalOnMissingBean<br/>R2DBC ConnectionFactory?"}
-    C -->|"có R2DBC"| X2["SKIP (reactive app)"]
-    C -->|"không"| D{"User đã @Bean DataSource?"}
-    D -->|"có"| X3["SKIP (user thắng)"]
-    D -->|"không"| E{"Có datasource URL<br/>trong properties?"}
-    E -->|"có"| F["PooledDataSourceConfiguration"]
-    E -->|"không"| G{"Có embedded DB driver?<br/>(H2, HSQLDB)"}
-    G -->|"có"| H["EmbeddedDatabaseConfiguration<br/>→ tạo in-memory DataSource"]
-    G -->|"không"| X4["SKIP (không đủ info)"]
-    F --> I{"HikariCP trên classpath?"}
-    I -->|"có (mặc định)"| J["Tạo HikariDataSource<br/>từ spring.datasource.* properties"]
-    I -->|"không"| K["Thử Tomcat Pool → DBCP2 → OracleUcp"]
+```d2 title="8.2. Evaluation flow"
+direction: down
+n_A: "DataSourceAutoConfiguration\nloaded from .imports file"
+n_B: "@ConditionalOnClass\nDataSource.class có?" { shape: diamond }
+n_X1: "SKIP toàn bộ class"
+n_C: "@ConditionalOnMissingBean\nR2DBC ConnectionFactory?" { shape: diamond }
+n_X2: "SKIP (reactive app)"
+n_D: "User đã @Bean DataSource?" { shape: diamond }
+n_X3: "SKIP (user thắng)"
+n_E: "Có datasource URL\ntrong properties?" { shape: diamond }
+n_F: "PooledDataSourceConfiguration"
+n_G: "Có embedded DB driver?\n(H2, HSQLDB)" { shape: diamond }
+n_H: "EmbeddedDatabaseConfiguration\n→ tạo in-memory DataSource"
+n_X4: "SKIP (không đủ info)"
+n_I: "HikariCP trên classpath?" { shape: diamond }
+n_J: "Tạo HikariDataSource\ntừ spring.datasource.* properties"
+n_K: "Thử Tomcat Pool → DBCP2 → OracleUcp"
+n_A -> n_B
+n_B -> n_X1: "không (no JDBC)"
+n_B -> n_C: "có"
+n_C -> n_X2: "có R2DBC"
+n_C -> n_D: "không"
+n_D -> n_X3: "có"
+n_D -> n_E: "không"
+n_E -> n_F: "có"
+n_E -> n_G: "không"
+n_G -> n_H: "có"
+n_G -> n_X4: "không"
+n_F -> n_I
+n_I -> n_J: "có (mặc định)"
+n_I -> n_K: "không"
 ```
 
 ### 8.3. DataSourceProperties — bind properties tự động
@@ -578,28 +642,42 @@ spring.datasource.hikari.minimum-idle=5
 
 ### 9.2. Dependency chain example
 
-```
-WebMvcAutoConfiguration
-  └── requires: DispatcherServletAutoConfiguration (DispatcherServlet bean)
-        └── requires: ServletWebServerFactoryAutoConfiguration (embedded Tomcat/Jetty/Undertow)
-              └── requires: EmbeddedWebServerFactoryCustomizerAutoConfiguration
-
-JpaRepositoriesAutoConfiguration
-  └── requires: HibernateJpaAutoConfiguration (EntityManagerFactory)
-        └── requires: DataSourceAutoConfiguration (DataSource)
-              └── requires: spring.datasource.url property OR embedded DB
+```d2 title="9.2. Dependency chain example"
+direction: right
+t0: "WebMvcAutoConfiguration"
+t1: "requires: DispatcherServletAutoConfiguration (DispatcherServlet bean)"
+t0 -> t1
+t2: "requires: ServletWebServerFactoryAutoConfiguration (embedded Tomcat/Jetty/Undertow)"
+t1 -> t2
+t3: "requires: EmbeddedWebServerFactoryCustomizerAutoConfiguration"
+t2 -> t3
+t4: "JpaRepositoriesAutoConfiguration"
+t0 -> t4
+t5: "requires: HibernateJpaAutoConfiguration (EntityManagerFactory)"
+t4 -> t5
+t6: "requires: DataSourceAutoConfiguration (DataSource)"
+t5 -> t6
+t7: "requires: spring.datasource.url property OR embedded DB"
+t6 -> t7
 ```
 
 ### 9.3. Starter = dependency aggregation + auto-config trigger
 
-```
-spring-boot-starter-data-jpa (POM — no code)
-├── spring-boot-starter (base)
-├── spring-boot-starter-aop (AOP for @Transactional)
-├── spring-data-jpa (Spring Data JPA)
-├── hibernate-core (JPA provider)
-├── spring-boot-starter-jdbc (JDBC + HikariCP)
-└── jakarta.persistence-api
+```d2 title="9.3. Starter = dependency aggregation + auto-config trigger"
+direction: right
+t0: "spring-boot-starter-data-jpa (POM — no code)"
+t1: "spring-boot-starter (base)"
+t0 -> t1
+t2: "spring-boot-starter-aop (AOP for @Transactional)"
+t0 -> t2
+t3: "spring-data-jpa (Spring Data JPA)"
+t0 -> t3
+t4: "hibernate-core (JPA provider)"
+t0 -> t4
+t5: "spring-boot-starter-jdbc (JDBC + HikariCP)"
+t0 -> t5
+t6: "jakarta.persistence-api"
+t0 -> t6
 ```
 
 Starter **không chứa code** — chỉ khai báo dependency. Khi dependency có mặt trên classpath → `@ConditionalOnClass` pass → auto-config kích hoạt.
@@ -880,12 +958,17 @@ GraalVM native image yêu cầu **biết tất cả class, reflection, proxy** t
 
 Spring Boot 3 thêm **AOT engine**: chạy auto-config logic **tại build-time**, sinh code Java thay thế:
 
-```mermaid
-flowchart LR
-    A["Build time<br/>(mvn spring-boot:aot-process)"] --> B["Chạy auto-config<br/>evaluate @Conditional<br/>resolve dependency"]
-    B --> C["Sinh Java source code<br/>(thay thế runtime logic)"]
-    C --> D["Compile thành<br/>native image"]
-    D --> E["Runtime: chạy<br/>generated code<br/>(không reflection,<br/>không @Conditional)"]
+```d2 title="13.2. AOT (Ahead-of-Time) processing — Spring Boot 3.x"
+direction: right
+n_A: "Build time\n(mvn spring-boot:aot-process)"
+n_B: "Chạy auto-config\nevaluate @Conditional\nresolve dependency"
+n_C: "Sinh Java source code\n(thay thế runtime logic)"
+n_D: "Compile thành\nnative image"
+n_E: "Runtime: chạy\ngenerated code\n(không reflection,\nkhông @Conditional)"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
 ```
 
 ### 13.3. Sinh ra gì?

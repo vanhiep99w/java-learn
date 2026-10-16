@@ -5,6 +5,9 @@ description: "Mổ xẻ chi tiết IoC Container trong Spring: DefaultListableBe
 
 Spring IoC Container quản lý việc tạo object, liên kết dependency, cấu hình và lifecycle của bean. Thay vì mỗi class tự tìm hoặc tự tạo dependency, container xây dựng object graph từ metadata cấu hình.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -35,7 +38,7 @@ Dependency injection chỉ là một phần của container. Scope, lifecycle, p
 
 ### 2.1. BeanFactory — interface nền tảng
 
-```java
+```java source="spring-ioc-container/01/BeanFactory.java"
 public interface BeanFactory {
     Object getBean(String name) throws BeansException;
     <T> T getBean(Class<T> requiredType) throws BeansException;
@@ -47,6 +50,10 @@ public interface BeanFactory {
     // ...
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="01/BeanFactory.java" region="example" variant="button">
+  Xem BeanFactory.java cùng các ví dụ khác
+</SourceRef>
 
 `BeanFactory` là interface tối giản — chỉ biết **lấy bean theo tên/type**. Nó **lazy**: chỉ tạo bean khi được hỏi.
 
@@ -78,15 +85,23 @@ public interface ApplicationContext extends
 
 ### 2.4. Startup flow tổng quan
 
-```mermaid
-flowchart TD
-    A["SpringApplication.run()"] --> B["Tạo ApplicationContext<br/>(chọn implementation theo classpath)"]
-    B --> C["prepareContext()<br/>— đăng ký @Configuration source"]
-    C --> D["refreshContext() → refresh()"]
-    D --> E["invokeBeanFactoryPostProcessors()<br/>— scan @Component, @Bean, @Import<br/>→ tạo BeanDefinition"]
-    E --> F["registerBeanPostProcessors()<br/>— đăng ký BPP (AutoProxyCreator, etc.)"]
-    F --> G["finishBeanFactoryInstantiation()<br/>— ⭐ tạo TẤT CẢ singleton bean"]
-    G --> H["finishRefresh()<br/>— publish ContextRefreshedEvent"]
+```d2 title="2.4. Startup flow tổng quan"
+direction: down
+n_A: "SpringApplication.run()"
+n_B: "Tạo ApplicationContext\n(chọn implementation theo classpath)"
+n_C: "prepareContext()\n— đăng ký @Configuration source"
+n_D: "refreshContext() → refresh()"
+n_E: "invokeBeanFactoryPostProcessors()\n— scan @Component, @Bean, @Import\n→ tạo BeanDefinition"
+n_F: "registerBeanPostProcessors()\n— đăng ký BPP (AutoProxyCreator, etc.)"
+n_G: "finishBeanFactoryInstantiation()\n— ⭐ tạo TẤT CẢ singleton bean"
+n_H: "finishRefresh()\n— publish ContextRefreshedEvent"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H
 ```
 
 > [!NOTE]
@@ -111,21 +126,30 @@ public class GenericApplicationContext extends AbstractApplicationContext {
 
 ### 3.1. Hierarchy
 
-```
-BeanFactory (interface)
-└── ListableBeanFactory (liệt kê bean)
-    └── ConfigurableListableBeanFactory (config + liệt kê)
-        └── DefaultListableBeanFactory (CONCRETE — ~4000 dòng)
-            ├── extends AbstractAutowireCapableBeanFactory
-            │     └── extends AbstractBeanFactory
-            │           └── extends DefaultSingletonBeanRegistry
-            │                 └── ⭐ chứa singletonObjects map (bean cache)
-            └── implements ConfigurableListableBeanFactory, BeanDefinitionRegistry
+```d2 title="3.1. Hierarchy"
+direction: right
+t0: "BeanFactory (interface)"
+t1: "ListableBeanFactory (liệt kê bean)"
+t0 -> t1
+t2: "ConfigurableListableBeanFactory (config + liệt kê)"
+t1 -> t2
+t3: "DefaultListableBeanFactory (CONCRETE — ~4000 dòng)"
+t2 -> t3
+t4: "extends AbstractAutowireCapableBeanFactory"
+t3 -> t4
+t5: "extends AbstractBeanFactory"
+t4 -> t5
+t6: "extends DefaultSingletonBeanRegistry"
+t5 -> t6
+t7: "⭐ chứa singletonObjects map (bean cache)"
+t6 -> t7
+t8: "implements ConfigurableListableBeanFactory, BeanDefinitionRegistry"
+t3 -> t8
 ```
 
 ### 3.2. Các data structure quan trọng
 
-```java
+```java source="spring-ioc-container/02/DefaultListableBeanFactory.java"
 // Rút gọn từ DefaultListableBeanFactory + DefaultSingletonBeanRegistry
 public class DefaultListableBeanFactory {
 
@@ -153,6 +177,10 @@ public class DefaultListableBeanFactory {
     private final Map<Class<?>, Object> resolvableDependencies = new ConcurrentHashMap<>(16);
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="02/DefaultListableBeanFactory.java" region="example" variant="button">
+  Xem DefaultListableBeanFactory.java cùng các ví dụ khác
+</SourceRef>
 
 ### 3.3. getBean() — entry point mọi thứ
 
@@ -212,7 +240,7 @@ protected <T> T doGetBean(String name, Class<T> requiredType, Object[] args) {
 
 ### 4.1. Thông tin trong BeanDefinition
 
-```java
+```java source="spring-ioc-container/03/BeanDefinition.java"
 public interface BeanDefinition extends AttributeAccessor {
     String getBeanClassName();             // class name (hoặc null nếu @Bean method)
     String getScope();                     // singleton, prototype, request...
@@ -227,6 +255,10 @@ public interface BeanDefinition extends AttributeAccessor {
     // ...
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="03/BeanDefinition.java" region="example" variant="button">
+  Xem BeanDefinition.java cùng các ví dụ khác
+</SourceRef>
 
 ### 4.2. BeanDefinition types
 
@@ -274,24 +306,33 @@ Trong `refresh()` bước 5: `invokeBeanFactoryPostProcessors()` — chạy **tr
 
 ### 5.2. Công việc
 
-```mermaid
-flowchart TD
-    A["ConfigurationClassPostProcessor<br/>.postProcessBeanDefinitionRegistry()"] --> B["Tìm candidate @Configuration classes<br/>(từ BeanDefinition đã đăng ký)"]
-    B --> C["ConfigurationClassParser.parse()<br/>— quét từng @Configuration class"]
-    C --> D["Xử lý @ComponentScan<br/>→ quét package → tạo BeanDefinition"]
-    C --> E["Xử lý @Import<br/>→ import thêm @Configuration / ImportSelector"]
-    C --> F["Xử lý @Bean methods<br/>→ tạo ConfigurationClassBeanDefinition"]
-    C --> G["Xử lý @ImportResource<br/>→ load XML"]
-    C --> H["Xử lý @PropertySource<br/>→ thêm vào Environment"]
-    D --> I["Đệ quy: class mới được scan<br/>có thể là @Configuration → parse tiếp"]
-    E --> I
+```d2 title="5.2. Công việc"
+direction: down
+n_A: "ConfigurationClassPostProcessor\n.postProcessBeanDefinitionRegistry()"
+n_B: "Tìm candidate @Configuration classes\n(từ BeanDefinition đã đăng ký)"
+n_C: "ConfigurationClassParser.parse()\n— quét từng @Configuration class"
+n_D: "Xử lý @ComponentScan\n→ quét package → tạo BeanDefinition"
+n_E: "Xử lý @Import\n→ import thêm @Configuration /\nImportSelector"
+n_F: "Xử lý @Bean methods\n→ tạo ConfigurationClassBeanDefinition"
+n_G: "Xử lý @ImportResource\n→ load XML"
+n_H: "Xử lý @PropertySource\n→ thêm vào Environment"
+n_I: "Đệ quy: class mới được scan\ncó thể là @Configuration → parse tiếp"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_C -> n_E
+n_C -> n_F
+n_C -> n_G
+n_C -> n_H
+n_D -> n_I
+n_E -> n_I
 ```
 
 ### 5.3. @Configuration CGLIB enhancement
 
 Khi `@Configuration` class có `@Bean` method gọi nhau, Spring phải đảm bảo bean vẫn là **singleton**:
 
-```java
+```java source="spring-ioc-container/04/AppConfig.java"
 @Configuration
 public class AppConfig {
 
@@ -308,6 +349,10 @@ public class AppConfig {
     }
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="04/AppConfig.java" region="example" variant="button">
+  Xem AppConfig.java cùng các ví dụ khác
+</SourceRef>
 
 `ConfigurationClassPostProcessor` dùng **CGLIB** wrap `@Configuration` class:
 
@@ -432,7 +477,7 @@ protected String determineAutowireCandidate(Map<String, Object> candidates, Depe
 
 `List<T>` injection: Spring tìm **tất cả** bean cùng type `T` → sắp xếp theo `@Order`/`Ordered` → inject list. Rất hữu ích cho strategy pattern.
 
-```java
+```java source="spring-ioc-container/05/CreditCardPayment.java"
 @Service
 @Order(1)
 public class CreditCardPayment implements PaymentService { ... }
@@ -448,6 +493,10 @@ public class PaymentRouter {
     // → [CreditCardPayment, PayPalPayment] — theo order
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="05/CreditCardPayment.java" region="example" variant="button">
+  Xem CreditCardPayment.java cùng các ví dụ khác
+</SourceRef>
 
 ---
 
@@ -485,45 +534,37 @@ private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(1
 
 ### 7.3. Flow chi tiết
 
-```mermaid
-sequenceDiagram
-    participant C as Container
-    participant A as ServiceA
-    participant B as ServiceB
-    participant Cache as Three-level Cache
-
-    Note over C: Bắt đầu tạo ServiceA
-    C->>A: instantiate (new ServiceA())
-    C->>Cache: Level 3: put("serviceA", () → getEarlyBeanReference(A))
-    Note over Cache: A chưa inject, chưa init<br/>nhưng đã có ObjectFactory
-
-    Note over C: Inject dependencies cho A
-    C->>C: A cần ServiceB → getBean("serviceB")
-
-    Note over C: Bắt đầu tạo ServiceB
-    C->>B: instantiate (new ServiceB())
-    C->>Cache: Level 3: put("serviceB", () → getEarlyBeanReference(B))
-
-    Note over C: Inject dependencies cho B
-    C->>C: B cần ServiceA → getBean("serviceA")
-    C->>Cache: getSingleton("serviceA")<br/>Level 1: miss<br/>Level 2: miss<br/>Level 3: HIT! → gọi ObjectFactory
-    Cache->>Cache: ObjectFactory.getObject()<br/>→ getEarlyBeanReference(A)<br/>→ có thể wrap bằng AOP proxy
-    Cache->>Cache: Move A: Level 3 → Level 2
-    Cache-->>C: Trả early reference của A (có thể là proxy)
-
-    C->>B: inject A (early reference) vào B
-    C->>B: @PostConstruct, init callbacks
-    C->>Cache: Level 1: put("serviceB", fully-initialized B)<br/>Remove from Level 2, 3
-
-    Note over C: ServiceB hoàn tất
-
-    C-->>C: Quay lại inject B cho A
-    C->>A: inject B (fully initialized) vào A
-    C->>A: @PostConstruct, init callbacks
-    C->>Cache: Level 1: put("serviceA", fully-initialized A)<br/>Remove from Level 2
-    Note over C: Kiểm tra: A trong Level 2 == A reference hiện tại?<br/>Nếu khác (bị proxy wrap) → exposedObject = earlyRef
-
-    Note over C: ServiceA hoàn tất
+```d2 title="7.3. Flow chi tiết"
+shape: sequence_diagram
+n_C: "Container"
+n_A: "ServiceA"
+n_B: "ServiceB"
+n_Cache: "Three-level Cache"
+n_C.note1: "Bắt đầu tạo ServiceA"
+n_C -> n_A: "instantiate (new ServiceA())"
+n_C -> n_Cache: "Level 3: put(\"serviceA\", () →\ngetEarlyBeanReference(A))"
+n_Cache.note2: "A chưa inject, chưa init\nnhưng đã có ObjectFactory"
+n_C.note3: "Inject dependencies cho A"
+n_C -> n_C: "A cần ServiceB → getBean(\"serviceB\")"
+n_C.note4: "Bắt đầu tạo ServiceB"
+n_C -> n_B: "instantiate (new ServiceB())"
+n_C -> n_Cache: "Level 3: put(\"serviceB\", () →\ngetEarlyBeanReference(B))"
+n_C.note5: "Inject dependencies cho B"
+n_C -> n_C: "B cần ServiceA → getBean(\"serviceA\")"
+n_C -> n_Cache: "getSingleton(\"serviceA\")\nLevel 1: miss\nLevel 2: miss\nLevel 3: HIT! → gọi ObjectFactory"
+n_Cache -> n_Cache: "ObjectFactory.getObject()\n→ getEarlyBeanReference(A)\n→ có thể wrap bằng AOP proxy"
+n_Cache -> n_Cache: "Move A: Level 3 → Level 2"
+n_Cache -> n_C: "Trả early reference của A (có thể là\nproxy)" { style.stroke-dash: 3 }
+n_C -> n_B: "inject A (early reference) vào B"
+n_C -> n_B: "@PostConstruct, init callbacks"
+n_C -> n_Cache: "Level 1: put(\"serviceB\",\nfully-initialized B)\nRemove from Level 2, 3"
+n_C.note6: "ServiceB hoàn tất"
+n_C -> n_C: "Quay lại inject B cho A" { style.stroke-dash: 3 }
+n_C -> n_A: "inject B (fully initialized) vào A"
+n_C -> n_A: "@PostConstruct, init callbacks"
+n_C -> n_Cache: "Level 1: put(\"serviceA\",\nfully-initialized A)\nRemove from Level 2"
+n_C.note7: "Kiểm tra: A trong Level 2 == A\nreference hiện tại?\nNếu khác (bị proxy wrap) →\nexposedObject = earlyRef"
+n_C.note8: "ServiceA hoàn tất"
 ```
 
 ### 7.4. Tại sao 3 level? Sao không 2?
@@ -575,7 +616,7 @@ Nếu **không** có circular dependency, ObjectFactory **không bao giờ** đ�
 
 ### 8.1. @Bean — đơn giản, phổ biến
 
-```java
+```java source="spring-ioc-container/06/AppConfig.java"
 @Configuration
 public class AppConfig {
     @Bean
@@ -587,6 +628,10 @@ public class AppConfig {
 }
 // Container gọi method → lấy return value → đăng ký làm bean
 ```
+
+<SourceRef project="spring-ioc-container" file="06/AppConfig.java" region="example" variant="button">
+  Xem AppConfig.java cùng các ví dụ khác
+</SourceRef>
 
 ### 8.2. FactoryBean — factory tạo bean phức tạp
 
@@ -602,7 +647,7 @@ public interface FactoryBean<T> {
 
 Ví dụ thực tế — `SqlSessionFactoryBean` (MyBatis):
 
-```java
+```java source="spring-ioc-container/07/SqlSessionFactoryBean.java"
 public class SqlSessionFactoryBean implements FactoryBean<SqlSessionFactory> {
     private DataSource dataSource;
     private Resource[] mapperLocations;
@@ -622,6 +667,10 @@ public class SqlSessionFactoryBean implements FactoryBean<SqlSessionFactory> {
     }
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="07/SqlSessionFactoryBean.java" region="example" variant="button">
+  Xem SqlSessionFactoryBean.java cùng các ví dụ khác
+</SourceRef>
 
 ### 8.3. Khác biệt quan trọng
 
@@ -692,19 +741,26 @@ META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
 
 File này liệt kê tất cả auto-configuration class. `AutoConfigurationImportSelector` load danh sách, filter theo `@Conditional`, rồi import:
 
-```mermaid
-flowchart TD
-    A["SpringApplication.run()"] --> B["@EnableAutoConfiguration<br/>→ @Import(AutoConfigurationImportSelector.class)"]
-    B --> C["Load danh sách từ<br/>AutoConfiguration.imports<br/>(~150 class trong spring-boot-autoconfigure)"]
-    C --> D["Filter bằng @ConditionalOnClass<br/>→ loại bỏ class không có trên classpath<br/>(ví dụ: không có MongoDB driver → skip MongoAutoConfiguration)"]
-    D --> E["Sắp xếp theo @AutoConfigureOrder,<br/>@AutoConfigureBefore, @AutoConfigureAfter"]
-    E --> F["Cho từng class: evaluate @ConditionalOnBean,<br/>@ConditionalOnMissingBean, @ConditionalOnProperty..."]
-    F --> G["Class pass → đăng ký BeanDefinition<br/>Class fail → skip hoàn toàn"]
+```d2 title="9.3. Auto-Configuration mechanism"
+direction: down
+n_A: "SpringApplication.run()"
+n_B: "@EnableAutoConfiguration\n→\n@Import(AutoConfigurationImportSelector.class)"
+n_C: "Load danh sách từ\nAutoConfiguration.imports\n(~150 class trong\nspring-boot-autoconfigure)"
+n_D: "Filter bằng @ConditionalOnClass\n→ loại bỏ class không có trên\nclasspath\n(ví dụ: không có MongoDB driver → skip\nMongoAutoConfiguration)"
+n_E: "Sắp xếp theo @AutoConfigureOrder,\n@AutoConfigureBefore,\n@AutoConfigureAfter"
+n_F: "Cho từng class: evaluate\n@ConditionalOnBean,\n@ConditionalOnMissingBean,\n@ConditionalOnProperty..."
+n_G: "Class pass → đăng ký BeanDefinition\nClass fail → skip hoàn toàn"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
 ```
 
 ### 9.4. Ví dụ: DataSourceAutoConfiguration
 
-```java
+```java source="spring-ioc-container/08/DataSourceAutoConfiguration.java"
 @AutoConfiguration(before = SqlInitializationAutoConfiguration.class)
 @ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
 @ConditionalOnMissingBean(type = "io.r2dbc.spi.ConnectionFactory")
@@ -726,6 +782,10 @@ public class DataSourceAutoConfiguration {
     }
 }
 ```
+
+<SourceRef project="spring-ioc-container" file="08/DataSourceAutoConfiguration.java" region="example" variant="button">
+  Xem DataSourceAutoConfiguration.java cùng các ví dụ khác
+</SourceRef>
 
 Luồng suy nghĩ:
 1. Có `DataSource.class` trên classpath? (có JDBC driver) → **tiếp**
@@ -854,13 +914,19 @@ private Map<String, Integer> map;                    // app.map={a:1,b:2}
 
 ### 11.1. Architecture
 
-```
-ApplicationEventPublisher (interface)
-    └── ApplicationContext (implement sẵn)
-           └── publishEvent(event)
-                  └── ApplicationEventMulticaster
-                         └── multicastEvent(event)
-                                └── duyệt tất cả listener match → invoke
+```d2 title="11.1. Architecture"
+direction: right
+t0: "ApplicationEventPublisher (interface)"
+t1: "ApplicationContext (implement sẵn)"
+t0 -> t1
+t2: "publishEvent(event)"
+t1 -> t2
+t3: "ApplicationEventMulticaster"
+t2 -> t3
+t4: "multicastEvent(event)"
+t3 -> t4
+t5: "duyệt tất cả listener match → invoke"
+t4 -> t5
 ```
 
 ### 11.2. Đăng ký listener
@@ -1031,15 +1097,23 @@ public class TenantCache { ... }  // mỗi tenant có cache riêng
 
 Spring cho phép **lồng** ApplicationContext: child context có thể tham chiếu bean từ parent, nhưng parent **không** thấy bean trong child.
 
-```
-Parent ApplicationContext
-├── shared beans (DataSource, common services)
-│
-├── Child Context 1 (DispatcherServlet — web endpoints)
-│   └── Controllers, ViewResolvers
-│
-└── Child Context 2 (Admin DispatcherServlet)
-    └── Admin Controllers
+```d2 title="13.1. Khi nào dùng"
+direction: right
+t0: "Parent ApplicationContext"
+t1: "shared beans (DataSource, common services)"
+t0 -> t1
+t2: "│"
+t0 -> t2
+t3: "Child Context 1 (DispatcherServlet — web endpoints)"
+t2 -> t3
+t4: "Controllers, ViewResolvers"
+t3 -> t4
+t5: "│"
+t0 -> t5
+t6: "Child Context 2 (Admin DispatcherServlet)"
+t5 -> t6
+t7: "Admin Controllers"
+t6 -> t7
 ```
 
 ### 13.2. Lookup order

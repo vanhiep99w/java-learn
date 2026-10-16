@@ -8,6 +8,9 @@ Transaction không chỉ là thêm `@Transactional` lên một method. Muốn d�
 > [!NOTE]
 > Bài viết dùng Jakarta Persistence hiện đại, vì vậy import nằm trong namespace `jakarta.persistence.*`. Nếu dự án cũ còn dùng `javax.persistence.*`, khái niệm không đổi nhưng cần nâng cấp dependency và import trước khi dùng nguyên mẫu code.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Bức tranh tổng thể](#bức-tranh-tổng-thể)
@@ -51,16 +54,25 @@ Một transaction database thường được kỳ vọng có bốn thuộc tín
 
 JPA không thay thế transaction của database. Nó giữ thay đổi trên entity trong **persistence context** — vùng quản lý các entity đang được theo dõi — rồi Hibernate chuyển các thay đổi đó thành SQL. Cuối cùng, database mới là nơi commit hoặc rollback dữ liệu.
 
-```mermaid
-flowchart LR
-    A[Service method] --> B[Transaction boundary]
-    B --> C[EntityManager]
-    C --> D[Persistence context]
-    D --> E[Hibernate dirty checking]
-    E --> F[SQL khi flush]
-    F --> G[(Database transaction)]
-    G -->|COMMIT| H[Dữ liệu bền vững]
-    G -->|ROLLBACK| I[Hủy thay đổi trong database]
+```d2 title="Bức tranh tổng thể"
+direction: right
+n_A: "Service method"
+n_B: "Transaction boundary"
+n_C: "EntityManager"
+n_D: "Persistence context"
+n_E: "Hibernate dirty checking"
+n_F: "SQL khi flush"
+n_G: "Database transaction" { shape: cylinder }
+n_H: "Dữ liệu bền vững"
+n_I: "Hủy thay đổi trong database"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H: "COMMIT"
+n_G -> n_I: "ROLLBACK"
 ```
 
 Điểm quan trọng là **flush không phải commit**. Flush gửi SQL xuống database nhưng SQL vẫn nằm trong transaction hiện tại và vẫn có thể rollback. Commit mới kết thúc transaction và làm thay đổi trở nên bền vững.
@@ -93,7 +105,7 @@ Ranh giới transaction nên bao quanh một use case nghiệp vụ hoàn chỉn
 
 Trong Java SE hoặc khi tự quản lý một persistence unit kiểu `RESOURCE_LOCAL`, JPA cung cấp `EntityTransaction`:
 
-```java
+```java source="transactions-with-jpa/01/ProductCommand.java"
 import java.math.BigDecimal;
 
 import jakarta.persistence.EntityManager;
@@ -133,6 +145,10 @@ public final class ProductCommand {
 }
 ```
 
+<SourceRef project="transactions-with-jpa" file="01/ProductCommand.java" region="example" variant="button">
+  Xem ProductCommand.java cùng các ví dụ khác
+</SourceRef>
+
 Entity được tải trong transaction là managed nên không cần gọi `em.merge(product)` sau khi đổi giá. Hibernate phát hiện thay đổi và flush trước commit.
 
 Không dùng `EntityTransaction` khi container đang quản lý transaction JTA hoặc khi Spring đã cung cấp `JpaTransactionManager`. Trộn hai cơ chế dễ gây lỗi “transaction already active”, dùng sai connection hoặc đóng nhầm `EntityManager` do container quản lý.
@@ -141,7 +157,7 @@ Không dùng `EntityTransaction` khi container đang quản lý transaction JTA 
 
 Trong Spring Boot, cách thông dụng là đặt boundary ở service:
 
-```java
+```java source="transactions-with-jpa/02/PricingService.java"
 import java.math.BigDecimal;
 
 import org.springframework.stereotype.Service;
@@ -165,6 +181,10 @@ public class PricingService {
 }
 ```
 
+<SourceRef project="transactions-with-jpa" file="02/PricingService.java" region="example" variant="button">
+  Xem PricingService.java cùng các ví dụ khác
+</SourceRef>
+
 Spring mở transaction trước khi vào method, gắn một `EntityManager` với thread đang xử lý, rồi commit hoặc rollback sau khi method kết thúc. `@PersistenceContext` và Spring Data repository nhận một proxy trỏ tới `EntityManager` đang gắn với transaction hiện tại. Bạn không tự `close()` đối tượng đó.
 
 Với transaction-scoped persistence context, entity được quản lý trong transaction hiện tại. Sau khi transaction kết thúc, các entity trả ra ngoài thường trở thành detached, nghĩa là không còn được dirty checking theo dõi.
@@ -175,7 +195,7 @@ Ta dùng bài toán trừ tồn kho. Hai request có thể cùng đặt một s�
 
 ### Entity Product và schema
 
-```java
+```java source="transactions-with-jpa/03/Product.java"
 package com.example.shop.product;
 
 import java.math.BigDecimal;
@@ -234,6 +254,10 @@ public class Product {
 }
 ```
 
+<SourceRef project="transactions-with-jpa" file="03/Product.java" region="example" variant="button">
+  Xem Product.java cùng các ví dụ khác
+</SourceRef>
+
 Schema tối thiểu tương ứng:
 
 ```sql
@@ -250,7 +274,7 @@ create table product (
 
 ### Use case đặt hàng
 
-```java
+```java source="transactions-with-jpa/04/OrderService.java"
 package com.example.shop.order;
 
 import org.springframework.stereotype.Service;
@@ -280,6 +304,10 @@ public class OrderService {
     }
 }
 ```
+
+<SourceRef project="transactions-with-jpa" file="04/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
 
 `Product` đã managed nên không cần `products.save(product)`. `orders.save(order)` đăng ký entity mới để persist. Cả cập nhật tồn kho và insert đơn hàng nằm trong cùng transaction; nếu insert order vi phạm constraint, transaction rollback cả hai.
 
@@ -355,9 +383,16 @@ Sau rollback, không nên tiếp tục dùng các managed entity cũ như thể 
 
 **Flush** là thao tác đồng bộ trạng thái của persistence context xuống database bằng SQL. **Commit** là thao tác xác nhận transaction. Một transaction có thể flush nhiều lần rồi vẫn rollback toàn bộ.
 
-```text
-thay đổi entity → flush → SQL đã chạy nhưng chưa bền vững → commit
-                         └──────────────────────────→ rollback vẫn hủy được
+```d2 title="Flush và commit"
+direction: right
+change: "Thay đổi entity"
+flush: "Flush"
+sql: "SQL đã chạy nhưng chưa bền vững"
+commit: "Commit: bền vững"
+rollback: "Rollback: vẫn hủy được thay đổi"
+change -> flush -> sql
+sql -> commit
+sql -> rollback
 ```
 
 Đừng gọi `flush()` sau mỗi `save()`. Làm vậy tăng round trip tới database, giảm khả năng batching và khiến code phụ thuộc quá sâu vào provider. Chỉ flush sớm khi bạn thực sự cần SQL chạy tại một checkpoint cụ thể.
@@ -379,7 +414,7 @@ Không nên giả định “mọi query đều flush” hoặc “`save()` luô
 
 Giả sử cần đổi một unique key rồi bắt lỗi ngay tại một vị trí xác định:
 
-```java
+```java source="transactions-with-jpa/05/CustomerService.java"
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
@@ -400,6 +435,10 @@ public class CustomerService {
     }
 }
 ```
+
+<SourceRef project="transactions-with-jpa" file="05/CustomerService.java" region="example" variant="button">
+  Xem CustomerService.java cùng các ví dụ khác
+</SourceRef>
 
 Nếu email trùng, Hibernate có thể ném `PersistenceException`; Spring thường dịch exception truy cập dữ liệu thành một subtype của `DataAccessException`, chẳng hạn `DataIntegrityViolationException`. Loại exception cuối cùng còn phụ thuộc database, driver và vị trí exception được dịch.
 
@@ -427,7 +466,7 @@ Giữ transaction đủ ngắn để giảm thời gian giữ connection và loc
 
 Lời gọi từ bean khác đi qua proxy nên transaction advice chạy. Lời gọi nội bộ qua `this` không đi qua proxy:
 
-```java
+```java source="transactions-with-jpa/06/ImportService.java"
 @Service
 public class ImportService {
     public void importAll(List<Row> rows) {
@@ -442,6 +481,10 @@ public class ImportService {
     }
 }
 ```
+
+<SourceRef project="transactions-with-jpa" file="06/ImportService.java" region="example" variant="button">
+  Xem ImportService.java cùng các ví dụ khác
+</SourceRef>
 
 Cách sửa rõ ràng nhất là tách `importOne()` sang một bean khác rồi gọi bean đó. Nếu boundary động hoặc cần lặp với transaction riêng, `TransactionTemplate` cũng phù hợp. Tránh self injection hoặc `AopContext.currentProxy()` nếu không có lý do mạnh, vì chúng làm thiết kế phụ thuộc cơ chế proxy.
 
@@ -593,7 +636,7 @@ Retry chỉ an toàn khi toàn bộ operation có thể chạy lại và side ef
 
 Mỗi lần retry phải dùng transaction và persistence context mới để tải version mới:
 
-```java
+```java source="transactions-with-jpa/07/InventoryCommand.java"
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -641,6 +684,10 @@ public class InventoryCommand {
 }
 ```
 
+<SourceRef project="transactions-with-jpa" file="07/InventoryCommand.java" region="example" variant="button">
+  Xem InventoryCommand.java cùng các ví dụ khác
+</SourceRef>
+
 Không đặt vòng lặp retry bên trong một `@Transactional` duy nhất. Persistence context cũ đã chứa state và version lỗi; transaction cũng có thể đã rollback-only. Hãy retry từ bên ngoài boundary như ví dụ trên.
 
 Với contention cao, retry liên tục có thể tạo retry storm. Dùng số lần hữu hạn, exponential backoff có jitter và metric để quan sát tỷ lệ conflict. Nếu xung đột là trạng thái bình thường chứ không còn hiếm, cân nhắc pessimistic lock hoặc atomic update.
@@ -649,7 +696,7 @@ Với contention cao, retry liên tục có thể tạo retry storm. Dùng số 
 
 **Pessimistic locking** yêu cầu database giữ lock khi đọc vì giả định xung đột có khả năng cao. `PESSIMISTIC_WRITE` thường ánh xạ thành `SELECT ... FOR UPDATE` hoặc cú pháp tương đương:
 
-```java
+```java source="transactions-with-jpa/08/ProductRepository.java"
 import java.util.Optional;
 
 import jakarta.persistence.LockModeType;
@@ -670,6 +717,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdForUpdate(@Param("id") long id);
 }
 ```
+
+<SourceRef project="transactions-with-jpa" file="08/ProductRepository.java" region="example" variant="button">
+  Xem ProductRepository.java cùng các ví dụ khác
+</SourceRef>
 
 Service phải gọi query khóa bên trong transaction:
 
@@ -712,12 +763,16 @@ Trong production, cấu hình timeout ở tầng database hoặc transaction đ�
 
 Deadlock xảy ra khi các transaction chờ lock của nhau theo vòng tròn:
 
-```mermaid
-flowchart LR
-    A[Transaction A giữ Product 1] --> B[Chờ Product 2]
-    C[Transaction B giữ Product 2] --> D[Chờ Product 1]
-    B --> C
-    D --> A
+```d2 title="Deadlock và thứ tự khóa"
+direction: right
+n_A: "Transaction A giữ Product 1"
+n_B: "Chờ Product 2"
+n_C: "Transaction B giữ Product 2"
+n_D: "Chờ Product 1"
+n_A -> n_B
+n_C -> n_D
+n_B -> n_C
+n_D -> n_A
 ```
 
 Database thường chọn một transaction làm nạn nhân và rollback nó. Giảm rủi ro bằng cách:

@@ -8,6 +8,9 @@ Relationship mapping biến liên kết giữa các object Java thành foreign k
 > [!NOTE]
 > Bài viết dùng API `jakarta.persistence.*`, phù hợp với Jakarta Persistence hiện đại và Spring Boot 3+. Ví dụ SQL minh họa theo PostgreSQL; tên sequence, cú pháp lấy ID và thứ tự câu lệnh có thể khác theo dialect, chiến lược sinh khóa và phiên bản Hibernate.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Bức tranh tổng thể](#1-bức-tranh-tổng-thể)
@@ -97,41 +100,46 @@ Ta dùng hệ thống blog nhỏ:
 - Một bài có tối đa một bộ metadata chi tiết.
 - Một bài được gắn nhiều tag. Khi quan hệ tag cần thêm thời điểm gắn, join row trở thành entity `PostTag`.
 
-```mermaid
-erDiagram
-    AUTHORS ||--o{ POSTS : writes
-    POSTS ||--o{ POST_COMMENTS : contains
-    POSTS ||--o| POST_DETAILS : has
-    POSTS ||--o{ POST_TAGS : tagged_by
-    TAGS ||--o{ POST_TAGS : classifies
-
-    AUTHORS {
-        bigint id PK
-        varchar name
-    }
-    POSTS {
-        bigint id PK
-        bigint author_id FK
-        varchar title
-    }
-    POST_COMMENTS {
-        bigint id PK
-        bigint post_id FK
-        varchar content
-    }
-    POST_DETAILS {
-        bigint post_id PK, FK
-        varchar slug UK
-    }
-    TAGS {
-        bigint id PK
-        varchar name UK
-    }
-    POST_TAGS {
-        bigint post_id PK, FK
-        bigint tag_id PK, FK
-        timestamp assigned_at
-    }
+```d2 title="2. Mô hình ví dụ và lược đồ"
+direction: right
+n_AUTHORS: "AUTHORS" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "name": "varchar"
+}
+n_POSTS: "POSTS" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "author_id": "bigint" { constraint: [foreign_key] }
+  "title": "varchar"
+}
+n_POST_COMMENTS: "POST_COMMENTS" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "post_id": "bigint" { constraint: [foreign_key] }
+  "content": "varchar"
+}
+n_POST_DETAILS: "POST_DETAILS" {
+  shape: sql_table
+  "post_id": "bigint" { constraint: [primary_key; foreign_key] }
+  "slug": "varchar" { constraint: [unique] }
+}
+n_TAGS: "TAGS" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "name": "varchar" { constraint: [unique] }
+}
+n_POST_TAGS: "POST_TAGS" {
+  shape: sql_table
+  "post_id": "bigint" { constraint: [primary_key; foreign_key] }
+  "tag_id": "bigint" { constraint: [primary_key; foreign_key] }
+  "assigned_at": "timestamp"
+}
+n_AUTHORS -> n_POSTS: "writes (1 → 0..*)"
+n_POSTS -> n_POST_COMMENTS: "contains (1 → 0..*)"
+n_POSTS -> n_POST_DETAILS: "has (1 → 0..1)"
+n_POSTS -> n_POST_TAGS: "tagged_by (1 → 0..*)"
+n_TAGS -> n_POST_TAGS: "classifies (1 → 0..*)"
 ```
 
 Lược đồ nên được bảo vệ bằng constraint thật, không chỉ bằng annotation Java:
@@ -164,7 +172,7 @@ create index idx_comment_post_id on post_comments(post_id);
 
 Với `PostComment -> Post`, bảng `post_comments` chứa `post_id`. Vì vậy `PostComment.post` là owning side, tức **phía sở hữu** chịu trách nhiệm ghi foreign key.
 
-```java
+```java source="relationships-mapping/01/PostComment.java"
 @Entity
 @Table(name = "post_comments")
 public class PostComment {
@@ -184,6 +192,10 @@ public class PostComment {
     }
 }
 ```
+
+<SourceRef project="relationships-mapping" file="01/PostComment.java" region="example" variant="button">
+  Xem PostComment.java cùng các ví dụ khác
+</SourceRef>
 
 `@JoinColumn(name = "post_id")` mô tả cột foreign key trên bảng của owning side. `optional = false` nói rằng association không được `null` ở object model. `nullable = false` mô tả nullability của cột khi provider sinh DDL.
 
@@ -206,12 +218,13 @@ private List<PostComment> comments = new ArrayList<>();
 
 `mappedBy = "post"` trỏ tới **tên field Java** `PostComment.post`, không phải tên cột `post_id`. Điều này nói với provider rằng hai field cùng mô tả một relationship. Hibernate không tạo thêm join table cho `Post.comments`.
 
-```text
-Post.comments                       PostComment.post
-inverse side                       owning side
-@OneToMany(mappedBy = "post")      @ManyToOne @JoinColumn("post_id")
-        └───────────────────────────────┘
-                  cùng một FK
+```d2 title="3.2. OneToMany hai chiều"
+direction: right
+inverse: "Post.comments: inverse side\n@OneToMany(mappedBy = post)"
+owner: "PostComment.post: owning side\n@ManyToOne @JoinColumn(post_id)"
+fk: "Cùng một FK: post_id"
+inverse -> fk
+owner -> fk
 ```
 
 Quan hệ này là bidirectional, nghĩa là object graph có thể được điều hướng theo cả hai hướng. Database vẫn chỉ có một foreign key `post_comments.post_id`.
@@ -241,7 +254,7 @@ Mapping này phù hợp khi child thật sự không cần biết parent. Tuy nh
 
 `OneToOne` qua foreign key thực chất là một to-one association có constraint `UNIQUE`. Ví dụ `PostDetails` giữ `post_id`:
 
-```java
+```java source="relationships-mapping/02/PostDetails.java"
 @Entity
 @Table(
     name = "post_details",
@@ -264,6 +277,10 @@ public class PostDetails {
 }
 ```
 
+<SourceRef project="relationships-mapping" file="02/PostDetails.java" region="example" variant="button">
+  Xem PostDetails.java cùng các ví dụ khác
+</SourceRef>
+
 `PostDetails.post` là owning side vì bảng `post_details` chứa foreign key. Nếu cần điều hướng ngược, `Post` khai báo:
 
 ```java
@@ -282,7 +299,7 @@ Không có `UNIQUE`, database vẫn cho nhiều row `post_details` cùng trỏ t
 
 Nếu details không có identity độc lập, dùng shared primary key. Cột `post_details.post_id` vừa là primary key vừa là foreign key:
 
-```java
+```java source="relationships-mapping/03/PostDetails.java"
 @Entity
 @Table(name = "post_details")
 public class PostDetails {
@@ -298,6 +315,10 @@ public class PostDetails {
     private String slug;
 }
 ```
+
+<SourceRef project="relationships-mapping" file="03/PostDetails.java" region="example" variant="button">
+  Xem PostDetails.java cùng các ví dụ khác
+</SourceRef>
 
 `@MapsId` bảo provider lấy ID của `Post` làm ID cho `PostDetails`. Mapping này biểu đạt ownership lifecycle mạnh: details không thể tồn tại nếu không có post.
 
@@ -365,7 +386,7 @@ Không dùng `CascadeType.REMOVE` hoặc `CascadeType.ALL` một cách máy móc
 
 Ngay khi join row có thêm `assigned_at`, `assigned_by`, `position`, `status` hoặc identity riêng, nó không còn là “chi tiết mapping”. Hãy nâng nó thành association entity, tức **entity đại diện chính quan hệ**.
 
-```java
+```java source="relationships-mapping/04/PostTagId.java"
 @Embeddable
 public class PostTagId implements Serializable {
     private Long postId;
@@ -398,9 +419,13 @@ public class PostTagId implements Serializable {
 }
 ```
 
+<SourceRef project="relationships-mapping" file="04/PostTagId.java" region="example" variant="button">
+  Xem PostTagId.java cùng các ví dụ khác
+</SourceRef>
+
 Composite key phải `Serializable` và có `equals()` cùng `hashCode()` theo giá trị khóa. Class thường có no-arg constructor như trên hoạt động portable hơn qua các phiên bản Jakarta Persistence và Hibernate so với dựa vào hỗ trợ record của một provider cụ thể.
 
-```java
+```java source="relationships-mapping/05/PostTag.java"
 @Entity
 @Table(name = "post_tags")
 public class PostTag {
@@ -425,12 +450,19 @@ public class PostTag {
 }
 ```
 
+<SourceRef project="relationships-mapping" file="05/PostTag.java" region="example" variant="button">
+  Xem PostTag.java cùng các ví dụ khác
+</SourceRef>
+
 Khi đó model trở thành hai quan hệ one-to-many:
 
-```text
-Post 1 ─── * PostTag * ─── 1 Tag
-                 │
-                 └── assignedAt, assignedBy, position, ...
+```d2 title="5.2. Khi nào tách association entity"
+direction: right
+post: "Post"
+association: "PostTag\nassignedAt, assignedBy, position, ..."
+tag: "Tag"
+post -> association: "1 → *"
+tag -> association: "1 → *"
 ```
 
 Association entity dễ mở rộng, dễ query và cho phép đặt constraint trực tiếp. Đây thường là lựa chọn bền vững hơn `@ManyToMany` trong domain có nghiệp vụ thật.
@@ -465,7 +497,7 @@ Nếu cả hai phía đều khai báo `@JoinColumn` hoặc `@JoinTable` mà khô
 
 Helper method gom invariant về một chỗ. **Invariant** là điều kiện luôn phải đúng trong domain; ở đây, comment nằm trong `post.comments` thì `comment.post` phải trỏ về đúng post đó.
 
-```java
+```java source="relationships-mapping/06/Post.java"
 public class Post {
     private List<PostComment> comments = new ArrayList<>();
 
@@ -486,6 +518,10 @@ public class Post {
     }
 }
 ```
+
+<SourceRef project="relationships-mapping" file="06/Post.java" region="example" variant="button">
+  Xem Post.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 public class PostComment {
@@ -587,21 +623,20 @@ public void removeComment(long postId, long commentId) {
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant S as Service transaction
-    participant P as Managed Post
-    participant C as Managed PostComment
-    participant H as Hibernate flush
-    participant D as Database
-
-    S->>P: removeComment(comment)
-    P->>P: comments.remove(comment)
-    P->>C: post = null
-    S->>H: transaction commit triggers flush
-    H->>H: compare collection snapshot
-    H->>D: delete from post_comments where id = ?
-    D-->>H: 1 row deleted
+```d2 title="7.2. Orphan removal xóa child rời aggregate"
+shape: sequence_diagram
+n_S: "Service transaction"
+n_P: "Managed Post"
+n_C: "Managed PostComment"
+n_H: "Hibernate flush"
+n_D: "Database"
+n_S -> n_P: "removeComment(comment)"
+n_P -> n_P: "comments.remove(comment)"
+n_P -> n_C: "post = null"
+n_S -> n_H: "transaction commit triggers flush"
+n_H -> n_H: "compare collection snapshot"
+n_H -> n_D: "delete from post_comments where id = ?"
+n_D -> n_H: "1 row deleted" { style.stroke-dash: 3 }
 ```
 
 Phân biệt hai tình huống:
@@ -681,7 +716,7 @@ Phần này ghép mapping parent-child thành ví dụ tối thiểu có thể c
 
 ### 9.1. Entity root và child
 
-```java
+```java source="relationships-mapping/07/Post.java"
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -751,7 +786,11 @@ public class Post {
 }
 ```
 
-```java
+<SourceRef project="relationships-mapping" file="07/Post.java" region="example" variant="button">
+  Xem Post.java cùng các ví dụ khác
+</SourceRef>
+
+```java source="relationships-mapping/08/PostComment.java"
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -808,6 +847,10 @@ public class PostComment {
     }
 }
 ```
+
+<SourceRef project="relationships-mapping" file="08/PostComment.java" region="example" variant="button">
+  Xem PostComment.java cùng các ví dụ khác
+</SourceRef>
 
 Entity có no-arg constructor `protected` để provider khởi tạo. Không dùng Lombok `@Data`: generated `toString()`, `equals()` và `hashCode()` dễ đi xuyên association, kích hoạt lazy load, tạo recursion hoặc làm hỏng collection khi ID thay đổi.
 

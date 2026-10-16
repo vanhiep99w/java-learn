@@ -87,24 +87,27 @@ Hành vi "ma quái" thường gặp:
 
 Mô hình sai trong đầu nhiều người:
 
-```text
-❌ Mô hình sai:
-   @Transactional  ──(bằng phép thuật)──►  method tự biết mở/commit transaction
-        "Cứ gắn vào là nó tự lo, ở đâu cũng được."
+```d2 title="4. Hiểu lầm cốt lõi: \"annotation tự nó làm phép\""
+direction: right
+annotation: "@Transactional"
+magic: "Method tự biết mở / commit transaction"
+wrong: "Mô hình SAI: annotation không phải phép\nthuật"
+annotation -> magic: "KHÔNG tự làm" { style.stroke-dash: 3 }
+wrong -> annotation
 ```
 
 Thực tế, annotation chỉ là **metadata** — một mẩu thông tin dán lên method. Bản thân nó **không chứa code**. Phải có ai đó **đọc** annotation và **sinh ra hành vi**. Trong Spring, "ai đó" là cơ chế AOP, và hành vi được nhét vào một **proxy**:
 
-```text
-✅ Mô hình đúng:
-   Lúc startup:
-     Spring quét thấy @Transactional → tạo PROXY bọc quanh OrderService
-     Logic "mở tx → gọi method thật → commit/rollback" nằm trong PROXY
-
-   Lúc chạy:
-     caller ──► PROXY (mở tx) ──► object thật (method) ──► PROXY (commit/rollback)
-                  ▲
-            chỉ chạy khi lời gọi ĐI QUA đây
+```d2 title="4. Hiểu lầm cốt lõi: \"annotation tự nó làm phép\""
+direction: down
+startup: "Startup: Spring đọc annotation"
+proxy: "Tạo proxy bọc target"
+caller: "Runtime: caller gọi bean"
+advice: "Proxy chạy TransactionInterceptor"
+target: "Target method"
+finish: "Proxy commit / rollback"
+startup -> proxy
+caller -> proxy -> advice -> target -> finish
 ```
 
 Annotation là "tấm biển chỉ dẫn"; proxy là "người thực thi". Tấm biển dán đúng chỗ nhưng nếu lời gọi không đi ngang qua người thực thi thì chẳng ai làm gì cả.
@@ -132,27 +135,18 @@ Spring AOP (runtime PROXY):
 
 Lúc context khởi động, một `BeanPostProcessor` (vd `InfrastructureAdvisorAutoProxyCreator`) phát hiện bean có `@Transactional`, và thay vì đăng ký object gốc, nó đăng ký một **proxy**:
 
-```text
-Bean trong Spring container thực chất là:
-
-   ┌──────────────────── OrderService$$Proxy ────────────────────┐
-   │  saveWithTransaction(order) {                               │
-   │     txManager.begin();           ← advice TRƯỚC             │
-   │     try {                                                   │
-   │        target.saveWithTransaction(order);  ← object THẬT    │
-   │        txManager.commit();                                  │
-   │     } catch (RuntimeException e) {                          │
-   │        txManager.rollback();     ← advice SAU (lỗi)         │
-   │     }                                                       │
-   │  }                                                          │
-   └────────────────────────────────────────────────────────────┘
-                          │ ủy quyền tới
-                          ▼
-              ┌──── OrderService (target thật) ────┐
-              │  saveWithTransaction(order) {      │
-              │     repo.save(...);                │  ← KHÔNG biết gì về tx
-              │  }                                 │
-              └────────────────────────────────────┘
+```d2 title="5. Spring AOP hoạt động bằng proxy — không phải bytecode weaving"
+direction: down
+caller: "Caller"
+proxy: "OrderService proxy"
+begin: "txManager.begin(): advice TRƯỚC"
+target: "Target thật: saveWithTransaction →\nrepo.save (không tự quản lý tx)"
+outcome: "Thành công hay RuntimeException?"
+commit: "txManager.commit()"
+rollback: "txManager.rollback(): advice SAU khi lỗi"
+caller -> proxy -> begin -> target -> outcome
+outcome -> commit: Thành công
+outcome -> rollback: RuntimeException
 ```
 
 Mọi thứ inject vào nơi khác (`@Autowired OrderService`) thực chất là **proxy**, không phải target. Đó là lý do gọi từ ngoài thì transaction chạy.
@@ -163,28 +157,32 @@ Mọi thứ inject vào nơi khác (`@Autowired OrderService`) thực chất là
 
 Đây là trái tim của câu trả lời. Bên trong object thật, từ khóa `this` trỏ tới **chính object thật đó** — **không phải** proxy. Proxy chỉ là một object *khác* bọc bên ngoài; object thật **không hề biết** proxy tồn tại.
 
-```text
-caller bên ngoài:
-   proxy.processOrder()
-      └─► target.processOrder()        ← đang chạy TRONG target
-              └─► this.saveWithTransaction()
-                     │
-                     ▼
-                  this = TARGET (object thật), KHÔNG phải proxy!
-                  → gọi thẳng target.saveWithTransaction()
-                  → KHÔNG đi qua lớp advice của proxy
-                  → không begin/commit/rollback → @Transactional vô hiệu
+```d2 title="6. Vì sao this.method() bỏ qua proxy"
+direction: down
+caller: "Caller bên ngoài"
+proxy: "proxy.processOrder()"
+outer: "target.processOrder(): chạy TRONG target"
+inner: "this.saveWithTransaction(): this =\nTARGET, không phải proxy"
+result: "Bỏ qua proxy advice: không begin /\ncommit / rollback; @Transactional vô\nhiệu"
+caller -> proxy -> outer -> inner -> result
 ```
 
-```text
-So sánh hai đường đi:
-
-  ✅ Đi qua proxy (có tx):
-     caller ──► [PROXY: begin tx] ──► target.method ──► [PROXY: commit]
-
-  ❌ Self-invocation (không tx):
-     caller ──► [PROXY] ──► target.outer() ──► this.inner()
-                                                  └─► target.inner()  (proxy bị nhảy cóc)
+```d2 title="6. Vì sao this.method() bỏ qua proxy"
+direction: right
+correct: "Đi qua proxy: có TX" {
+  caller: Caller
+  begin: "Proxy: begin TX"
+  target: "target.method()"
+  commit: "Proxy: commit"
+  caller -> begin -> target -> commit
+}
+wrong: "Self-invocation: không có TX cho inner" {
+  caller: Caller
+  proxy: Proxy
+  outer: "target.outer()"
+  inner: "this.inner() = target.inner()\nnhảy cóc proxy"
+  caller -> proxy -> outer -> inner
+}
 ```
 
 > [!IMPORTANT]

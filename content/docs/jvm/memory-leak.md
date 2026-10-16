@@ -85,15 +85,23 @@ GC bắt đầu từ **GC Roots** và duyệt theo reference chain. Object **rea
 
 ### 3.2. Reachability chain — đường đi từ Root tới Leak
 
-```
-GC Root: Static field EventProcessor.recentEvents (HashMap)
-    └─ HashMap.table (Node[])
-        └─ Node (hash=42, key="evt-1234")
-            ├─ key: "evt-1234" (String, 56 bytes)
-            └─ value: Event object (1 KB)
-                ├─ id: "evt-1234"
-                ├─ timestamp: 1718000000
-                └─ payload: byte[] (100 KB)  ← LEAK! Ứng dụng không cần nữa
+```d2 title="3.2. Reachability chain — đường đi từ Root tới Leak"
+direction: right
+t0: "GC Root: Static field EventProcessor.recentEvents (HashMap)"
+t1: "HashMap.table (Node[])"
+t0 -> t1
+t2: "Node (hash=42, key=\"evt-1234\")"
+t1 -> t2
+t3: "key: \"evt-1234\" (String, 56 bytes)"
+t2 -> t3
+t4: "value: Event object (1 KB)"
+t2 -> t4
+t5: "id: \"evt-1234\""
+t4 -> t5
+t6: "timestamp: 1718000000"
+t4 -> t6
+t7: "payload: byte[] (100 KB)  ← LEAK! Ứng dụng không cần nữa"
+t4 -> t7
 ```
 
 **Tổng retained size cho 1 triệu entries:** ~100 GB leak chỉ vì thiếu `recentEvents.remove()` hoặc bounded size.
@@ -117,33 +125,44 @@ Gray   | Đã visit nhưng chưa scan hết children
 Black  | Đã visit + đã scan tất cả children → CHẮC CHẮN SỐNG
 ```
 
-```mermaid
-flowchart TD
-    A["Bắt đầu: Tất cả object = WHITE"] --> B["Đánh dấu GC Roots = GRAY"]
-    B --> C["Lấy 1 GRAY object"]
-    C --> D["Scan tất cả reference fields"]
-    D --> E["Đánh dấu children chưa visit = GRAY"]
-    E --> F["Đánh dấu object hiện tại = BLACK"]
-    F --> G{"Còn GRAY object?"}
-    G -->|Có| C
-    G -->|Không| H["Tất cả WHITE objects = GARBAGE → thu hồi"]
+```d2 title="4.1. Tri-color marking algorithm"
+direction: down
+n_A: "Bắt đầu: Tất cả object = WHITE"
+n_B: "Đánh dấu GC Roots = GRAY"
+n_C: "Lấy 1 GRAY object"
+n_D: "Scan tất cả reference fields"
+n_E: "Đánh dấu children chưa visit = GRAY"
+n_F: "Đánh dấu object hiện tại = BLACK"
+n_G: "Còn GRAY object?" { shape: diamond }
+n_H: "Tất cả WHITE objects = GARBAGE → thu\nhồi"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_C: "Có"
+n_G -> n_H: "Không"
 ```
 
 ### 4.2. Tại sao reachable nhưng không cần = LEAK
 
-```
-Sau marking phase:
-
-GC Root (static HashMap)
-    │
-    ├─→ Entry "evt-1" ── BLACK (reachable → SỐNG)
-    ├─→ Entry "evt-2" ── BLACK (reachable → SỐNG)
-    ├─→ Entry "evt-3" ── BLACK (reachable → SỐNG)
-    │   ... 1 triệu entries ...
-    └─→ Entry "evt-1000000" ── BLACK
-
-GC kết luận: TẤT CẢ 1 triệu entries đều SỐNG → không thu hồi gì.
-Thực tế: ứng dụng chỉ cần 100 entry gần nhất. 999.900 entries là LEAK.
+```d2 title="4.2. Tại sao reachable nhưng không cần = LEAK"
+direction: down
+root: "GC Root: static HashMap"
+e1: "Entry evt-1: BLACK, reachable, SỐNG"
+e2: "Entry evt-2: BLACK, reachable, SỐNG"
+e3: "Entry evt-3: BLACK, reachable, SỐNG"
+en: "... Entry evt-1000000: BLACK"
+result: "GC: tất cả 1 triệu entries SỐNG, không\nthu hồi"
+leak: "App chỉ cần 100 entries gần nhất;\n999.900 entries là LEAK"
+root -> e1
+root -> e2
+root -> e3
+root -> en
+e1 -> result
+en -> result
+result -> leak
 ```
 
 **GC không có khái niệm "cần hay không cần"** — nó chỉ biết "reachable hay không". Responsibility nằm ở **developer**: phải remove reference khi object không cần nữa.
@@ -170,13 +189,19 @@ Java cung cấp 4 mức "sức mạnh" reference để kiểm soát GC:
 
 ### 5.1. Thứ tự ưu tiên khi GC
 
-```mermaid
-flowchart LR
-    A["GC cần memory"] --> B{"Còn Weak refs<br/>chỉ tới object?"}
-    B -->|Có| C["Thu hồi Weak → enqueue ReferenceQueue"]
-    B -->|Không đủ| D{"Còn Soft refs<br/>chỉ tới object?"}
-    D -->|Có| E["Thu hồi Soft (LRU — cái cũ nhất trước)"]
-    D -->|Không đủ| F["OOM! Không còn gì thu hồi được"]
+```d2 title="5.1. Thứ tự ưu tiên khi GC"
+direction: right
+n_A: "GC cần memory"
+n_B: "Còn Weak refs\nchỉ tới object?" { shape: diamond }
+n_C: "Thu hồi Weak → enqueue ReferenceQueue"
+n_D: "Còn Soft refs\nchỉ tới object?" { shape: diamond }
+n_E: "Thu hồi Soft (LRU — cái cũ nhất trước)"
+n_F: "OOM! Không còn gì thu hồi được"
+n_A -> n_B
+n_B -> n_C: "Có"
+n_B -> n_D: "Không đủ"
+n_D -> n_E: "Có"
+n_D -> n_F: "Không đủ"
 ```
 
 ### 5.2. WeakHashMap — internal mechanism
@@ -199,20 +224,19 @@ private static class Entry<K,V> extends WeakReference<Object> {
 
 **Flow khi key bị GC:**
 
-```mermaid
-sequenceDiagram
-    participant GC
-    participant RQ as ReferenceQueue
-    participant WH as WeakHashMap
-
-    Note over GC: Key object không còn strong ref
-    GC->>GC: Mark key object as garbage
-    GC->>RQ: Enqueue WeakReference (Entry)
-    Note over WH: Lần tiếp theo gọi get/put/size...
-    WH->>RQ: expungeStaleEntries() — poll queue
-    RQ-->>WH: Return enqueued entries
-    WH->>WH: Remove entry từ table
-    WH->>WH: value = null (giải phóng value cho GC)
+```d2 title="5.2. WeakHashMap — internal mechanism"
+shape: sequence_diagram
+n_GC: "GC"
+n_RQ: "ReferenceQueue"
+n_WH: "WeakHashMap"
+n_GC.note1: "Key object không còn strong ref"
+n_GC -> n_GC: "Mark key object as garbage"
+n_GC -> n_RQ: "Enqueue WeakReference (Entry)"
+n_WH.note2: "Lần tiếp theo gọi get/put/size..."
+n_WH -> n_RQ: "expungeStaleEntries() — poll queue"
+n_RQ -> n_WH: "Return enqueued entries" { style.stroke-dash: 3 }
+n_WH -> n_WH: "Remove entry từ table"
+n_WH -> n_WH: "value = null (giải phóng value cho GC)"
 ```
 
 > [!WARNING]
@@ -279,41 +303,46 @@ Object trở thành phantom reachable (chỉ PhantomReference trỏ tới)
 
 JVM có một **daemon thread** tên `Reference Handler` (priority MAX_PRIORITY - 2) chuyên xử lý reference:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    GC Mark Phase                        │
-│                                                         │
-│  1. Mark all reachable objects (tri-color)              │
-│  2. Phát hiện objects chỉ reachable qua Reference       │
-│  3. Phân loại: Soft? Weak? Phantom?                     │
-│  4. Quyết định clear (dựa trên memory pressure)         │
-└────────────────────────┬────────────────────────────────┘
-                         │ discovered list
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│              Reference Handler Thread                   │
-│                                                         │
-│  1. Nhận discovered references từ GC                    │
-│  2. Clear referent (set referent = null)                │
-│  3. Enqueue vào ReferenceQueue (nếu có)                 │
-│  4. Notify waiting threads (FinalReference → Finalizer) │
-└─────────────────────────────────────────────────────────┘
+```d2 title="6.1. Reference Handler Thread"
+direction: down
+mark: "GC Mark Phase"
+reachable: "1. Mark reachable objects (tri-color)"
+reference: "2. Phát hiện objects chỉ reachable qua\nReference"
+classify: "3. Phân loại: Soft / Weak / Phantom"
+clear: "4. Quyết định clear theo memory pressure"
+handler: "Reference Handler Thread: nhận\ndiscovered references"
+nullref: "Clear referent: set referent = null"
+queue: "Enqueue vào ReferenceQueue nếu có"
+notify: "Notify waiting threads: FinalReference →\nFinalizer"
+mark -> reachable -> reference -> classify -> clear
+clear -> handler: "discovered list"
+handler -> nullref -> queue -> notify
 ```
 
 ### 6.2. Processing order
 
-```mermaid
-flowchart TD
-    A["GC hoàn thành marking"] --> B["Process SoftReferences"]
-    B --> C{"Memory đủ?"}
-    C -->|Đủ| D["Giữ Soft refs (không clear)"]
-    C -->|Thiếu| E["Clear Soft refs (LRU order)"]
-    E --> F["Process WeakReferences"]
-    D --> F
-    F --> G["Clear tất cả Weak refs (luôn luôn)"]
-    G --> H["Finalize: FinalReference → Finalizer thread"]
-    H --> I["Process PhantomReferences"]
-    I --> J["Enqueue vào ReferenceQueue"]
+```d2 title="6.2. Processing order"
+direction: down
+n_A: "GC hoàn thành marking"
+n_B: "Process SoftReferences"
+n_C: "Memory đủ?" { shape: diamond }
+n_D: "Giữ Soft refs (không clear)"
+n_E: "Clear Soft refs (LRU order)"
+n_F: "Process WeakReferences"
+n_G: "Clear tất cả Weak refs (luôn luôn)"
+n_H: "Finalize: FinalReference → Finalizer\nthread"
+n_I: "Process PhantomReferences"
+n_J: "Enqueue vào ReferenceQueue"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "Đủ"
+n_C -> n_E: "Thiếu"
+n_E -> n_F
+n_D -> n_F
+n_F -> n_G
+n_G -> n_H
+n_H -> n_I
+n_I -> n_J
 ```
 
 > [!NOTE]
@@ -381,19 +410,17 @@ static class MyRunnable implements Runnable {
 
 Mỗi Thread có một `ThreadLocalMap` riêng (field `threadLocals`). Key là `WeakReference<ThreadLocal>`, value là **strong reference**:
 
-```
-Thread object
-  └─ threadLocals: ThreadLocalMap
-       └─ Entry[] table (open addressing, power-of-2 size)
-            ┌─────────────────────────────────────────────┐
-            │ Entry extends WeakReference<ThreadLocal<?>> │
-            │                                             │
-            │  ┌─────────┐                                │
-            │  │   key   │ ── WeakRef ──→ ThreadLocal obj │
-            │  ├─────────┤                                │
-            │  │  value  │ ── STRONG ──→ Your object      │
-            │  └─────────┘            (có thể rất lớn!)   │
-            └─────────────────────────────────────────────┘
+```d2 title="8.1. Cấu trúc ThreadLocal.ThreadLocalMap"
+direction: right
+thread: "Thread object"
+map: "threadLocals: ThreadLocalMap"
+table: "Entry[] table: open addressing,\npower-of-2"
+entry: "Entry extends\nWeakReference<ThreadLocal<?>>"
+key: "ThreadLocal object"
+value: "Your object: có thể rất lớn"
+thread -> map -> table -> entry
+entry -> key: weak { style.stroke-dash: 3 }
+entry -> value: STRONG
 ```
 
 ### 8.2. Tại sao key là WeakReference?
@@ -402,18 +429,16 @@ Thread object
 
 **Vấn đề:** Key = null nhưng **value vẫn strong reference** → value KHÔNG bị GC! Đây là "stale entry".
 
-```mermaid
-sequenceDiagram
-    participant TL as ThreadLocal (static field)
-    participant TLM as ThreadLocalMap (per thread)
-    participant GC
-
-    Note over TL: ThreadLocal declared as static field
-    TL->>TLM: set(myValue) → Entry(WeakRef(TL), myValue)
-
-    Note over TL: Hot deploy: class unloaded → TL = null
-    GC->>TLM: WeakRef cleared → key = null
-    Note over TLM: Entry still exists!<br/>key=null, value=myValue (STRONG)<br/>= STALE ENTRY LEAK
+```d2 title="8.2. Tại sao key là WeakReference?"
+shape: sequence_diagram
+n_TL: "ThreadLocal (static field)"
+n_TLM: "ThreadLocalMap (per thread)"
+n_GC: "GC"
+n_TL.note1: "ThreadLocal declared as static field"
+n_TL -> n_TLM: "set(myValue) → Entry(WeakRef(TL),\nmyValue)"
+n_TL.note2: "Hot deploy: class unloaded → TL = null"
+n_GC -> n_TLM: "WeakRef cleared → key = null"
+n_TLM.note3: "Entry still exists!\nkey=null, value=myValue (STRONG)\n= STALE ENTRY LEAK"
 ```
 
 ### 8.3. Khi nào leak thật sự xảy ra?
@@ -479,16 +504,23 @@ void handleRequest() {
 
 Khi ứng dụng hot-deploy (JEE container, Tomcat, OSGi): ClassLoader cũ tạo mới → load class mới. Class cũ **chỉ** được unload khi **ClassLoader** bị GC. ClassLoader bị GC **chỉ khi** tất cả 3 điều kiện thoả:
 
-```mermaid
-flowchart TD
-    A{"ClassLoader có thể GC?"} --> B["1. Không còn strong ref tới ClassLoader"]
-    A --> C["2. Không còn strong ref tới bất kỳ Class nào nó load"]
-    A --> D["3. Không còn instance nào của class đó sống"]
-    B --> E{"Tất cả 3 đều đúng?"}
-    C --> E
-    D --> E
-    E -->|Có| F["ClassLoader + tất cả class + static fields → GC"]
-    E -->|Không| G["ClassLoader SỐNG → tất cả class trong Metaspace sống"]
+```d2 title="9.1. Cơ chế Class Unloading"
+direction: down
+n_A: "ClassLoader có thể GC?" { shape: diamond }
+n_B: "1. Không còn strong ref tới\nClassLoader"
+n_C: "2. Không còn strong ref tới bất kỳ\nClass nào nó load"
+n_D: "3. Không còn instance nào của class đó\nsống"
+n_E: "Tất cả 3 đều đúng?" { shape: diamond }
+n_F: "ClassLoader + tất cả class + static\nfields → GC"
+n_G: "ClassLoader SỐNG → tất cả class trong\nMetaspace sống"
+n_A -> n_B
+n_A -> n_C
+n_A -> n_D
+n_B -> n_E
+n_C -> n_E
+n_D -> n_E
+n_E -> n_F: "Có"
+n_E -> n_G: "Không"
 ```
 
 Nếu **bất kỳ** tham chiếu nào còn sống (ThreadLocal, static field, timer, listener...) → cả ClassLoader + tất cả class + tất cả static → **sống mãi**.
@@ -574,15 +606,23 @@ bean.dumpHeap("/tmp/heap.hprof", true);  // true = chỉ dump live objects
 
 ### 11.2. Workflow tìm leak — step by step
 
-```mermaid
-flowchart TD
-    A["1. Mở heap dump trong MAT"] --> B["2. Leak Suspects Report<br/>(MAT tự phân tích)"]
-    B --> C["3. Histogram → sort by Retained Size"]
-    C --> D["4. Dominator Tree → object nào giữ sống nhiều nhất?"]
-    D --> E["5. Right-click suspect → Path to GC Roots"]
-    E --> F["6. Exclude weak/soft/phantom refs<br/>(chỉ giữ strong path)"]
-    F --> G["7. Đọc chain: Static field → Collection → Leak"]
-    G --> H["8. Fix: remove entry, bound collection, weak ref"]
+```d2 title="11.2. Workflow tìm leak — step by step"
+direction: down
+n_A: "1. Mở heap dump trong MAT"
+n_B: "2. Leak Suspects Report\n(MAT tự phân tích)"
+n_C: "3. Histogram → sort by Retained Size"
+n_D: "4. Dominator Tree → object nào giữ\nsống nhiều nhất?"
+n_E: "5. Right-click suspect → Path to GC\nRoots"
+n_F: "6. Exclude weak/soft/phantom refs\n(chỉ giữ strong path)"
+n_G: "7. Đọc chain: Static field →\nCollection → Leak"
+n_H: "8. Fix: remove entry, bound\ncollection, weak ref"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G
+n_G -> n_H
 ```
 
 **Ví dụ practical:**

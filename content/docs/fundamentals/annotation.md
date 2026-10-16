@@ -5,6 +5,9 @@ description: "Mổ xẻ Annotation trong Java: @interface syntax, RetentionPolic
 
 Annotation là metadata gắn vào class, method, field và các phần tử khác của chương trình Java. Bản thân annotation không thực thi logic; compiler, framework hoặc công cụ phải đọc metadata và quyết định hành động tương ứng.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -114,7 +117,7 @@ public @interface Cacheable {
 
 ### 5.1. @Inherited
 
-```java
+```java source="annotation/01/Role.java"
 @Inherited
 @Retention(RUNTIME)
 @Target(TYPE)
@@ -128,6 +131,10 @@ class Child extends Parent { }
 // Child.class.getAnnotation(Role.class) → @Role("admin") ← KẾ THỪA!
 // Chỉ áp dụng cho class, KHÔNG cho method hay field
 ```
+
+<SourceRef project="annotation" file="01/Role.java" region="example" variant="button">
+  Xem Role.java cùng các ví dụ khác
+</SourceRef>
 
 ### 5.2. @Repeatable (Java 8)
 
@@ -146,7 +153,7 @@ class DailyJob { }
 
 ## 6. Runtime Processing — Reflection API
 
-```java
+```java source="annotation/02/MyAnnotation.java"
 // Đọc annotation trên class
 MyAnnotation ann = MyClass.class.getAnnotation(MyAnnotation.class);
 String value = ann.value();     // "important"
@@ -167,6 +174,10 @@ for (Method method : clazz.getDeclaredMethods()) {
 }
 ```
 
+<SourceRef project="annotation" file="02/MyAnnotation.java" region="example" variant="button">
+  Xem MyAnnotation.java cùng các ví dụ khác
+</SourceRef>
+
 ### 6.1. Annotation Proxy — JVM tạo proxy tự động
 
 Khi gọi `getAnnotation()`, JVM tạo **dynamic proxy** implement annotation interface:
@@ -183,7 +194,7 @@ Khi gọi `getAnnotation()`, JVM tạo **dynamic proxy** implement annotation in
 
 ### 6.2. Cách AnnotationInvocationHandler hoạt động — chi tiết nội bộ
 
-```java
+```java source="annotation/03/AnnotationInvocationHandler.java"
 // sun.reflect.annotation.AnnotationInvocationHandler (simplified)
 class AnnotationInvocationHandler implements InvocationHandler {
     private final Class<? extends Annotation> type;  // MyAnnotation.class
@@ -208,22 +219,25 @@ class AnnotationInvocationHandler implements InvocationHandler {
 }
 ```
 
+<SourceRef project="annotation" file="03/AnnotationInvocationHandler.java" region="example" variant="button">
+  Xem AnnotationInvocationHandler.java cùng các ví dụ khác
+</SourceRef>
+
 **Flow hoàn chỉnh khi gọi `getAnnotation()`:**
 
-```mermaid
-sequenceDiagram
-    participant Code as Application Code
-    participant Class as Class object
-    participant CP as .class constant pool
-    participant Proxy as Proxy.newProxyInstance
-
-    Code->>Class: getAnnotation(MyAnnotation.class)
-    Class->>CP: Đọc RuntimeVisibleAnnotations attribute
-    CP-->>Class: Raw bytes: element-value pairs
-    Class->>Class: Parse thành Map<String, Object>
-    Class->>Proxy: Tạo dynamic proxy (MyAnnotation interface)
-    Proxy-->>Code: $Proxy1 instance (cached)
-    Note over Code: ann.value() → InvocationHandler → map.get("value")
+```d2 title="6.2. Cách AnnotationInvocationHandler hoạt động — chi tiết nội bộ"
+shape: sequence_diagram
+n_Code: "Application Code"
+n_Class: "Class object"
+n_CP: ".class constant pool"
+n_Proxy: "Proxy.newProxyInstance"
+n_Code -> n_Class: "getAnnotation(MyAnnotation.class)"
+n_Class -> n_CP: "Đọc RuntimeVisibleAnnotations\nattribute"
+n_CP -> n_Class: "Raw bytes: element-value pairs" { style.stroke-dash: 3 }
+n_Class -> n_Class: "Parse thành Map<String, Object>"
+n_Class -> n_Proxy: "Tạo dynamic proxy (MyAnnotation\ninterface)"
+n_Proxy -> n_Code: "\$Proxy1 instance (cached)" { style.stroke-dash: 3 }
+n_Code.note1: "ann.value() → InvocationHandler →\nmap.get(\"value\")"
 ```
 
 > [!NOTE]
@@ -283,7 +297,7 @@ Compiler (`javac`) hỗ trợ chạy **annotation processor** tại compile-time
 
 ### 8.2. AbstractProcessor
 
-```java
+```java source="annotation/04/AutoToStringProcessor.java"
 @SupportedAnnotationTypes("com.example.AutoToString")
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class AutoToStringProcessor extends AbstractProcessor {
@@ -310,6 +324,10 @@ public class AutoToStringProcessor extends AbstractProcessor {
     }
 }
 ```
+
+<SourceRef project="annotation" file="04/AutoToStringProcessor.java" region="example" variant="button">
+  Xem AutoToStringProcessor.java cùng các ví dụ khác
+</SourceRef>
 
 ### 8.3. Lombok — APT ở mức magic
 
@@ -354,15 +372,17 @@ Spring Boot startup:
 
 ### 9.3. @Transactional — AOP Proxy
 
-```
-                    ┌──────────────────────────┐
-Client ──────────→  │   TransactionInterceptor │
-                    │   (AOP Proxy)            │
-                    │                          │
-                    │  1. Get transaction      │
-                    │  2. Call real method ──────→ RealObject.doTransfer()
-                    │  3. Commit / Rollback    │
-                    └──────────────────────────┘
+```d2 title="9.3. @Transactional — AOP Proxy"
+shape: sequence_diagram
+client: Client
+proxy: "TransactionInterceptor (AOP Proxy)"
+target: "RealObject"
+client -> proxy: doTransfer
+proxy -> proxy: "1. Get transaction"
+proxy -> target: "2. Call real method: doTransfer()"
+target -> proxy: "return / throw"
+proxy -> proxy: "3. Commit / Rollback"
+proxy -> client: "return / rethrow"
 ```
 
 Spring tạo proxy (JDK dynamic proxy hoặc CGLIB):
@@ -389,7 +409,7 @@ public @interface RateLimit {
 
 ### 10.2. AOP Aspect xử lý
 
-```java
+```java source="annotation/05/RateLimitAspect.java"
 @Aspect
 @Component
 public class RateLimitAspect {
@@ -407,6 +427,10 @@ public class RateLimitAspect {
     }
 }
 ```
+
+<SourceRef project="annotation" file="05/RateLimitAspect.java" region="example" variant="button">
+  Xem RateLimitAspect.java cùng các ví dụ khác
+</SourceRef>
 
 ### 10.3. Checklist tạo custom annotation
 

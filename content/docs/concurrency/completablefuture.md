@@ -130,11 +130,17 @@ CompletableFuture<String> greeting =
         (first, last) -> first + " " + last);
 ```
 
-```mermaid
-flowchart LR
-    A["thenApply<br/>T → U"] -->|"sync transform"| R1["CF&lt;U&gt;"]
-    B["thenCompose<br/>T → CF&lt;U&gt;"] -->|"async chain"| R2["CF&lt;U&gt;"]
-    C["thenCombine<br/>CF&lt;T&gt; + CF&lt;U&gt;"] -->|"merge 2 results"| R3["CF&lt;V&gt;"]
+```d2 title="4.3. thenCombine — kết hợp 2 futures"
+direction: right
+n_A: "thenApply\nT → U"
+n_R1: "CF<U>"
+n_B: "thenCompose\nT → CF<U>"
+n_R2: "CF<U>"
+n_C: "thenCombine\nCF<T> + CF<U>"
+n_R3: "CF<V>"
+n_A -> n_R1: "sync transform"
+n_B -> n_R2: "async chain"
+n_C -> n_R3: "merge 2 results"
 ```
 
 | Method | Input → Output | Analogy |
@@ -360,18 +366,20 @@ static abstract class Completion {
 
 ### 9.1. Memory layout
 
-```
-┌────────────────────────────────────────────┐
-│         CompletableFuture<T>               │
-│                                            │
-│  result: null → (khi complete) → value     │
-│                                            │
-│  stack: ──→ UniApply ──→ UniAccept ──→ null│
-│             (CF-2)       (CF-3)            │
-│             ↓             ↓                │
-│          dep=CF-2      dep=CF-3            │
-│          fn=lambda1    fn=lambda2          │
-└────────────────────────────────────────────┘
+```d2 title="9.1. Memory layout"
+direction: right
+cf: "CompletableFuture<T>" {
+  result: "result: null → value khi complete"
+  stack: stack
+  apply: "UniApply\n(dep=CF-2, fn=lambda1)"
+  accept: "UniAccept\n(dep=CF-3, fn=lambda2)"
+  nil: null
+  stack -> apply -> accept -> nil
+}
+cf2: CF-2
+cf3: CF-3
+cf.apply -> cf2: dep
+cf.accept -> cf3: dep
 ```
 
 ### 9.2. Treiber Stack — CAS-based lock-free push

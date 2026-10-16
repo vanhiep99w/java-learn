@@ -31,18 +31,19 @@ Hiệu năng phụ thuộc vào nguồn dữ liệu, stateful operation, boxing,
 
 ## 2. Stream Pipeline Architecture — Source, Intermediate, Terminal
 
-```mermaid
-flowchart LR
-    SRC["Source<br/>(Collection, array, generator)"]
-    I1["filter()"]
-    I2["map()"]
-    I3["sorted()"]
-    T["collect() / sum() / forEach()"]
-
-    SRC --> I1 --> I2 --> I3 --> T
-
-    style SRC fill:#4ecdc4
-    style T fill:#ff6b6b
+```d2 title="2. Stream Pipeline Architecture — Source, Intermediate, Terminal"
+direction: right
+n_SRC: "Source\n(Collection, array, generator)"
+n_I1: "filter()"
+n_I2: "map()"
+n_I3: "sorted()"
+n_T: "collect() / sum() / forEach()"
+n_SRC -> n_I1
+n_I1 -> n_I2
+n_I2 -> n_I3
+n_I3 -> n_T
+n_SRC.style.fill: "#4ecdc4"
+n_T.style.fill: "#ff6b6b"
 ```
 
 | Component | Vai trò | Ví dụ |
@@ -78,13 +79,15 @@ List<String> result = stream.collect(Collectors.toList());
 
 **Internal**: mỗi intermediate op tạo một **stage** (AbstractPipeline node). Các stages liên kết thành **linked list**:
 
-```
-Pipeline structure (linked list of stages):
-Head → FilterOp → MapOp → [Terminal: collect]
-  │        │         │
-  │        │         └─ AbstractPipeline { previousStage=FilterOp, opFlags }
-  │        └─ AbstractPipeline { previousStage=Head, opFlags }
-  └─ AbstractPipeline { spliterator=source, sourceFlags }
+```d2 title="3. Lazy Evaluation — không gì chạy cho tới terminal"
+direction: right
+head: "Head: AbstractPipeline\nspliterator=source, sourceFlags"
+filter: "FilterOp: AbstractPipeline\npreviousStage=Head, opFlags"
+map: "MapOp: AbstractPipeline\npreviousStage=FilterOp, opFlags"
+terminal: "Terminal: collect"
+head -> filter -> map -> terminal
+filter -> head: previousStage { style.stroke-dash: 3 }
+map -> filter: previousStage { style.stroke-dash: 3 }
 ```
 
 ### 3.1. Sink chain — wrapSink mechanism
@@ -209,13 +212,14 @@ LinkedList Spliterator: split = duyệt tới giữa (O(n))
 | `limit(n)` | Lấy n element đầu | Short-circuit nhưng cần ordering |
 | `skip(n)` | Bỏ n element đầu | Phải đếm |
 
-```mermaid
-flowchart TD
-    A["stateless ops<br/>filter, map, flatMap"]
-    B["stateful ops<br/>sorted, distinct"]
-    
-    A -->|"Parallel: perfect split"| PA["Mỗi thread xử lý chunk riêng"]
-    B -->|"Parallel: barrier"| PB["Phải merge/buffer trước khi tiếp"]
+```d2 title="5.2. Stateful (cần biết/buffer nhiều element)"
+direction: down
+n_A: "stateless ops\nfilter, map, flatMap"
+n_B: "stateful ops\nsorted, distinct"
+n_PA: "Mỗi thread xử lý chunk riêng"
+n_PB: "Phải merge/buffer trước khi tiếp"
+n_A -> n_PA: "Parallel: perfect split"
+n_B -> n_PB: "Parallel: barrier"
 ```
 
 > [!WARNING]
@@ -300,22 +304,29 @@ Collector.of(
 
 ### 8.2. Parallel collector flow
 
-```mermaid
-flowchart TD
-    S["Stream (parallel)"]
-    S --> T1["Thread 1: supplier() → acc A"]
-    S --> T2["Thread 2: supplier() → acc B"]
-    S --> T3["Thread 3: supplier() → acc C"]
-    
-    T1 -->|"accumulate chunk 1"| A1["A: [1,2,3]"]
-    T2 -->|"accumulate chunk 2"| A2["B: [4,5,6]"]
-    T3 -->|"accumulate chunk 3"| A3["C: [7,8,9]"]
-    
-    A1 --> M1["combiner(A, B) → [1,2,3,4,5,6]"]
-    A2 --> M1
-    M1 --> M2["combiner(AB, C) → [1..9]"]
-    A3 --> M2
-    M2 --> F["finisher() → result"]
+```d2 title="8.2. Parallel collector flow"
+direction: down
+n_S: "Stream (parallel)"
+n_T1: "Thread 1: supplier() → acc A"
+n_T2: "Thread 2: supplier() → acc B"
+n_T3: "Thread 3: supplier() → acc C"
+n_A1: "A: [1,2,3]"
+n_A2: "B: [4,5,6]"
+n_A3: "C: [7,8,9]"
+n_M1: "combiner(A, B) → [1,2,3,4,5,6]"
+n_M2: "combiner(AB, C) → [1..9]"
+n_F: "finisher() → result"
+n_S -> n_T1
+n_S -> n_T2
+n_S -> n_T3
+n_T1 -> n_A1: "accumulate chunk 1"
+n_T2 -> n_A2: "accumulate chunk 2"
+n_T3 -> n_A3: "accumulate chunk 3"
+n_A1 -> n_M1
+n_A2 -> n_M1
+n_M1 -> n_M2
+n_A3 -> n_M2
+n_M2 -> n_F
 ```
 
 ### 8.3. Custom Collector ví dụ: group by + stats

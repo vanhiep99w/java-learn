@@ -52,33 +52,23 @@ public final class String {
 
 ### 2.1. Memory Layout chi tiết (64-bit JVM, compressed oops)
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│              String object "hello" (JDK 17)                  │
-├──────────────────────────────────────────────────────────────┤
-│  [Object Header]     12 bytes (mark word 8B + klass ptr 4B)  │
-│  [value]             4 bytes  → pointer tới byte[]           │
-│  [coder]             1 byte   → 0 (LATIN1)                   │
-│  [hash]              4 bytes  → 0 (chưa tính) hoặc cached    │
-│  [hashIsZero]        1 byte   → false                        │
-│  [padding]           2 bytes  → align to 8 bytes             │
-├──────────────────────────────────────────────────────────────┤
-│  Total String obj:   24 bytes                                │
-└──────────────────────────────────────────────────────────────┘
-         │
-         ▼ value points to:
-┌──────────────────────────────────────────────────────────────┐
-│              byte[] array "hello"                            │
-├──────────────────────────────────────────────────────────────┤
-│  [Object Header]     12 bytes                                │
-│  [length]            4 bytes  → 5                            │
-│  [data]              5 bytes  → {104, 101, 108, 108, 111}    │
-│  [padding]           3 bytes  → align to 8 bytes             │
-├──────────────────────────────────────────────────────────────┤
-│  Total byte[] obj:   24 bytes                                │
-└──────────────────────────────────────────────────────────────┘
-
-Total memory cho "hello": 24 + 24 = 48 bytes
+```d2 title="2.1. Memory Layout chi tiết (64-bit JVM, compressed oops)"
+direction: right
+string: "String hello (JDK 17): 24B" {
+  header: "Header: 12B (mark 8B + klass 4B)"
+  value: "value: reference 4B"
+  coder: "coder: 1B = 0 (LATIN1)"
+  hash: "hash: 4B = 0 hoặc cached"
+  zero: "hashIsZero: 1B = false"
+  padding: "padding: 2B"
+}
+array: "byte[] hello: 24B" {
+  header: "Header: 12B"
+  length: "length: 4B = 5"
+  data: "data: 5B = 104, 101, 108, 108, 111"
+  padding: "padding: 3B"
+}
+string.value -> array: "Tổng: 24 + 24 = 48B"
 ```
 
 | JDK | Backing | Ký tự ASCII `"hello"` | Ký tự Unicode `"xin chào"` |
@@ -164,23 +154,17 @@ String d = c.intern();     // (4) đẩy vào pool (đã có → trả về refe
 
 Bên trong HotSpot, String Pool là một **concurrent hash table** viết bằng C++ (`src/hotspot/share/classfile/stringTable.cpp`):
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                     StringTable (C++)                      │
-│                                                            │
-│  _the_table: ConcurrentHashTable<StringTableConfig>        │
-│  ┌───────┬───────┬───────┬───────┬───────┬───────┐         │
-│  │bucket0│bucket1│bucket2│  ...  │  ...  │bucketN│         │
-│  └───┬───┴───────┴───┬───┴───────┴───────┴───────┘         │
-│      │               │                                     │
-│      ▼               ▼                                     │
-│  ┌──────┐        ┌──────┐                                  │
-│  │oop*  │──→ String "hello" (Java heap)                    │
-│  └──────┘        │oop*  │──→ String "world" (Java heap)    │
-│                  └──────┘                                  │
-└────────────────────────────────────────────────────────────┘
-
-oop* = ordinary object pointer — con trỏ tới Java object trên heap
+```d2 title="4.2. StringTable — cấu trúc bên trong JVM (C++ level)"
+direction: right
+table: "StringTable (C++)" {
+  structure: "_the_table: ConcurrentHashTable<StringTableConfig>"
+  b0: "bucket 0: oop*"
+  b2: "bucket 2: oop*"
+  other: "bucket 1, ..., bucket N"
+}
+heap: "Java Heap" { hello: "String hello"; world: "String world" }
+table.b0 -> heap.hello: "ordinary object pointer"
+table.b2 -> heap.world: "ordinary object pointer"
 ```
 
 **Flow chi tiết khi JVM gặp String literal `"hello"` lần đầu:**
@@ -216,21 +200,22 @@ public native String intern();   // native method — JVM thực thi bằng C++
 
 **Native implementation flow:**
 
-```
-Java: "hello".intern()
-  │
-  ▼
-JNI: JVM_InternString(env, jstring)
-  │
-  ├─ (1) Chuyển jstring → oop (Java object pointer)
-  │
-  ├─ (2) Gọi StringTable::intern(oop string)
-  │     ├─ Tính hash từ byte[] content
-  │     ├─ Lookup trong ConcurrentHashTable (lock-free, CAS-based)
-  │     ├─ Nếu found → return existing oop
-  │     └─ Nếu not found → insert weak reference → return oop
-  │
-  └─ (3) Return interned reference về Java
+```d2 title="4.3. intern() — từ Java xuống native code"
+direction: down
+java: "Java: hello.intern()"
+jni: "JNI: JVM_InternString(env, jstring)"
+oop: "Chuyển jstring → oop"
+intern: "StringTable::intern(oop string)"
+hash: "Tính hash từ byte[] content"
+lookup: "Lookup ConcurrentHashTable: lock-free,\nCAS-based"
+found: "Found: return existing oop"
+insert: "Not found: insert weak reference →\nreturn oop"
+ret: "Return interned reference về Java"
+java -> jni -> oop -> intern -> hash -> lookup
+lookup -> found: found
+lookup -> insert: "not found"
+found -> ret
+insert -> ret
 ```
 
 **Tại sao lock-free?** Nhiều thread có thể gọi `intern()` đồng thời. ConcurrentHashTable dùng **CAS (Compare-And-Swap)** để insert, tránh lock contention.
@@ -286,13 +271,19 @@ JDK 9 thay `char[]` bằng `byte[]` + `coder` flag:
 
 ### 5.2. Cơ chế chọn coder — JVM quyết định khi nào?
 
-```mermaid
-flowchart TD
-    A["new String(data)"] --> B{"Mọi ký tự ≤ 0xFF<br/>(Latin-1 range)?"}
-    B -->|Có| C["coder = LATIN1<br/>byte[] size = length"]
-    B -->|Không| D["coder = UTF16<br/>byte[] size = length × 2"]
-    C --> E["charAt(i) = value[i] & 0xFF"]
-    D --> F["charAt(i) = getChar(value, i)<br/>= (value[2i+1] << 8) | value[2i]"]
+```d2 title="5.2. Cơ chế chọn coder — JVM quyết định khi nào?"
+direction: down
+n_A: "new String(data)"
+n_B: "Mọi ký tự ≤ 0xFF\n(Latin-1 range)?" { shape: diamond }
+n_C: "coder = LATIN1\nbyte[] size = length"
+n_D: "coder = UTF16\nbyte[] size = length × 2"
+n_E: "charAt(i) = value[i] & 0xFF"
+n_F: "charAt(i) = getChar(value, i)\n= (value[2i+1] << 8) | value[2i]"
+n_A -> n_B
+n_B -> n_C: "Có"
+n_B -> n_D: "Không"
+n_C -> n_E
+n_D -> n_F
 ```
 
 **Quan trọng:** Quyết định coder xảy ra **khi tạo String** (trong constructor). Không thể thay đổi sau đó (vì immutable).
@@ -450,14 +441,21 @@ ASTORE_2         // s
 
 ### 6.3. StringConcatFactory — 6 strategies nội bộ
 
-```mermaid
-flowchart TD
-    A["invokedynamic #makeConcatWithConstants"] --> B["StringConcatFactory.makeConcatWithConstants()"]
-    B --> C{"Chọn Strategy<br/>(JVM flag)"}
-    C -->|default| D["MH_INLINE_SIZED_EXACT<br/>Tính size → alloc byte[] → copy"]
-    C -->|flag| E["BC_SB<br/>Generate bytecode dùng StringBuilder"]
-    C -->|flag| F["BC_SB_SIZED<br/>StringBuilder + pre-sized"]
-    C -->|flag| G["MH_SB_SIZED<br/>MethodHandle + StringBuilder"]
+```d2 title="6.3. StringConcatFactory — 6 strategies nội bộ"
+direction: down
+n_A: "invokedynamic #makeConcatWithConstants"
+n_B: "StringConcatFactory.makeConcatWithConstants()"
+n_C: "Chọn Strategy\n(JVM flag)" { shape: diamond }
+n_D: "MH_INLINE_SIZED_EXACT\nTính size → alloc byte[] → copy"
+n_E: "BC_SB\nGenerate bytecode dùng StringBuilder"
+n_F: "BC_SB_SIZED\nStringBuilder + pre-sized"
+n_G: "MH_SB_SIZED\nMethodHandle + StringBuilder"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D: "default"
+n_C -> n_E: "flag"
+n_C -> n_F: "flag"
+n_C -> n_G: "flag"
 ```
 
 **Default strategy (MH_INLINE_SIZED_EXACT):**
@@ -654,17 +652,27 @@ Sau dedup:
 
 ### 9.2. Dedup process — step by step
 
-```mermaid
-flowchart TD
-    A["Young GC promote String<br/>to Old Generation"] --> B["String survive ≥ 1 Young GC?"]
-    B -->|Không| X["Skip — string tạm, sẽ bị GC sớm"]
-    B -->|Có| C["Thêm vào dedup queue"]
-    C --> D["Dedup thread (concurrent)"]
-    D --> E["Tính hash của byte[] content"]
-    E --> F{"Lookup trong<br/>dedup hash table"}
-    F -->|Found match| G["Cập nhật String.value<br/>trỏ tới shared byte[]"]
-    G --> H["Old byte[] unreachable → GC"]
-    F -->|Not found| I["Thêm byte[] vào hash table"]
+```d2 title="9.2. Dedup process — step by step"
+direction: down
+n_A: "Young GC promote String\nto Old Generation"
+n_B: "String survive ≥ 1 Young GC?"
+n_X: "Skip — string tạm, sẽ bị GC sớm"
+n_C: "Thêm vào dedup queue"
+n_D: "Dedup thread (concurrent)"
+n_E: "Tính hash của byte[] content"
+n_F: "Lookup trong\ndedup hash table" { shape: diamond }
+n_G: "Cập nhật String.value\ntrỏ tới shared byte[]"
+n_H: "Old byte[] unreachable → GC"
+n_I: "Thêm byte[] vào hash table"
+n_A -> n_B
+n_B -> n_X: "Không"
+n_B -> n_C: "Có"
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
+n_F -> n_G: "Found match"
+n_G -> n_H
+n_F -> n_I: "Not found"
 ```
 
 ### 9.3. Bật deduplication
@@ -738,19 +746,17 @@ String y = "hel";     // KHÔNG final
 
 ### 10.2. Memory diagram
 
-```
-          Stack                        Heap / String Pool
-        ┌───────┐
-    a → │  ref  │ ──────────────────→ ┌─────────────────────┐
-        ├───────┤                     │ String "hello"      │ ← POOL
-    b → │  ref  │ ──────────────────→ │ (shared by a, b, d) │
-        ├───────┤                     └─────────────────────┘
-    c → │  ref  │ ──────→ ┌─────────────────────────────────┐
-        ├───────┤         │ String "hello"                  │ ← HEAP (separate object)
-    d → │  ref  │ ────┐   │ (equals same, != different ref) │
-        └───────┘     │   └─────────────────────────────────┘
-                      │
-                      └──→ (trỏ về pool object — intern() returned pool ref)
+```d2 title="10.2. Memory diagram"
+direction: right
+stack: Stack { a: a; b: b; c: c; d: d }
+heap: "Heap / String Pool" {
+  pool: "String hello: POOL\nshared by a, b, d"
+  separate: "String hello: object riêng\nequals = true, reference khác"
+}
+stack.a -> heap.pool
+stack.b -> heap.pool
+stack.d -> heap.pool: "intern() trả pool ref"
+stack.c -> heap.separate
 ```
 
 ### 10.3. Integer.valueOf cache tương tự

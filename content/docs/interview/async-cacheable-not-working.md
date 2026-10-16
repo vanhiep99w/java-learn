@@ -88,26 +88,29 @@ public class ReportService {
 
 Giống `@Transactional`, lúc startup Spring tạo proxy bọc quanh bean và nhét logic vào đó:
 
-```text
-@Async:
-   ┌──── ReportService$$Proxy ─────────────────────┐
-   │  generateAsync() {                            │
-   │     taskExecutor.submit(() ->                 │  ← đẩy sang thread pool
-   │         target.generateAsync());              │
-   │     return;   // trả ngay cho caller          │
-   │  }                                            │
-   └───────────────────────────────────────────────┘
-
-@Cacheable:
-   ┌──── ReportService$$Proxy ─────────────────────┐
-   │  getProduct(id) {                             │
-   │     if (cache.contains(id))                   │  ← kiểm tra cache TRƯỚC
-   │         return cache.get(id);                 │
-   │     T result = target.getProduct(id);         │
-   │     cache.put(id, result);                    │  ← lưu cache SAU
-   │     return result;                            │
-   │  }                                            │
-   └───────────────────────────────────────────────┘
+```d2 title="4. Gốc rễ chung: cùng một cơ chế proxy"
+direction: down
+async: "@Async: ReportService proxy" {
+  caller: "Caller gọi generateAsync()"
+  submit: "taskExecutor.submit(target.generateAsync)"
+  immediate: "Return ngay cho caller"
+  pool: "Thread pool chạy target.generateAsync()"
+  caller -> submit
+  submit -> immediate
+  submit -> pool
+}
+cache: "@Cacheable: ReportService proxy" {
+  get: "Caller gọi getProduct(id)"
+  check: "cache.contains(id)?" { shape: diamond }
+  hit: "return cache.get(id)"
+  target: "result = target.getProduct(id)"
+  store: "cache.put(id, result)"
+  ret: "return result"
+  get -> check
+  check -> hit: Có
+  check -> target: Không
+  target -> store -> ret
+}
 ```
 
 Vì logic nằm trong proxy, **mọi nguyên nhân khiến lời gọi không đi qua proxy đều phá cả hai**. Đó là lý do ta xét chung. (Xem bài "@Transactional self-invocation" trong cùng category để hiểu sâu cơ chế proxy + CGLIB/JDK.)
@@ -121,14 +124,14 @@ Vì logic nằm trong proxy, **mọi nguyên nhân khiến lời gọi không đ
 
 Hệt như `@Transactional`: gọi `this.method()` từ bên trong cùng class đi thẳng tới object thật, bỏ qua proxy.
 
-```text
-caller ──► proxy.handleRequest()
-              └─► target.handleRequest()
-                     └─► this.generateAsync()
-                            │
-                            ▼
-                         this = TARGET, không phải proxy
-                         → gọi thẳng target.generateAsync() (đồng bộ, không cache)
+```d2 title="5. Nguyên nhân #1: self-invocation"
+direction: down
+caller: "Caller"
+proxy: "proxy.handleRequest()"
+outer: "target.handleRequest()"
+inner: "this.generateAsync(): this = TARGET"
+result: "Gọi thẳng target: đồng bộ, không cache,\nkhông đi qua proxy"
+caller -> proxy -> outer -> inner -> result
 ```
 
 **Cách sửa** (giống `@Transactional`):
@@ -286,25 +289,29 @@ Một số provider yêu cầu khai báo trước tên cache. Thiếu cấu hìn
 
 ## 10. Checklist chẩn đoán
 
-```text
-╭──────────────────────────────────────────────────────────────╮
-│ B1. Đã có @EnableAsync / @EnableCaching chưa?                │
-│     • Chưa → thêm vào @Configuration/@SpringBootApplication   │
-│     • @Cacheable: có CacheManager bean + cache provider chưa? │
-│                                                              │
-│ B2. Lời gọi có đi qua proxy không?                           │
-│     • Gọi this.method() nội bộ? → self-invocation → tách bean │
-│                                                              │
-│ B3. Method có public, không final/private/static không?      │
-│     • Vi phạm → đổi sang public, bỏ final                    │
-│                                                              │
-│ B4. (@Async) Kiểu trả về có là void/Future/CompletableFuture?│
-│     • Trả T thường → sửa kiểu trả về                         │
-│     • Có ThreadPoolTaskExecutor riêng chưa?                  │
-│                                                              │
-│ B5. (@Cacheable) Bật log cache xem hit/miss:                 │
-│     • Không thấy log → B1/B2. Toàn miss → vấn đề KEY (mục 9)  │
-╰──────────────────────────────────────────────────────────────╯
+```d2 title="10. Checklist chẩn đoán"
+direction: down
+start: "@Async / @Cacheable không hoạt động"
+b1: "B1: @EnableAsync / @EnableCaching đã\nbật?"
+e1: "Chưa: thêm vào @Configuration; cache cần\nCacheManager + provider"
+b2: "B2: Lời gọi đi qua proxy?"
+e2: "this.method(): self-invocation → tách\nbean"
+b3: "B3: Method public, không final / private\n/ static?"
+e3: "Vi phạm: đổi public, bỏ final"
+b4: "B4: Async trả void / Future /\nCompletableFuture?"
+e4: "Trả T thường: sửa kiểu trả về; kiểm tra\nThreadPoolTaskExecutor riêng"
+b5: "B5: Bật log cache, xem hit / miss"
+e5: "Không có log: kiểm tra B1 / B2; toàn\nmiss: kiểm tra KEY"
+start -> b1
+b1 -> e1: Chưa
+b1 -> b2: Rồi
+b2 -> e2: Không
+b2 -> b3: Có
+b3 -> e3: Không
+b3 -> b4: Có
+b4 -> e4: Không
+b4 -> b5: Có
+b5 -> e5
 ```
 
 ---

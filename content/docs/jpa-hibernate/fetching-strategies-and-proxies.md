@@ -8,6 +8,9 @@ Fetching strategy là cách ứng dụng quyết định **dữ liệu liên qua
 > [!NOTE]
 > Bài viết dùng **Jakarta Persistence** (chuẩn API, thường vẫn được gọi là JPA), **Hibernate ORM** (persistence provider triển khai chuẩn đó) và **Spring Data JPA** (lớp repository xây trên JPA). Annotation `@EntityGraph` của Spring Data là tiện ích; `EntityGraph` và query hint bên dưới mới thuộc chuẩn Jakarta Persistence.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Bức tranh tổng thể](#1-bức-tranh-tổng-thể)
@@ -76,34 +79,36 @@ Cần tách hai câu hỏi:
 
 Ta dùng ba entity: khách hàng, đơn hàng và dòng hàng. Một khách hàng có nhiều đơn; một đơn có nhiều dòng hàng.
 
-```mermaid
-erDiagram
-    CUSTOMER ||--o{ PURCHASE_ORDER : places
-    PURCHASE_ORDER ||--o{ ORDER_LINE : contains
-
-    CUSTOMER {
-        bigint id PK
-        string name
-    }
-    PURCHASE_ORDER {
-        bigint id PK
-        bigint customer_id FK
-        string status
-        datetime created_at
-    }
-    ORDER_LINE {
-        bigint id PK
-        bigint order_id FK
-        string product_name
-        int quantity
-    }
+```d2 title="2.1. Quan hệ dữ liệu"
+direction: right
+n_CUSTOMER: "CUSTOMER" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "name": "string"
+}
+n_PURCHASE_ORDER: "PURCHASE_ORDER" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "customer_id": "bigint" { constraint: [foreign_key] }
+  "status": "string"
+  "created_at": "datetime"
+}
+n_ORDER_LINE: "ORDER_LINE" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "order_id": "bigint" { constraint: [foreign_key] }
+  "product_name": "string"
+  "quantity": "int"
+}
+n_CUSTOMER -> n_PURCHASE_ORDER: "places (1 → 0..*)"
+n_PURCHASE_ORDER -> n_ORDER_LINE: "contains (1 → 0..*)"
 ```
 
 ### 2.2. Mapping domain
 
 Ví dụ dùng field access và namespace `jakarta.persistence` của Spring Boot hiện đại:
 
-```java
+```java source="fetching-strategies-and-proxies/01/Customer.java"
 @Entity
 @Table(name = "customer")
 public class Customer {
@@ -131,7 +136,11 @@ public class Customer {
 }
 ```
 
-```java
+<SourceRef project="fetching-strategies-and-proxies" file="01/Customer.java" region="example" variant="button">
+  Xem Customer.java cùng các ví dụ khác
+</SourceRef>
+
+```java source="fetching-strategies-and-proxies/02/PurchaseOrder.java"
 @Entity
 @Table(name = "purchase_order")
 public class PurchaseOrder {
@@ -177,6 +186,10 @@ public class PurchaseOrder {
     }
 }
 ```
+
+<SourceRef project="fetching-strategies-and-proxies" file="02/PurchaseOrder.java" region="example" variant="button">
+  Xem PurchaseOrder.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 @Entity
@@ -387,7 +400,7 @@ Sau khi transaction kết thúc, entity thường trở thành **detached**: obj
 
 Anti-pattern điển hình:
 
-```java
+```java source="fetching-strategies-and-proxies/03/OrderService.java"
 @Service
 public class OrderService {
     private final PurchaseOrderRepository repository;
@@ -402,6 +415,10 @@ public class OrderService {
     }
 }
 ```
+
+<SourceRef project="fetching-strategies-and-proxies" file="03/OrderService.java" region="example" variant="button">
+  Xem OrderService.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 @RestController
@@ -420,7 +437,7 @@ Lỗi không nằm ở `LAZY`. Lỗi nằm ở fetch boundary: service trả obj
 
 Fetch đúng graph và map DTO khi persistence context còn mở:
 
-```java
+```java source="fetching-strategies-and-proxies/04/PurchaseOrderRepository.java"
 public interface PurchaseOrderRepository
         extends JpaRepository<PurchaseOrder, Long> {
 
@@ -434,6 +451,10 @@ public interface PurchaseOrderRepository
     Optional<PurchaseOrder> findDetailsById(Long id);
 }
 ```
+
+<SourceRef project="fetching-strategies-and-proxies" file="04/PurchaseOrderRepository.java" region="example" variant="button">
+  Xem PurchaseOrderRepository.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 public record OrderLineResponse(String productName, int quantity) {
@@ -692,7 +713,7 @@ public record OrderSummary(
 }
 ```
 
-```java
+```java source="fetching-strategies-and-proxies/05/PurchaseOrderRepository.java"
 public interface PurchaseOrderRepository
         extends JpaRepository<PurchaseOrder, Long> {
 
@@ -712,6 +733,10 @@ public interface PurchaseOrderRepository
     List<OrderSummary> findSummariesByStatus(OrderStatus status);
 }
 ```
+
+<SourceRef project="fetching-strategies-and-proxies" file="05/PurchaseOrderRepository.java" region="example" variant="button">
+  Xem PurchaseOrderRepository.java cùng các ví dụ khác
+</SourceRef>
 
 SQL chỉ chọn cột cần thiết:
 
@@ -827,7 +852,7 @@ Fetch join to-one không nhân số root row nên thường dùng được cùng
 
 Đừng tạo một method `findById()` rồi dùng cho mọi màn hình. Tên repository method nên thể hiện shape dữ liệu:
 
-```java
+```java source="fetching-strategies-and-proxies/06/PurchaseOrderRepository.java"
 public interface PurchaseOrderRepository
         extends JpaRepository<PurchaseOrder, Long> {
 
@@ -859,13 +884,17 @@ public interface PurchaseOrderRepository
 }
 ```
 
+<SourceRef project="fetching-strategies-and-proxies" file="06/PurchaseOrderRepository.java" region="example" variant="button">
+  Xem PurchaseOrderRepository.java cùng các ví dụ khác
+</SourceRef>
+
 `@EntityGraph` ở ví dụ trên là `org.springframework.data.jpa.repository.EntityGraph`. Nó chuyển metadata thành JPA entity graph khi thực thi repository query. Hibernate vẫn là provider tạo SQL cuối cùng.
 
 ### 10.2. Service giữ transaction và mapping DTO
 
 Transaction boundary nên bao trọn query, business rule và DTO mapping cần association:
 
-```java
+```java source="fetching-strategies-and-proxies/07/OrderQueryService.java"
 @Service
 public class OrderQueryService {
     private final PurchaseOrderRepository repository;
@@ -883,6 +912,10 @@ public class OrderQueryService {
     }
 }
 ```
+
+<SourceRef project="fetching-strategies-and-proxies" file="07/OrderQueryService.java" region="example" variant="button">
+  Xem OrderQueryService.java cùng các ví dụ khác
+</SourceRef>
 
 `@Transactional` là tính năng của Spring, không phải annotation JPA. Spring mở hoặc tham gia transaction và gắn `EntityManager` với thread cho lời gọi đó. Xem cơ chế đầy đủ tại [Transactions with JPA](./transactions-with-jpa.md) và [Spring Data JPA](./spring-data-jpa.md).
 
@@ -927,7 +960,7 @@ spring.jpa.properties.hibernate.generate_statistics=true
 
 Ví dụ integration test xác minh fetch plan detail dùng đúng một prepared statement:
 
-```java
+```java source="fetching-strategies-and-proxies/08/OrderFetchingTest.java"
 @SpringBootTest
 @Transactional
 class OrderFetchingTest {
@@ -953,6 +986,10 @@ class OrderFetchingTest {
 }
 ```
 
+<SourceRef project="fetching-strategies-and-proxies" file="08/OrderFetchingTest.java" region="example" variant="button">
+  Xem OrderFetchingTest.java cùng các ví dụ khác
+</SourceRef>
+
 Fixture cần được tạo trước khi `statistics.clear()`. Nếu test tự setup dữ liệu sau đó, các `INSERT` và query lấy sequence cũng được đếm. Khi dùng second-level cache, hãy cô lập hoặc xóa cache để kết quả không phụ thuộc thứ tự chạy test.
 
 Test số query là regression test hữu ích, nhưng đừng đóng đinh mọi query thành “phải đúng một”. Với graph lớn, hai query ổn định có thể tốt hơn một join tạo rất nhiều row.
@@ -974,21 +1011,32 @@ Test số query là regression test hữu ích, nhưng đừng đóng đinh mọ
 
 ## 13. Decision guide
 
-```mermaid
-flowchart TD
-    A[Use case cần dữ liệu liên quan] --> B{Có cần managed entity để cập nhật?}
-    B -->|Không| C[Ưu tiên DTO projection]
-    B -->|Có| D{Có phân trang root?}
-    D -->|Có| E[Page root ID hoặc fetch to-one]
-    E --> F[Query thứ hai tải collection theo ID]
-    D -->|Không| G{Graph có nhiều collection?}
-    G -->|Không| H[Fetch join hoặc EntityGraph]
-    G -->|Có| I[Join một collection]
-    I --> J[Batch hoặc subselect cho phần còn lại]
-    H --> K[Kiểm tra SQL và số row]
-    J --> K
-    C --> K
-    F --> K
+```d2 title="13. Decision guide"
+direction: down
+n_A: "Use case cần dữ liệu liên quan"
+n_B: "Có cần managed entity để cập nhật?" { shape: diamond }
+n_C: "Ưu tiên DTO projection"
+n_D: "Có phân trang root?" { shape: diamond }
+n_E: "Page root ID hoặc fetch to-one"
+n_F: "Query thứ hai tải collection theo ID"
+n_G: "Graph có nhiều collection?" { shape: diamond }
+n_H: "Fetch join hoặc EntityGraph"
+n_I: "Join một collection"
+n_J: "Batch hoặc subselect cho phần còn lại"
+n_K: "Kiểm tra SQL và số row"
+n_A -> n_B
+n_B -> n_C: "Không"
+n_B -> n_D: "Có"
+n_D -> n_E: "Có"
+n_E -> n_F
+n_D -> n_G: "Không"
+n_G -> n_H: "Không"
+n_G -> n_I: "Có"
+n_I -> n_J
+n_H -> n_K
+n_J -> n_K
+n_C -> n_K
+n_F -> n_K
 ```
 
 Nếu chưa chắc, bắt đầu từ DTO cho read-only API; dùng fetch join hoặc entity graph cho command cần managed entity; dùng batch hoặc subselect khi graph động hoặc nhiều collection. Sau đó đo SQL thật thay vì suy đoán từ annotation.

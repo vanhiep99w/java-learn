@@ -112,10 +112,14 @@ public class HashSet<E> {
 }
 ```
 
-```mermaid
-flowchart LR
-    HS["HashSet&lt;E&gt;"] -->|bọc| HM["HashMap&lt;E, PRESENT&gt;"]
-    TS["TreeSet&lt;E&gt;"] -->|bọc| TM["TreeMap&lt;E, PRESENT&gt;"]
+```d2 title="5. Set là Map \"đội lốt\""
+direction: right
+n_HS: "HashSet<E>"
+n_HM: "HashMap<E, PRESENT>"
+n_TS: "TreeSet<E>"
+n_TM: "TreeMap<E, PRESENT>"
+n_HS -> n_HM: "bọc"
+n_TS -> n_TM: "bọc"
 ```
 
 > [!NOTE]

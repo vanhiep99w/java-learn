@@ -67,12 +67,15 @@ Developer\r\n
 
 Server gửi từng chunk khi sẵn sàng; client xử lý ngay. Đây là nền của: tải file lớn (server đọc đĩa và đẩy dần), export CSV khổng lồ, log streaming.
 
-```mermaid
-flowchart LR
-    DB["Nguồn (DB/file)"] -->|"từng phần"| S["Server"]
-    S -->|"chunk 1"| C["Client (xử lý ngay)"]
-    S -->|"chunk 2"| C
-    S -->|"chunk N + chunk rỗng (hết)"| C
+```d2 title="3. Chunked transfer encoding — stream qua HTTP/1.1"
+direction: right
+n_DB: "Nguồn (DB/file)"
+n_S: "Server"
+n_C: "Client (xử lý ngay)"
+n_DB -> n_S: "từng phần"
+n_S -> n_C: "chunk 1"
+n_S -> n_C: "chunk 2"
+n_S -> n_C: "chunk N + chunk rỗng (hết)"
 ```
 
 > [!NOTE]
@@ -109,10 +112,13 @@ public Flux<PriceUpdate> stream() {
 
 Vấn đề lớn nhất khi stream: **producer nhanh hơn consumer**. Nếu producer cứ đẩy, consumer không kịp xử lý → hàng đợi phình → OOM.
 
-```mermaid
-flowchart LR
-    P["Producer (1M item/s)"] -->|"đẩy ào ạt"| Q["Buffer phình to 💥"]
-    Q --> C["Consumer (1K item/s)"]
+```d2 title="5. Backpressure — vấn đề cốt lõi của streaming"
+direction: right
+n_P: "Producer (1M item/s)"
+n_Q: "Buffer phình to 💥"
+n_C: "Consumer (1K item/s)"
+n_P -> n_Q: "đẩy ào ạt"
+n_Q -> n_C
 ```
 
 **Backpressure** = cơ chế để consumer *báo ngược* cho producer "tôi chỉ nhận được N item nữa thôi, chậm lại". Đây là khác biệt then chốt giữa stream "ngây thơ" (push mù) và stream có kiểm soát.

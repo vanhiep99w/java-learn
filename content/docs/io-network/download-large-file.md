@@ -78,13 +78,19 @@ try (var out = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOp
 }
 ```
 
-```mermaid
-flowchart TD
-    A["Đứt mạng ở 60%"] --> B["Kiểm tra file local: có 600MB"]
-    B --> C["GET Range: bytes=629145600-"]
-    C --> D{"Server trả?"}
-    D -->|"206 Partial"| E["Append phần còn lại → hoàn tất"]
-    D -->|"200 OK (không hỗ trợ Range)"| F["Phải tải lại từ đầu"]
+```d2 title="3. HTTP Range request & resume download"
+direction: down
+n_A: "Đứt mạng ở 60%"
+n_B: "Kiểm tra file local: có 600MB"
+n_C: "GET Range: bytes=629145600-"
+n_D: "Server trả?" { shape: diamond }
+n_E: "Append phần còn lại → hoàn tất"
+n_F: "Phải tải lại từ đầu"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E: "206 Partial"
+n_D -> n_F: "200 OK (không hỗ trợ Range)"
 ```
 
 > [!IMPORTANT]
@@ -134,14 +140,26 @@ try (FileChannel src = FileChannel.open(filePath, READ);
 }
 ```
 
-```mermaid
-flowchart LR
-    subgraph Normal["Copy thường"]
-        D1["Đĩa"] --> K1["Kernel"] --> U["User space (app)"] --> K2["Kernel/Socket"] --> N1["NIC"]
-    end
-    subgraph Zero["Zero-copy (sendfile)"]
-        D2["Đĩa"] --> K3["Kernel"] --> N2["NIC"]
-    end
+```d2 title="5. Zero-copy: transferTo, sendfile, FileChannel"
+direction: right
+n_Normal: "Copy thường" {
+  n_D1: "Đĩa"
+  n_K1: "Kernel"
+  n_U: "User space (app)"
+  n_K2: "Kernel/Socket"
+  n_N1: "NIC"
+}
+n_Zero: "Zero-copy (sendfile)" {
+  n_D2: "Đĩa"
+  n_K3: "Kernel"
+  n_N2: "NIC"
+}
+n_Normal.n_D1 -> n_Normal.n_K1
+n_Normal.n_K1 -> n_Normal.n_U
+n_Normal.n_U -> n_Normal.n_K2
+n_Normal.n_K2 -> n_Normal.n_N1
+n_Zero.n_D2 -> n_Zero.n_K3
+n_Zero.n_K3 -> n_Zero.n_N2
 ```
 
 > [!NOTE]

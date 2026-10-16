@@ -143,12 +143,17 @@ invokedynamic #0:accept:()Ljava/util/function/Consumer;
 
 **Flow tại runtime (chỉ lần đầu):**
 
-```mermaid
-flowchart TD
-    A["invokedynamic lần đầu"] --> B["JVM gọi LambdaMetafactory.metafactory()"]
-    B --> C["Tạo class implement Consumer (dùng ASM bytecode gen)"]
-    C --> D["Tạo CallSite (link vào invokedynamic)"]
-    D --> E["Lần gọi sau: dùng trực tiếp CallSite — KHÔNG bootstrap lại"]
+```d2 title="4.2. invokedynamic — bootstrap tại runtime"
+direction: down
+n_A: "invokedynamic lần đầu"
+n_B: "JVM gọi\nLambdaMetafactory.metafactory()"
+n_C: "Tạo class implement Consumer (dùng ASM\nbytecode gen)"
+n_D: "Tạo CallSite (link vào invokedynamic)"
+n_E: "Lần gọi sau: dùng trực tiếp CallSite —\nKHÔNG bootstrap lại"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
 ```
 
 `LambdaMetafactory` tạo **lightweight class** tại runtime:

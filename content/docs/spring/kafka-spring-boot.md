@@ -29,22 +29,23 @@ Thiết kế đúng cần phối hợp key, partition count, concurrency, retry,
 
 ## 2. Kafka Architecture — Broker, Topic, Partition, Replica
 
-```
-┌───────────────────────────────────────────────────────┐
-│                    Kafka Cluster                      │
-│                                                       │
-│  Broker 0            Broker 1           Broker 2      │
-│  ┌──────────────┐  ┌──────────────┐   ┌──────────────┐│
-│  │Topic: orders │  │Topic: orders │   │Topic: orders ││
-│  │ P0 (leader)  │  │ P1 (leader)  │   │ P2 (leader)  ││
-│  │ P1 (replica) │  │ P2 (replica) │   │ P0 (replica) ││
-│  └──────────────┘  └──────────────┘   └──────────────┘│
-│                                                       │
-│  Controller: Broker 0 (quản lý partition assignment)  │
-└───────────────────────────────────────────────────────┘
-
-Producer ──→ Partition (by key hash) ──→ Broker (leader)
-Consumer ←── Partition (assigned by group coordinator) ←── Broker
+```d2 title="2. Kafka Architecture — Broker, Topic, Partition, Replica"
+direction: right
+producer: Producer
+cluster: "Kafka Cluster: topic orders" {
+  b0: "Broker 0: controller\nP0 leader, P1 replica"
+  b1: "Broker 1\nP1 leader, P2 replica"
+  b2: "Broker 2\nP2 leader, P0 replica"
+}
+partition: "Partition: by key hash"
+consumer: "Consumer: partition assignment\nby group coordinator"
+producer -> partition
+partition -> cluster.b0: leader
+partition -> cluster.b1: leader
+partition -> cluster.b2: leader
+cluster.b0 -> consumer
+cluster.b1 -> consumer
+cluster.b2 -> consumer
 ```
 
 | Concept | Ý nghĩa |
@@ -79,23 +80,22 @@ Consumer Group "order-service" (3 instances):
 
 ### 3.1. Send flow
 
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant P as KafkaProducer
-    participant A as Accumulator
-    participant S as Sender Thread
-    participant B as Broker
-
-    App->>P: send(record)
-    P->>P: serialize key/value
-    P->>P: partition(key) → partition number
-    P->>A: append to batch (per partition)
-    Note over A: Batch chờ: batch.size hoặc linger.ms
-    A->>S: batch ready
-    S->>B: Produce request (batch of records)
-    B-->>S: ACK (or error)
-    S-->>App: callback(metadata/exception)
+```d2 title="3.1. Send flow"
+shape: sequence_diagram
+n_App: "Application"
+n_P: "KafkaProducer"
+n_A: "Accumulator"
+n_S: "Sender Thread"
+n_B: "Broker"
+n_App -> n_P: "send(record)"
+n_P -> n_P: "serialize key/value"
+n_P -> n_P: "partition(key) → partition number"
+n_P -> n_A: "append to batch (per partition)"
+n_A.note1: "Batch chờ: batch.size hoặc linger.ms"
+n_A -> n_S: "batch ready"
+n_S -> n_B: "Produce request (batch of records)"
+n_B -> n_S: "ACK (or error)" { style.stroke-dash: 3 }
+n_S -> n_App: "callback(metadata/exception)" { style.stroke-dash: 3 }
 ```
 
 ### 3.2. Acks — mức đảm bảo ghi
@@ -129,19 +129,18 @@ Producer gắn **sequence number** cho mỗi message gửi tới partition. Brok
 
 Mỗi consumer group có **1 broker** làm **Group Coordinator** (broker hosting `__consumer_offsets` partition cho group đó):
 
-```mermaid
-sequenceDiagram
-    participant C1 as Consumer 1
-    participant C2 as Consumer 2
-    participant GC as Group Coordinator
-
-    C1->>GC: JoinGroup (first → leader)
-    C2->>GC: JoinGroup
-    GC->>C1: JoinResponse (you're leader, members=[C1,C2])
-    GC->>C2: JoinResponse (you're follower)
-    C1->>GC: SyncGroup (assignment: C1→P0, C2→P1)
-    GC->>C1: SyncResponse (your partitions: P0)
-    GC->>C2: SyncResponse (your partitions: P1)
+```d2 title="4.1. Group Coordinator"
+shape: sequence_diagram
+n_C1: "Consumer 1"
+n_C2: "Consumer 2"
+n_GC: "Group Coordinator"
+n_C1 -> n_GC: "JoinGroup (first → leader)"
+n_C2 -> n_GC: "JoinGroup"
+n_GC -> n_C1: "JoinResponse (you're leader,\nmembers=[C1,C2])"
+n_GC -> n_C2: "JoinResponse (you're follower)"
+n_C1 -> n_GC: "SyncGroup (assignment: C1→P0, C2→P1)"
+n_GC -> n_C1: "SyncResponse (your partitions: P0)"
+n_GC -> n_C2: "SyncResponse (your partitions: P1)"
 ```
 
 ### 4.2. Rebalancing — khi nào?
@@ -294,11 +293,15 @@ public void onOrder(
 
 `concurrency = "3"` tạo **3 KafkaMessageListenerContainer** — mỗi container = 1 thread = 1 Kafka consumer:
 
-```
-ConcurrentMessageListenerContainer
-  ├─ KafkaMessageListenerContainer #0 → Consumer → P0
-  ├─ KafkaMessageListenerContainer #1 → Consumer → P1
-  └─ KafkaMessageListenerContainer #2 → Consumer → P2
+```d2 title="7.2. ConcurrentMessageListenerContainer"
+direction: right
+t0: "ConcurrentMessageListenerContainer"
+t1: "KafkaMessageListenerContainer #0 → Consumer → P0"
+t0 -> t1
+t2: "KafkaMessageListenerContainer #1 → Consumer → P1"
+t0 -> t2
+t3: "KafkaMessageListenerContainer #2 → Consumer → P2"
+t0 -> t3
 ```
 
 > [!WARNING]
@@ -345,16 +348,22 @@ DefaultErrorHandler errorHandler(KafkaOperations<String, Object> template) {
 
 ### 8.2. Flow
 
-```mermaid
-flowchart TD
-    A["Message nhận"] --> B["Process"]
-    B -->|thành công| C["Commit offset"]
-    B -->|exception| D{"Retryable?"}
-    D -->|có| E["Retry (backoff)"]
-    E --> B
-    E -->|"max retries"| F["Dead Letter Topic (DLT)"]
-    D -->|không| F
-    F --> C
+```d2 title="8.2. Flow"
+direction: down
+n_A: "Message nhận"
+n_B: "Process"
+n_C: "Commit offset"
+n_D: "Retryable?" { shape: diamond }
+n_E: "Retry (backoff)"
+n_F: "Dead Letter Topic (DLT)"
+n_A -> n_B
+n_B -> n_C: "thành công"
+n_B -> n_D: "exception"
+n_D -> n_E: "có"
+n_E -> n_B
+n_E -> n_F: "max retries"
+n_D -> n_F: "không"
+n_F -> n_C
 ```
 
 ### 8.3. Non-blocking retry (Spring Kafka 2.7+)

@@ -209,13 +209,19 @@ Khi thực thi `invokevirtual`, có thể hình dung JVM làm bốn bước:
 3. Tìm implementation cụ thể nhất của `sound()` cho `Dog`.
 4. Chạy `Dog.sound()`.
 
-```mermaid
-flowchart LR
-    Call["animal.sound()"] --> Compile["Compile-time<br/>Animal có sound()?"]
-    Compile --> Bytecode["invokevirtual<br/>Animal.sound"]
-    Bytecode --> Runtime{"Runtime object<br/>là lớp nào?"}
-    Runtime -->|Dog| Dog["Dog.sound()"]
-    Runtime -->|Cat| Cat["Cat.sound()"]
+```d2 title="4.1. Từ lời gọi Java đến invokevirtual"
+direction: right
+n_Call: "animal.sound()"
+n_Compile: "Compile-time\nAnimal có sound()?"
+n_Bytecode: "invokevirtual\nAnimal.sound"
+n_Runtime: "Runtime object\nlà lớp nào?" { shape: diamond }
+n_Dog: "Dog.sound()"
+n_Cat: "Cat.sound()"
+n_Call -> n_Compile
+n_Compile -> n_Bytecode
+n_Bytecode -> n_Runtime
+n_Runtime -> n_Dog: "Dog"
+n_Runtime -> n_Cat: "Cat"
 ```
 
 > [!IMPORTANT]
@@ -239,20 +245,13 @@ Khi lớp con override một method, nó **thay địa chỉ method ở cùng sl
 
 Object `Dog` chứa thông tin để JVM biết nó thuộc lớp `Dog`. Từ metadata của lớp, JVM có thể đến vtable và lấy đúng slot:
 
-```text
-tham chiếu animal
-       │
-       ▼
-┌──────────────────┐
-│ object Dog       │
-│ class → Dog      │
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ vtable của Dog   │
-│ sound → Dog.sound│
-└──────────────────┘
+```d2 title="4.2. Vtable giúp chọn method nhanh như thế nào?"
+direction: right
+animal: "Tham chiếu animal"
+object: "Object Dog: class → Dog"
+vtable: "Vtable của Dog: sound → Dog.sound"
+animal -> object
+object -> vtable: "class metadata"
 ```
 
 Do đó có thể ghi nhớ `invokevirtual` theo mô hình đơn giản sau:
@@ -435,13 +434,19 @@ Quy tắc giải quyết của compiler (theo thứ tự ưu tiên):
 2. **Interface cụ thể hơn thắng** — `B extends A`, default của `B` > của `A`.
 3. Còn lại → mơ hồ → **bắt buộc override**.
 
-```mermaid
-flowchart TD
-    Call["gọi obj.hi()"] --> C1{"class/superclass<br/>có hi() ?"}
-    C1 -->|có| UseClass["dùng bản của class"]
-    C1 -->|không| C2{"interface nào<br/>cụ thể hơn ?"}
-    C2 -->|có| UseSpecific["dùng default cụ thể nhất"]
-    C2 -->|mơ hồ| Force["lỗi compile → buộc override"]
+```d2 title="5.2. Default method & bài toán đa kế thừa hành vi"
+direction: down
+n_Call: "gọi obj.hi()"
+n_C1: "class/superclass\ncó hi() ?" { shape: diamond }
+n_UseClass: "dùng bản của class"
+n_C2: "interface nào\ncụ thể hơn ?" { shape: diamond }
+n_UseSpecific: "dùng default cụ thể nhất"
+n_Force: "lỗi compile → buộc override"
+n_Call -> n_C1
+n_C1 -> n_UseClass: "có"
+n_C1 -> n_C2: "không"
+n_C2 -> n_UseSpecific: "có"
+n_C2 -> n_Force: "mơ hồ"
 ```
 
 > [!NOTE]

@@ -48,15 +48,23 @@ public ThreadPoolExecutor(
 
 Quy tắc phân luồng (dispatch logic):
 
-```mermaid
-flowchart TD
-    A["submit(task)"] --> B{"workerCount < corePoolSize?"}
-    B -->|có| C["Tạo core thread mới, chạy task ngay"]
-    B -->|không| D{"workQueue.offer(task) thành công?"}
-    D -->|có| E["Task vào queue, chờ thread rảnh lấy ra"]
-    D -->|không| F{"workerCount < maximumPoolSize?"}
-    F -->|có| G["Tạo non-core thread mới, chạy task ngay"]
-    F -->|không| H["RejectedExecutionHandler xử lý"]
+```d2 title="2. Kiến trúc tổng quan — 5 tham số quyết định mọi thứ"
+direction: down
+n_A: "submit(task)"
+n_B: "workerCount < corePoolSize?" { shape: diamond }
+n_C: "Tạo core thread mới, chạy task ngay"
+n_D: "workQueue.offer(task) thành công?" { shape: diamond }
+n_E: "Task vào queue, chờ thread rảnh lấy ra"
+n_F: "workerCount < maximumPoolSize?" { shape: diamond }
+n_G: "Tạo non-core thread mới, chạy task\nngay"
+n_H: "RejectedExecutionHandler xử lý"
+n_A -> n_B
+n_B -> n_C: "có"
+n_B -> n_D: "không"
+n_D -> n_E: "có"
+n_D -> n_F: "không"
+n_F -> n_G: "có"
+n_F -> n_H: "không"
 ```
 
 > [!WARNING]
@@ -317,15 +325,21 @@ Khi nào dùng:
 
 ## 9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED
 
-```mermaid
-stateDiagram-v2
-    [*] --> RUNNING: new ThreadPoolExecutor()
-    RUNNING --> SHUTDOWN: shutdown()
-    RUNNING --> STOP: shutdownNow()
-    SHUTDOWN --> STOP: shutdownNow()
-    SHUTDOWN --> TIDYING: queue rỗng + workerCount = 0
-    STOP --> TIDYING: workerCount = 0
-    TIDYING --> TERMINATED: terminated() hook chạy xong
+```d2 title="9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED"
+direction: right
+n_RUNNING: "RUNNING"
+n_SHUTDOWN: "SHUTDOWN"
+n_STOP: "STOP"
+n_TIDYING: "TIDYING"
+n_TERMINATED: "TERMINATED"
+n_start: "Bắt đầu" { shape: circle }
+n_start -> n_RUNNING: "new ThreadPoolExecutor()"
+n_RUNNING -> n_SHUTDOWN: "shutdown()"
+n_RUNNING -> n_STOP: "shutdownNow()"
+n_SHUTDOWN -> n_STOP: "shutdownNow()"
+n_SHUTDOWN -> n_TIDYING: "queue rỗng + workerCount = 0"
+n_STOP -> n_TIDYING: "workerCount = 0"
+n_TIDYING -> n_TERMINATED: "terminated() hook chạy xong"
 ```
 
 | State | Accept task mới? | Xử lý queue? | Interrupt worker? |

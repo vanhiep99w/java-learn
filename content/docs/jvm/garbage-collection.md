@@ -84,16 +84,17 @@ Trong ví dụ này, câu trả lời cho “biến nào là GC Root?” là:
 
 Có thể hình dung Heap nằm bên phải đường phân cách:
 
-```text
-        NƠI JVM BẮT ĐẦU                         HEAP
-
-[stack slot: order] ────────────────────────→ [Order object]
-      GC Root                                    │
-                                                 └──→ [Customer object]
-
-[static slot: CACHE] ───────────────────────→ [ArrayList object]
-      GC Root                                    │
-                                                 └──→ [Order object]
+```d2 title="2.1. GC Root là biến nào trong code?"
+direction: right
+roots: "Nơi JVM bắt đầu: GC Roots" {
+  order: "Stack slot: order"
+  cache: "Static slot: CACHE"
+}
+heap: Heap { order: Order; customer: Customer; list: ArrayList; cached: Order }
+roots.order -> heap.order
+heap.order -> heap.customer
+roots.cache -> heap.list
+heap.list -> heap.cached
 ```
 
 **GC Root là nơi bắt đầu mũi tên ở bên trái, không phải object `Order` hay `ArrayList` ở bên phải.** Nói ngắn gọn:
@@ -115,20 +116,28 @@ Nếu gọi `CACHE.clear()` và không còn root nào khác dẫn tới `Order`,
 
 GC xác định object **sống** hay **chết** bằng **reachability analysis** (không dùng reference counting):
 
-```mermaid
-flowchart TD
-    R1["GC Root: local reference trong stack frame"] --> A["Object A"]
-    R2["GC Root: static reference"] --> B["Object B"]
-    A --> C["Object C"]
-    A --> D["Object D"]
-    C --> E["Object E"]
-
-    F["Object F"] -.->|"không có đường từ root"| X["Có thể được GC thu hồi"]
-    G["Object G"] --> F
-
-    style F fill:#ff6b6b
-    style G fill:#ff6b6b
-    style X fill:#ff6b6b
+```d2 title="2.2. JVM dùng GC Roots như thế nào?"
+direction: down
+n_R1: "GC Root: local reference trong stack\nframe"
+n_A: "Object A"
+n_R2: "GC Root: static reference"
+n_B: "Object B"
+n_C: "Object C"
+n_D: "Object D"
+n_E: "Object E"
+n_F: "Object F"
+n_X: "Có thể được GC thu hồi"
+n_G: "Object G"
+n_R1 -> n_A
+n_R2 -> n_B
+n_A -> n_C
+n_A -> n_D
+n_C -> n_E
+n_F -> n_X: "không có đường từ root" { style.stroke-dash: 3 }
+n_G -> n_F
+n_F.style.fill: "#ff6b6b"
+n_G.style.fill: "#ff6b6b"
+n_X.style.fill: "#ff6b6b"
 ```
 
 Trong sơ đồ, `A`, `B`, `C`, `D`, `E` sống vì có ít nhất một đường đi từ GC Root. `F` và `G` có thể tham chiếu lẫn nhau nhưng vẫn chết vì cả cụm không có đường đi từ bất kỳ root nào.
@@ -204,19 +213,17 @@ Có hai lớp khái niệm cần tách riêng:
 
 Sơ đồ dưới đây là **mô hình generational cổ điển** thường dùng để giải thích Serial và Parallel Collector. Đây không phải layout cố định cho mọi JVM. G1 chia heap thành regions, còn ZGC dùng cơ chế relocation và barrier khác; phần 4.6 sẽ so sánh.
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│ Java Heap (object/array; giới hạn bởi Xms và Xmx)                      │
-├────────────────────────────────┬───────────────────────────────────────┤
-│ Young Generation               │ Old / Tenured Generation              │
-│                                │                                       │
-│  ┌─────────┬────────┬───────┐  │  Object sống lâu hoặc được promote    │
-│  │  Eden   │  S0    │  S1   │  │                                       │
-│  │ allocate│ From/To│To/From│  │                                       │
-│  └─────────┴────────┴───────┘  │                                       │
-└────────────────────────────────┴───────────────────────────────────────┘
-
-Metaspace: vùng native memory riêng, không nằm trong Java Heap
+```d2 title="4. Heap Layout: Eden, Survivor, Old, Metaspace"
+direction: right
+heap: "Java Heap: object / array, Xms / Xmx" {
+  young: "Young Generation" {
+    eden: "Eden: allocate"
+    s0: "S0: From / To"
+    s1: "S1: To / From"
+  }
+  old: "Old / Tenured Generation\nobject sống lâu hoặc được promote"
+}
+metaspace: "Metaspace: native memory riêng\nkhông nằm trong Java Heap"
 ```
 
 | Vùng | Chứa gì | Điều gì thường xảy ra ở đây? |
@@ -244,15 +251,17 @@ Tỉ lệ **Eden:S0:S1 ≈ 8:1:1** và Old Gen khoảng **2/3 heap** chỉ là c
 
 Với object nhỏ trong collector generational thông thường, đường đi của một lệnh `new` thường như sau:
 
-```text
-new Order()
-    │
-    ├── object nhỏ, TLAB còn chỗ
-    │       └── cấp phát trong TLAB thuộc Eden bằng bump-the-pointer
-    │
-    └── TLAB đầy hoặc object đặc biệt/lớn
-            └── slow path → đường cấp phát riêng của collector
-                              (Old hoặc Humongous region tùy collector)
+```d2 title="4.2. Từ new đến Eden — TLAB và đường cấp phát"
+direction: down
+allocate: "new Order()"
+check: "Object nhỏ, TLAB còn chỗ?"
+fast: "Bump-the-pointer trong TLAB thuộc Eden"
+slow: "TLAB đầy hoặc object đặc biệt / lớn"
+collector: "Slow path theo collector: Old hoặc\nHumongous region"
+allocate -> check
+check -> fast: Có
+check -> slow: Không
+slow -> collector
 ```
 
 **TLAB (Thread-Local Allocation Buffer)** là một lát nhỏ của Eden được dành riêng cho từng thread. Khi thread gọi `new`, nó thường chỉ cần tăng một con trỏ trong TLAB. Các thread không phải tranh chấp một allocation pointer dùng chung, nên cấp phát object nhỏ rất nhanh.
@@ -327,13 +336,13 @@ Object chết trong Eden hoặc From không cần được copy. Cả vùng cũ 
 
 Object được **promote** từ Survivor vào Old Gen khi đạt effective tenuring threshold hoặc khi Survivor To không còn đủ chỗ. `-XX:MaxTenuringThreshold` là giới hạn age, không phải lời hứa rằng mọi object sẽ sống đúng số vòng đó. JVM có thể hạ threshold động nếu nhiều object cùng age làm Survivor bị đầy.
 
-```text
-Eden ── Young GC, còn sống ──→ Survivor (age + 1)
-                                  │
-                  age đạt ngưỡng hoặc To đầy
-                                  │
-                                  ▼
-                              Old Gen
+```d2 title="4.4. Promotion vào Old Gen"
+direction: right
+eden: "Eden"
+survivor: "Survivor: age + 1"
+old: "Old Gen"
+eden -> survivor: "Young GC, còn sống"
+survivor -> old: "age đạt ngưỡng hoặc To đầy"
 ```
 
 Có ba tình huống làm Old Gen tăng nhanh:
@@ -575,19 +584,18 @@ Mark-Compact = đánh dấu → dồn object sống → gom vùng trống thành
 
 **Stop-the-World (STW)**: JVM yêu cầu **tất cả** application thread dừng lại tại **safepoint** trước khi GC bắt đầu.
 
-```mermaid
-sequenceDiagram
-    participant App as App Threads
-    participant GC as GC Thread
-    
-    App->>App: đang chạy code...
-    GC->>App: "Dừng lại!" (STW request)
-    App->>App: chạy tới safepoint gần nhất
-    Note over App: FROZEN — không chạy code
-    GC->>GC: Mark live objects
-    GC->>GC: Sweep/Copy/Compact
-    GC->>App: "Tiếp tục!"
-    App->>App: resume
+```d2 title="6. Stop-the-World — tại sao GC phải dừng ứng dụng"
+shape: sequence_diagram
+n_App: "App Threads"
+n_GC: "GC Thread"
+n_App -> n_App: "đang chạy code..."
+n_GC -> n_App: "\"Dừng lại!\" (STW request)"
+n_App -> n_App: "chạy tới safepoint gần nhất"
+n_App.note1: "FROZEN — không chạy code"
+n_GC -> n_GC: "Mark live objects"
+n_GC -> n_GC: "Sweep/Copy/Compact"
+n_GC -> n_App: "\"Tiếp tục!\""
+n_App -> n_App: "resume"
 ```
 
 **Tại sao cần STW?** Nếu app thread tiếp tục chạy:
@@ -637,13 +645,17 @@ Parallel:  |--Mark--|--Compact--|            (8 threads, ~50ms)
 
 CMS (Concurrent Mark Sweep) là collector đầu tiên làm phần **mark** song song với app:
 
-```mermaid
-flowchart LR
-    subgraph "CMS Phases"
-        A["1. Initial Mark (STW)"] --> B["2. Concurrent Mark"]
-        B --> C["3. Remark (STW)"]
-        C --> D["4. Concurrent Sweep"]
-    end
+```d2 title="8. CMS — Concurrent Mark Sweep (deprecated)"
+direction: right
+n_group1: "CMS Phases" {
+  n_A: "1. Initial Mark (STW)"
+  n_B: "2. Concurrent Mark"
+  n_C: "3. Remark (STW)"
+  n_D: "4. Concurrent Sweep"
+}
+n_group1.n_A -> n_group1.n_B
+n_group1.n_B -> n_group1.n_C
+n_group1.n_C -> n_group1.n_D
 ```
 
 | Phase | STW? | Làm gì |
@@ -681,13 +693,19 @@ E = Eden, S = Survivor, O = Old, H = Humongous, F = Free
 
 ### 9.2. Mixed GC — chỉ thu regions "rác nhiều nhất"
 
-```mermaid
-flowchart TD
-    A["Concurrent Marking"] --> B["Xác định liveness ratio mỗi region"]
-    B --> C["Sắp xếp: region nào rác nhiều nhất?"]
-    C --> D["Chọn N regions sao cho pause ≤ target"]
-    D --> E["Evacuation (copy sống sang region mới)"]
-    E --> F["Free regions cũ"]
+```d2 title="9.2. Mixed GC — chỉ thu regions \"rác nhiều nhất\""
+direction: down
+n_A: "Concurrent Marking"
+n_B: "Xác định liveness ratio mỗi region"
+n_C: "Sắp xếp: region nào rác nhiều nhất?"
+n_D: "Chọn N regions sao cho pause ≤ target"
+n_E: "Evacuation (copy sống sang region mới)"
+n_F: "Free regions cũ"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
 ```
 
 G1 **chọn** regions có nhiều rác nhất (**"garbage first"**) để thu — đạt hiệu quả tối đa trong target pause time.
@@ -741,13 +759,14 @@ void fieldStore(Object obj, Object newRef) {
 3. GC thread drain SATB buffers → mark những objects này là reachable
 4. Kết quả: GC **không bao giờ miss** object đang sống tại snapshot time
 
-```
-Thread-local SATB Buffer (per-thread):
-┌─────┬─────┬─────┬─────┐
-│old₁ │old₂ │old₃ │ ... │ → khi đầy → flush vào global queue
-└─────┴─────┴─────┴─────┘
-              ↓
-GC thread: drain + mark old references → safe
+```d2 title="9.5. SATB Write Barrier — Snapshot-At-The-Beginning"
+direction: right
+local: "Thread-local SATB buffer\nold₁, old₂, old₃, ..."
+global: "Global queue"
+gc: "GC thread: drain + mark old references"
+safe: "Safe"
+local -> global: "khi đầy: flush"
+global -> gc -> safe
 ```
 
 > [!NOTE]
@@ -803,16 +822,18 @@ Nếu pointer chưa được remap (object đã di chuyển) → barrier **tự 
 
 ### 10.4. Concurrent phases
 
-```
-ZGC: gần như MỌI THỨ concurrent
-┌─────────────────────────────────────────────────────────┐
-│ Pause Mark Start (<1ms)                                 │
-│ Concurrent Mark & Remap                                 │
-│ Pause Mark End (<1ms)                                   │
-│ Concurrent Relocate                                     │
-│ (app thread tự fixup khi đọc qua load barrier)          │
-└─────────────────────────────────────────────────────────┘
-STW chỉ ở 2 điểm: Mark Start + Mark End → tổng < 1ms
+```d2 title="10.4. Concurrent phases"
+direction: down
+start: "Pause Mark Start (<1ms): STW"
+mark: "Concurrent Mark & Remap"
+end: "Pause Mark End (<1ms): STW"
+relocate: "Concurrent Relocate"
+barrier: "App thread tự fixup khi đọc qua load\nbarrier"
+note: "Chỉ 2 điểm STW: Mark Start + Mark End;\npause rất ngắn"
+start -> mark -> end -> relocate
+relocate -> barrier
+start -> note { style.stroke-dash: 3 }
+end -> note { style.stroke-dash: 3 }
 ```
 
 > [!IMPORTANT]

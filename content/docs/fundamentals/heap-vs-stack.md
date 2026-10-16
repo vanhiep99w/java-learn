@@ -36,20 +36,20 @@ Cách phân chia này giúp giải thích `StackOverflowError`, `OutOfMemoryErro
 
 JVM chia bộ nhớ runtime thành các vùng, mỗi vùng có vòng đời và phạm vi chia sẻ khác nhau:
 
-```
-┌───────────────────────────── JVM Process Memory ─────────────────────────────┐
-│                                                                              │
-│   HEAP  (chia sẻ toàn JVM, GC quản lý)        METASPACE (native, chia sẻ)    │
-│   ┌──────────────┬──────────────┐             ┌──────────────────────────┐   │
-│   │  Young Gen   │   Old Gen    │             │ class metadata, method,  │   │
-│   │ Eden+S0+S1   │ object sống  │             │ static field, constant   │   │
-│   └──────────────┴──────────────┘             └──────────────────────────┘   │
-│                                                                              │
-│   PER-THREAD (mỗi thread một bộ riêng)                                       │
-│   ┌──────────────┬──────────────┬──────────────┐                             │
-│   │  JVM Stack   │  PC Register │ Native Stack │  × N thread                 │
-│   └──────────────┴──────────────┴──────────────┘                             │
-└──────────────────────────────────────────────────────────────────────────────┘
+```d2 title="2. Bản đồ bộ nhớ runtime của JVM"
+direction: right
+jvm: "JVM Process Memory" {
+  heap: "Heap: chia sẻ, GC quản lý" {
+    young: "Young Gen: Eden + S0 + S1"
+    old: "Old Gen: object sống lâu"
+  }
+  metaspace: "Metaspace: native, chia sẻ\nclass metadata, method, constant pool"
+  thread: "Per-thread × N" {
+    stack: "JVM Stack"
+    pc: "PC Register"
+    native: "Native Stack"
+  }
+}
 ```
 
 | Vùng | Chia sẻ? | Chứa gì | Ai dọn |
@@ -67,16 +67,12 @@ Trọng tâm doc này là hai vùng bạn chạm hằng ngày: **Stack** (vòng 
 
 Mỗi thread có **một JVM stack**. Mỗi lần **gọi method** đẩy một **stack frame**; method **return** thì pop frame đó. Frame chứa:
 
-```
-┌─────────── Stack Frame (một method call) ──────────────────┐
-│ Local Variable Array  │ slot 0: this                       │
-│                       │ slot 1: tham số / biến cục bộ      │
-│                       │ slot 2: ...                        │
-│───────────────────────┼────────────────────────────────────│
-│ Operand Stack         │ vùng tính toán tạm (push/pop)      │
-│───────────────────────┼────────────────────────────────────│
-│ Frame Data            │ ref tới constant pool, return addr │
-└────────────────────────────────────────────────────────────┘
+```d2 title="3. Stack — frame, local array và operand stack"
+frame: "Stack Frame (một method call)" {
+  local: "Local Variable Array\nslot 0: this; slot 1: tham số / local; ..."
+  operand: "Operand Stack\nvùng tính toán tạm: push / pop"
+  data: "Frame Data\nconstant pool ref, return address, exception table"
+}
 ```
 
 - **Local Variable Array**: lưu tham số và biến cục bộ. `long`/`double` chiếm **2 slot**, còn lại 1 slot. `this` luôn ở slot 0 (method instance).
@@ -107,17 +103,15 @@ Mỗi thread có **một JVM stack**. Mỗi lần **gọi method** đẩy một 
 
 **Mọi object** (`new`) và **mọi mảng** sống trên **heap**, chia sẻ giữa các thread, do GC quản lý. Một object trong HotSpot có layout:
 
-```
-┌──────────── Object trên Heap ─────────────┐
-│ Object Header                             │
-│   ├─ Mark Word (8 byte): hash, GC age,    │
-│   │   lock state (biased/thin/fat)        │
-│   └─ Klass Pointer (4 byte nén): trỏ class│
-│───────────────────────────────────────────│
-│ Instance Fields (int, ref, ...)           │
-│───────────────────────────────────────────│
-│ Padding → bội số 8 byte (alignment)       │
-└───────────────────────────────────────────┘
+```d2 title="4. Heap — object layout, header và reference"
+object: "Object trên Heap" {
+  header: "Object Header" {
+    mark: "Mark Word (8B): hash, GC age, lock state"
+    klass: "Klass pointer (4B nén): trỏ class"
+  }
+  fields: "Instance fields: int, reference, ..."
+  padding: "Padding: alignment bội số 8B"
+}
 ```
 
 - **Mark Word** lưu identity hashCode (mục equals-hashCode), tuổi GC, và **trạng thái khóa** — chính nơi `synchronized` ghi (xem [synchronized internals](/concurrency/synchronized-internals-deep-dive/)).
@@ -141,15 +135,16 @@ void demo() {
 }
 ```
 
-```
-        STACK (frame demo)              HEAP
-        ┌──────────────┐
- x      │      42      │  ← giá trị nằm thẳng trên stack
-        ├──────────────┤                ┌──────────────┐
- arr    │   ref ───────┼──────────────▶ │ [1, 2, 3]    │
-        ├──────────────┤                ├──────────────┤
- s      │   ref ───────┼──────────────▶ │ "hi"         │
-        └──────────────┘                └──────────────┘
+```d2 title="5. Giá trị nằm ở đâu — primitive vs object vs reference"
+direction: right
+stack: "Stack: frame demo" {
+  x: "x = 42 (giá trị trực tiếp)"
+  arr: "arr = reference"
+  s: "s = reference"
+}
+heap: Heap { arr: "int[] {1, 2, 3}"; s: "String hi" }
+stack.arr -> heap.arr
+stack.s -> heap.s
 ```
 
 | Loại | Slot trên stack chứa | Object thực |

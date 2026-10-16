@@ -59,14 +59,17 @@ Mỗi Java object trên heap bắt đầu bằng **Object Header**:
 
 ## 3. Lock Escalation — 4 cấp độ lock
 
-```mermaid
-flowchart LR
-    A["No Lock"] --> B["Biased Lock"]
-    B --> C["Thin Lock<br/>(Lightweight)"]
-    C --> D["Fat Lock<br/>(Heavyweight)"]
-    
-    B -.->|"Thread khác<br/>cố acquire"| C
-    C -.->|"CAS fail nhiều lần<br/>(spin exhausted)"| D
+```d2 title="3. Lock Escalation — 4 cấp độ lock"
+direction: right
+n_A: "No Lock"
+n_B: "Biased Lock"
+n_C: "Thin Lock\n(Lightweight)"
+n_D: "Fat Lock\n(Heavyweight)"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_B -> n_C: "Thread khác\ncố acquire" { style.stroke-dash: 3 }
+n_C -> n_D: "CAS fail nhiều lần\n(spin exhausted)" { style.stroke-dash: 3 }
 ```
 
 | Cấp | Chi phí | Khi nào | Mechanism |
@@ -113,13 +116,15 @@ Khi có **2 thread** (nhưng không đồng thời contend), biased lock bị re
 
 JVM tạo **Lock Record** trên stack frame của thread đang acquire:
 
-```
-Thread T1 stack:
-┌───────────────────┐
-│ Lock Record       │
-│ ├─ displaced mark │  ← copy mark word gốc vào đây (backup)
-│ └─ obj reference  │  ← pointer tới object bị lock
-└───────────────────┘
+```d2 title="5.1. Lock Record"
+stack: "Thread T1 stack" {
+  record: "Lock Record" {
+    mark: "displaced mark: backup mark word gốc"
+    ref: "obj reference"
+  }
+}
+object: "Object bị lock"
+stack.record.ref -> object
 ```
 
 ### 5.2. Acquire flow
@@ -174,17 +179,17 @@ class ObjectMonitor {
 };
 ```
 
-```
-Object Mark Word: [ObjectMonitor* | 10]
-
-ObjectMonitor:
-┌─────────────────────────────────────────────────┐
-│ _owner = Thread T1 (đang giữ lock)              │
-│ _recursions = 0                                 │
-│ _EntryList: T2 → T3 → null (đang chờ acquire)   │
-│ _WaitSet:   T4 → null (đã gọi wait())           │
-│ _cxq:       T5 → null (mới bị block)            │
-└─────────────────────────────────────────────────┘
+```d2 title="6. Fat Lock (Heavyweight) — ObjectMonitor và OS mutex"
+direction: right
+mark: "Object Mark Word: ObjectMonitor* | 10"
+monitor: ObjectMonitor {
+  owner: "_owner = Thread T1 (giữ lock)"
+  recursion: "_recursions = 0"
+  entry: "_EntryList: T2 → T3 → null\n(chờ acquire)"
+  wait: "_WaitSet: T4 → null\n(đã gọi wait())"
+  cxq: "_cxq: T5 → null\n(mới bị block)"
+}
+mark -> monitor
 ```
 
 ### 6.1. Enter (acquire fat lock)

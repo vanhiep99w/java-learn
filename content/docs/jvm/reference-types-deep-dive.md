@@ -5,6 +5,9 @@ description: "Mổ xẻ 4 loại reference trong Java: Strong, Weak, Soft, Phant
 
 Java cung cấp strong, soft, weak và phantom reference để biểu đạt các mức độ giữ object khác nhau đối với garbage collector. Chúng hỗ trợ cache, metadata phụ trợ và cleanup theo lifecycle của object.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -47,16 +50,19 @@ WeakReference<Object> weak = new WeakReference<>(obj);
 PhantomReference<Object> phantom = new PhantomReference<>(obj, queue);
 ```
 
-```mermaid
-flowchart LR
-    S["Strong<br/>GC: never collect"] --> SO["Soft<br/>GC: collect before OOM"]
-    SO --> W["Weak<br/>GC: collect anytime"]
-    W --> P["Phantom<br/>GC: already dead,<br/>cleanup notification"]
-    
-    style S fill:#ff6b6b
-    style SO fill:#feca57
-    style W fill:#48dbfb
-    style P fill:#c8d6e5
+```d2 title="2. 4 loại reference — từ mạnh đến yếu"
+direction: right
+n_S: "Strong\nGC: never collect"
+n_SO: "Soft\nGC: collect before OOM"
+n_W: "Weak\nGC: collect anytime"
+n_P: "Phantom\nGC: already dead,\ncleanup notification"
+n_S -> n_SO
+n_SO -> n_W
+n_W -> n_P
+n_S.style.fill: "#ff6b6b"
+n_SO.style.fill: "#feca57"
+n_W.style.fill: "#48dbfb"
+n_P.style.fill: "#c8d6e5"
 ```
 
 | Type | `get()` trả gì sau GC | Khi nào bị clear | Use case chính |
@@ -72,13 +78,19 @@ flowchart LR
 
 GC đánh giá **reachability** từ GC Roots (stack variables, static fields, JNI refs...):
 
-```
-GC Root
-  ├── strong → Object A  ← STRONGLY reachable (không GC)
-  ├── soft → Object B    ← SOFTLY reachable (GC trước OOM)
-  │     └── strong → Object C  ← C: softly reachable (transitive)
-  └── weak → Object D    ← WEAKLY reachable (GC any time)
-        └── strong → Object E  ← E: weakly reachable (weakest link)
+```d2 title="3. GC Reachability Analysis — khi nào object \"chết\"?"
+direction: down
+root: "GC Root"
+a: "Object A: strongly reachable, không GC"
+b: "Object B: softly reachable, GC trước OOM"
+c: "Object C: softly reachable (transitive)"
+d: "Object D: weakly reachable, GC any time"
+e: "Object E: weakly reachable (weakest\nlink)"
+root -> a: strong
+root -> b: soft { style.stroke-dash: 3 }
+b -> c: strong
+root -> d: weak { style.stroke-dash: 3 }
+d -> e: strong
 ```
 
 **Quy tắc "mắt xích yếu nhất"**: reachability = loại reference **yếu nhất** trên path từ GC root tới object.
@@ -188,7 +200,7 @@ List<WeakReference<EventListener>> listeners = new ArrayList<>();
 
 ## 6. WeakHashMap internals — key biến mất tự động
 
-```java
+```java source="reference-types-deep-dive/01/WeakHashMap.java"
 public class WeakHashMap<K,V> extends AbstractMap<K,V> {
     // Entry extend WeakReference<Object> — KEY là weak ref
     private static class Entry<K,V> extends WeakReference<Object> implements Map.Entry<K,V> {
@@ -207,6 +219,10 @@ public class WeakHashMap<K,V> extends AbstractMap<K,V> {
     private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
 }
 ```
+
+<SourceRef project="reference-types-deep-dive" file="01/WeakHashMap.java" region="example" variant="button">
+  Xem WeakHashMap.java cùng các ví dụ khác
+</SourceRef>
 
 **Cleanup mechanism** — `expungeStaleEntries()`:
 
@@ -247,7 +263,7 @@ phantom.get();  // LUÔN null (JDK 8) — không thể "hồi sinh" object
 
 ### 7.1. Resource cleanup pattern
 
-```java
+```java source="reference-types-deep-dive/02/ResourceCleaner.java"
 public class ResourceCleaner {
     private static final ReferenceQueue<MyResource> queue = new ReferenceQueue<>();
     private static final Set<CleanupRef> refs = ConcurrentHashMap.newKeySet();
@@ -280,6 +296,10 @@ public class ResourceCleaner {
     }
 }
 ```
+
+<SourceRef project="reference-types-deep-dive" file="02/ResourceCleaner.java" region="example" variant="button">
+  Xem ResourceCleaner.java cùng các ví dụ khác
+</SourceRef>
 
 > [!TIP]
 > JDK 9+ cung cấp `java.lang.ref.Cleaner` — chính xác pattern trên nhưng đóng gói sẵn. Thay thế `finalize()` (deprecated JDK 9). `DirectByteBuffer` dùng Cleaner để free native memory khi buffer bị GC.
@@ -341,7 +361,7 @@ Vấn đề:
 
 ### 9.2. Cleaner (JDK 9+) — thay thế finalize
 
-```java
+```java source="reference-types-deep-dive/03/MyResource.java"
 public class MyResource implements AutoCloseable {
     private static final Cleaner cleaner = Cleaner.create();
     private final Cleaner.Cleanable cleanable;
@@ -368,6 +388,10 @@ public class MyResource implements AutoCloseable {
 }
 ```
 
+<SourceRef project="reference-types-deep-dive" file="03/MyResource.java" region="example" variant="button">
+  Xem MyResource.java cùng các ví dụ khác
+</SourceRef>
+
 > [!WARNING]
 > Cleaner action **KHÔNG ĐƯỢC** reference object gốc (trực tiếp hoặc gián tiếp). Nếu reference → object không bao giờ phantom reachable → Cleaner không bao giờ chạy → **memory leak**. Dùng static inner class, capture chỉ primitive/ptr cần cleanup.
 
@@ -388,14 +412,18 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 }
 ```
 
-```
-Thread.threadLocals (ThreadLocalMap):
-┌──────────────────────┬────────────────┐
-│ Key (WeakRef → TL)   │ Value (Strong) │
-├──────────────────────┼────────────────┤
-│ WeakRef → threadLocal│ → MyObject     │ ← strong ref giữ value sống
-│ null (TL đã bị GC)   │ → MyObject     │ ← LEAK! key=null nhưng value vẫn sống
-└──────────────────────┴────────────────┘
+```d2 title="10. ThreadLocal memory leak — WeakReference bẫy"
+direction: right
+map: "Thread.threadLocals (ThreadLocalMap)" {
+  live: "Entry: key = WeakRef(ThreadLocal)"
+  stale: "Entry: key = null (TL đã GC)"
+}
+tl: ThreadLocal
+v1: "MyObject: value sống nhờ strong ref"
+v2: "MyObject: LEAK, key=null nhưng value sống"
+map.live -> tl: weak { style.stroke-dash: 3 }
+map.live -> v1: strong
+map.stale -> v2: strong
 ```
 
 **Leak scenario:**
@@ -429,13 +457,19 @@ try {
 | Native resource cleanup (backup cho close()) | **Phantom** + Cleaner | Post-mortem, non-resurrectible |
 | ClassLoader metadata tracking | **Weak** | Loader unload → metadata GC |
 
-```mermaid
-flowchart TD
-    A["Cần giữ object sống?"] -->|có| B["Strong reference"]
-    A -->|"không — muốn GC tự quản"| C{"Khi nào nên GC?"}
-    C -->|"chỉ khi sắp OOM"| D["SoftReference<br/>(cache)"]
-    C -->|"bất kỳ GC nào"| E["WeakReference<br/>(metadata, listener)"]
-    C -->|"object đã chết,<br/>cần cleanup"| F["PhantomReference<br/>(resource cleanup)"]
+```d2 title="11. So sánh & decision matrix"
+direction: down
+n_A: "Cần giữ object sống?"
+n_B: "Strong reference"
+n_C: "Khi nào nên GC?" { shape: diamond }
+n_D: "SoftReference\n(cache)"
+n_E: "WeakReference\n(metadata, listener)"
+n_F: "PhantomReference\n(resource cleanup)"
+n_A -> n_B: "có"
+n_A -> n_C: "không — muốn GC tự quản"
+n_C -> n_D: "chỉ khi sắp OOM"
+n_C -> n_E: "bất kỳ GC nào"
+n_C -> n_F: "object đã chết,\ncần cleanup"
 ```
 
 ---

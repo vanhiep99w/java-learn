@@ -5,6 +5,9 @@ description: "Mổ xẻ Reflection API: Method lookup & invoke, accessor inflati
 
 Reflection cho phép chương trình khám phá và thao tác với class, method, field hoặc constructor tại runtime. Dynamic proxy dùng thông tin đó để chặn lời gọi và bổ sung hành vi mà không sửa trực tiếp class gọi.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -31,7 +34,7 @@ JDK dynamic proxy hoạt động trên interface; các giải pháp dựa trên 
 
 ## 2. Reflection cơ bản — Class, Method, Field dưới hood
 
-```java
+```java source="reflection-dynamic-proxy-deep-dive/01/ReflectionLookup.java"
 // Class object — metadata của mỗi class trong JVM
 Class<?> clazz = MyEntity.class;  // hoặc obj.getClass(), Class.forName(...)
 
@@ -45,6 +48,10 @@ Field f = clazz.getDeclaredField("name");
 // Constructor
 Constructor<?> ctor = clazz.getDeclaredConstructor();
 ```
+
+<SourceRef project="reflection-dynamic-proxy-deep-dive" file="01/ReflectionLookup.java" region="example" variant="button">
+  Xem ReflectionLookup.java cùng các ví dụ khác
+</SourceRef>
 
 **Bên trong `getDeclaredMethod()`:**
 
@@ -97,7 +104,7 @@ Generate bytecode tốn ~1ms (define class + verify + link). Nếu method chỉ 
 
 ### 4.2. Inflation threshold
 
-```java
+```java source="reflection-dynamic-proxy-deep-dive/02/MethodAccessorImpl.java"
 // sun.reflect.ReflectionFactory:
 private static int inflationThreshold = 15;  // -Dsun.reflect.inflationThreshold=15
 
@@ -111,6 +118,10 @@ public Object invoke(Object obj, Object[] args) {
     return invoke0(method, obj, args);  // native call
 }
 ```
+
+<SourceRef project="reflection-dynamic-proxy-deep-dive" file="02/MethodAccessorImpl.java" region="example" variant="button">
+  Xem MethodAccessorImpl.java cùng các ví dụ khác
+</SourceRef>
 
 ### 4.3. Generated accessor bytecode
 
@@ -225,7 +236,7 @@ public interface InvocationHandler {
 }
 ```
 
-```java
+```java source="reflection-dynamic-proxy-deep-dive/03/LoggingHandler.java"
 public class LoggingHandler implements InvocationHandler {
     private final Object target;   // real object
 
@@ -248,6 +259,10 @@ public class LoggingHandler implements InvocationHandler {
     }
 }
 ```
+
+<SourceRef project="reflection-dynamic-proxy-deep-dive" file="03/LoggingHandler.java" region="example" variant="button">
+  Xem LoggingHandler.java cùng các ví dụ khác
+</SourceRef>
 
 > [!TIP]
 > `InvocationHandler.invoke()` nhận **Method object** → biết chính xác method nào được gọi. Có thể dispatch khác nhau theo method name, annotation, return type... Đây là nền tảng của AOP (Aspect-Oriented Programming).
@@ -360,7 +375,7 @@ user.getName();  // → proxy handler: query DB lần đầu, cache, delegate
 | Dependency | JDK built-in | Thư viện ngoài (cglib / ByteBuddy) |
 | Spring default | Khi bean có interface | Khi bean không có interface (hoặc `proxyTargetClass=true`) |
 
-```java
+```java source="reflection-dynamic-proxy-deep-dive/04/CglibProxyDemo.java"
 // CGLIB proxy (Spring AOP khi không có interface):
 Enhancer enhancer = new Enhancer();
 enhancer.setSuperclass(UserServiceImpl.class);  // subclass, không cần interface
@@ -372,6 +387,10 @@ enhancer.setCallback((MethodInterceptor) (obj, method, args, proxy) -> {
 });
 UserServiceImpl proxy = (UserServiceImpl) enhancer.create();
 ```
+
+<SourceRef project="reflection-dynamic-proxy-deep-dive" file="04/CglibProxyDemo.java" region="example" variant="button">
+  Xem CglibProxyDemo.java cùng các ví dụ khác
+</SourceRef>
 
 > [!NOTE]
 > Spring Boot 2.0+ default dùng **CGLIB** (`proxyTargetClass=true`) kể cả khi bean có interface. Lý do: tránh bug khi inject concrete class mà proxy chỉ implement interface. JDK Proxy vẫn dùng được nhưng phải opt-in.

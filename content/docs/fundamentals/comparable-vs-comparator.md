@@ -85,12 +85,17 @@ Bug ở mục 1 vi phạm tính chất **1** (đối xứng): `compare(a,b)` và
 
 Khi comparator **không** nhất quán, các bất biến này bị phá: TimSort tính toán ranh giới merge dựa trên giả định "nếu a≤b và b≤c thì a≤c". Nếu giả định sai, nó có thể truy cập **ngoài biên mảng** hoặc rơi vào trạng thái vô lý. Từ JDK 7, TimSort **chủ động kiểm tra** và ném `IllegalArgumentException: Comparison method violates its general contract!` thay vì im lặng cho kết quả sai hoặc `ArrayIndexOutOfBoundsException`.
 
-```mermaid
-flowchart TD
-    A["sort gọi compare(...) nhiều lần"] --> B{"kết quả nhất quán<br/>(total order)?"}
-    B -->|có| C["merge run đúng → sorted"]
-    B -->|không| D["bất biến TimSort vỡ"]
-    D --> E["ném IllegalArgumentException<br/>'violates general contract'"]
+```d2 title="4. Vì sao TimSort phát hiện được vi phạm"
+direction: down
+n_A: "sort gọi compare(...) nhiều lần"
+n_B: "kết quả nhất quán\n(total order)?" { shape: diamond }
+n_C: "merge run đúng → sorted"
+n_D: "bất biến TimSort vỡ"
+n_E: "ném IllegalArgumentException\n'violates general contract'"
+n_A -> n_B
+n_B -> n_C: "có"
+n_B -> n_D: "không"
+n_D -> n_E
 ```
 
 > [!WARNING]
@@ -212,12 +217,16 @@ Comparator.comparing(Employee::department)
 
 ## 9. Comparable hay Comparator — chọn cái nào
 
-```mermaid
-flowchart TD
-    A{"Có một thứ tự<br/>'tự nhiên' duy nhất?"} -->|có, vd tiền, ngày| B["implements Comparable<br/>(natural ordering)"]
-    A -->|"nhiều thứ tự / tùy ngữ cảnh"| C["Comparator bên ngoài"]
-    A -->|"không sửa được class<br/>(class thư viện)"| C
-    B --> D["+ vẫn dùng Comparator khi cần thứ tự khác"]
+```d2 title="9. Comparable hay Comparator — chọn cái nào"
+direction: down
+n_A: "Có một thứ tự\n'tự nhiên' duy nhất?" { shape: diamond }
+n_B: "implements Comparable\n(natural ordering)"
+n_C: "Comparator bên ngoài"
+n_D: "+ vẫn dùng Comparator khi cần thứ tự\nkhác"
+n_A -> n_B: "có, vd tiền, ngày"
+n_A -> n_C: "nhiều thứ tự / tùy ngữ cảnh"
+n_A -> n_C: "không sửa được class\n(class thư viện)"
+n_B -> n_D
 ```
 
 | Dùng `Comparable` khi | Dùng `Comparator` khi |

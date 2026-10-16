@@ -44,18 +44,24 @@ private transient volatile int sizeCtl;            // control: -1 = init, -N = r
 private transient volatile CounterCell[] counterCells; // distributed counter
 ```
 
-```
-JDK 7:  16 Segment locks (cố định)
-         ┌─────┬─────┬─────┬─────┐
-         │Seg 0│Seg 1│...  │Seg15│   ← mỗi segment có lock riêng
-         └──┬──┴──┬──┴─────┴──┬──┘
-            │     │           │
-           [bins][bins]     [bins]
-
-JDK 8+: N bin locks (N = table.length, scale theo size)
-         ┌──┬──┬──┬──┬──┬──┬──┬──┐
-         │b0│b1│b2│b3│b4│b5│b6│b7│...   ← lock trên head node của từng bin
-         └──┴──┴──┴──┴──┴──┴──┴──┘
+```d2 title="2. Kiến trúc JDK 8+ — từ Segment sang per-bin lock"
+direction: right
+jdk7: "JDK 7: 16 Segment locks cố định" {
+  s0: "Segment 0: lock riêng"
+  s1: "Segment 1: lock riêng"
+  sn: "... Segment 15: lock riêng"
+  b0: bins
+  b1: bins
+  bn: bins
+  s0 -> b0
+  s1 -> b1
+  sn -> bn
+}
+jdk8: "JDK 8+: N = table.length, scale theo size" {
+  b0: "bin 0: lock trên head node"
+  b1: "bin 1: lock trên head node"
+  bn: "... bin N-1: lock trên head node"
+}
 ```
 
 > [!NOTE]
@@ -167,21 +173,35 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 }
 ```
 
-```mermaid
-flowchart TD
-    A["putVal(key, value)"] --> B{"table == null?"}
-    B -->|có| C["initTable() via CAS"]
-    B -->|không| D{"bin[i] == null?"}
-    D -->|có| E["CAS đặt Node mới — no lock"]
-    D -->|không| F{"bin[i].hash == MOVED?"}
-    F -->|có| G["helpTransfer() — giúp resize"]
-    F -->|không| H["synchronized(head node)"]
-    H --> I{"linked list hay tree?"}
-    I -->|list| J["duyệt list, thêm/cập nhật"]
-    I -->|tree| K["putTreeVal()"]
-    J --> L{"binCount >= 8?"}
-    L -->|có| M["treeifyBin()"]
-    L -->|không| N["addCount — update size"]
+```d2 title="4. put() internals — CAS + synchronized + treeify"
+direction: down
+n_A: "putVal(key, value)"
+n_B: "table == null?" { shape: diamond }
+n_C: "initTable() via CAS"
+n_D: "bin[i] == null?" { shape: diamond }
+n_E: "CAS đặt Node mới — no lock"
+n_F: "bin[i].hash == MOVED?" { shape: diamond }
+n_G: "helpTransfer() — giúp resize"
+n_H: "synchronized(head node)"
+n_I: "linked list hay tree?" { shape: diamond }
+n_J: "duyệt list, thêm/cập nhật"
+n_K: "putTreeVal()"
+n_L: "binCount >= 8?" { shape: diamond }
+n_M: "treeifyBin()"
+n_N: "addCount — update size"
+n_A -> n_B
+n_B -> n_C: "có"
+n_B -> n_D: "không"
+n_D -> n_E: "có"
+n_D -> n_F: "không"
+n_F -> n_G: "có"
+n_F -> n_H: "không"
+n_H -> n_I
+n_I -> n_J: "list"
+n_I -> n_K: "tree"
+n_J -> n_L
+n_L -> n_M: "có"
+n_L -> n_N: "không"
 ```
 
 > [!TIP]

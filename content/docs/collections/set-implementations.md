@@ -37,14 +37,23 @@ Bí mật lớn nhất của package `java.util`: `HashSet`, `LinkedHashSet`, `T
 | `LinkedHashSet` | `LinkedHashMap` | HashMap + doubly-linked list |
 | `TreeSet` | `TreeMap` | Red-Black Tree |
 
-```mermaid
-flowchart TD
-    HS[HashSet] --> HM[HashMap]
-    LHS[LinkedHashSet] --> LHM[LinkedHashMap]
-    TS[TreeSet] --> TM[TreeMap]
-    HM --> A["bucket array + chaining/treeify"]
-    LHM --> B["HashMap + doubly-linked theo thứ tự chèn"]
-    TM --> C["Red-Black Tree (sorted)"]
+```d2 title="2. Sự thật: Set chỉ là Map đội lốt"
+direction: down
+n_HS: "HashSet"
+n_HM: "HashMap"
+n_LHS: "LinkedHashSet"
+n_LHM: "LinkedHashMap"
+n_TS: "TreeSet"
+n_TM: "TreeMap"
+n_A: "bucket array + chaining/treeify"
+n_B: "HashMap + doubly-linked theo thứ tự\nchèn"
+n_C: "Red-Black Tree (sorted)"
+n_HS -> n_HM
+n_LHS -> n_LHM
+n_TS -> n_TM
+n_HM -> n_A
+n_LHM -> n_B
+n_TM -> n_C
 ```
 
 > [!NOTE]
@@ -89,10 +98,21 @@ HashSet {"a", "b"}  thực chất là  HashMap { "a"→PRESENT, "b"→PRESENT }
 
 `LinkedHashSet` extends `HashSet` nhưng backing bằng `LinkedHashMap`. `LinkedHashMap` = `HashMap` + một **doubly-linked list** xuyên qua mọi entry theo **thứ tự chèn** (insertion order):
 
-```
-HashMap buckets (định vị O(1))         doubly-linked list (thứ tự duyệt)
-  bucket[3] → "b"                        head → "a" ⇄ "b" ⇄ "c" → tail
-  bucket[7] → "a", "c"                   (đúng thứ tự đã add)
+```d2 title="4. LinkedHashSet — thêm doubly-linked giữ thứ tự chèn"
+direction: right
+b3: "bucket[3]"
+b7: "bucket[7]"
+a: "a"
+b: "b"
+c: "c"
+head: "head"
+tail: "tail"
+b3 -> b: "định vị O(1)"
+b7 -> a
+b7 -> c
+head -> a
+a <-> b <-> c: "thứ tự chèn"
+c -> tail
 ```
 
 - Mỗi entry có thêm 2 con trỏ `before`/`after` nối theo thứ tự chèn.
@@ -145,14 +165,21 @@ new HashSet<>(...).add(u1); add(u2);   // u1.equals(u2)? → quyết định tr�
 new TreeSet<>(byScore).add(u1); add(u2); // compare(u1,u2)==0? → quyết định trùng
 ```
 
-```mermaid
-flowchart TD
-    A["set.add(x)"] --> B{Set loại nào?}
-    B -->|HashSet/LinkedHashSet| C["dùng hashCode + equals"]
-    B -->|TreeSet| D["dùng compareTo / Comparator"]
-    D --> E{"compare(x, existing) == 0?"}
-    E -->|có| F["coi là TRÙNG → không thêm"]
-    E -->|không| G["chèn vào cây"]
+```d2 title="6. TreeSet dùng compareTo, KHÔNG dùng equals"
+direction: down
+n_A: "set.add(x)"
+n_B: "Set loại nào?" { shape: diamond }
+n_C: "dùng hashCode + equals"
+n_D: "dùng compareTo / Comparator"
+n_E: "compare(x, existing) == 0?" { shape: diamond }
+n_F: "coi là TRÙNG → không thêm"
+n_G: "chèn vào cây"
+n_A -> n_B
+n_B -> n_C: "HashSet/LinkedHashSet"
+n_B -> n_D: "TreeSet"
+n_D -> n_E
+n_E -> n_F: "có"
+n_E -> n_G: "không"
 ```
 
 > [!IMPORTANT]
@@ -205,11 +232,15 @@ Mọi thao tác này là **O(log n)** (đi xuống cây). Đây là lý do chọ
 
 ## 9. Chọn Set nào & tuning
 
-```mermaid
-flowchart TD
-    A{"Cần thứ tự?"} -->|"không quan tâm"| H["HashSet (nhanh nhất)"]
-    A -->|"giữ thứ tự CHÈN"| L["LinkedHashSet"]
-    A -->|"luôn SẮP XẾP / truy vấn dải"| T["TreeSet"]
+```d2 title="9. Chọn Set nào & tuning"
+direction: down
+n_A: "Cần thứ tự?" { shape: diamond }
+n_H: "HashSet (nhanh nhất)"
+n_L: "LinkedHashSet"
+n_T: "TreeSet"
+n_A -> n_H: "không quan tâm"
+n_A -> n_L: "giữ thứ tự CHÈN"
+n_A -> n_T: "luôn SẮP XẾP / truy vấn dải"
 ```
 
 | Cần | Chọn |

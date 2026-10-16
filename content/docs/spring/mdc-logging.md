@@ -8,6 +8,9 @@ description: "Hiểu MDC của SLF4J/Logback, cách gắn correlation ID trong S
 > [!IMPORTANT]
 > MDC thường dựa trên `ThreadLocal`. Nó rất tiện cho request đồng bộ, nhưng **không tự đi qua thread khác**. Mọi ứng dụng dùng `@Async`, `CompletableFuture`, executor, message listener hoặc WebFlux phải thiết kế propagation và cleanup rõ ràng.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. MDC giải quyết vấn đề gì?](#1-mdc-giải-quyết-vấn-đề-gì)
@@ -92,14 +95,19 @@ try (MDC.MDCCloseable ignored = MDC.putCloseable("orderId", orderId.toString()))
 
 Với adapter MDC phổ biến của Logback, mỗi thread có context map riêng. Điều này phù hợp Servlet request đồng bộ: một request xử lý chủ yếu trên một Tomcat worker thread.
 
-```text
-Tomcat worker-17:
-  MDC = { requestId=67f2, tenantId=acme }
-  └── Controller → Service → Repository cùng thấy context này
-
-Tomcat worker-21:
-  MDC = { requestId=901c, tenantId=globex }
-  └── context hoàn toàn khác
+```d2 title="2.2. Vì sao ThreadLocal vừa hữu ích vừa nguy hiểm"
+direction: right
+w17: "Tomcat worker-17" {
+  mdc: "MDC: requestId=67f2, tenantId=acme"
+  controller: Controller
+  service: Service
+  repo: Repository
+  controller -> service -> repo: "cùng context"
+  mdc -> controller
+}
+w21: "Tomcat worker-21" {
+  mdc: "MDC: requestId=901c, tenantId=globex\ncontext hoàn toàn khác"
+}
 ```
 
 Nhưng thread trong server là **thread pool**: khi request kết thúc, worker thread không biến mất mà được tái sử dụng. Nếu không clear MDC, request sau có thể thừa hưởng context cũ.
@@ -185,7 +193,7 @@ Nhiều log platform ưu tiên JSON thay vì pattern text. Khi đó MDC field n�
 
 Correlation ID cần tồn tại từ đầu request, bao gồm Spring Security, request bị reject trước controller và error handling. Vì vậy `OncePerRequestFilter` là điểm đặt phù hợp hơn HandlerInterceptor.
 
-```java
+```java source="mdc-logging/01/CorrelationIdFilter.java"
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class CorrelationIdFilter extends OncePerRequestFilter {
@@ -221,6 +229,10 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 }
 ```
 
+<SourceRef project="mdc-logging" file="01/CorrelationIdFilter.java" region="example" variant="button">
+  Xem CorrelationIdFilter.java cùng các ví dụ khác
+</SourceRef>
+
 Filter làm bốn việc:
 
 1. Lấy ID từ header inbound nếu format hợp lệ, hoặc sinh UUID mới.
@@ -248,7 +260,7 @@ Chi tiết về Servlet filter order và DispatcherServlet ở các bài liên q
 
 Filter phù hợp cho context cấp toàn bộ request. `HandlerInterceptor` phù hợp khi context chỉ biết được sau khi Spring MVC đã chọn handler, ví dụ endpoint name hoặc annotation business.
 
-```java
+```java source="mdc-logging/02/EndpointMdcInterceptor.java"
 @Component
 public class EndpointMdcInterceptor implements HandlerInterceptor {
 
@@ -277,9 +289,13 @@ public class EndpointMdcInterceptor implements HandlerInterceptor {
 }
 ```
 
+<SourceRef project="mdc-logging" file="02/EndpointMdcInterceptor.java" region="example" variant="button">
+  Xem EndpointMdcInterceptor.java cùng các ví dụ khác
+</SourceRef>
+
 Đăng ký explicit:
 
-```java
+```java source="mdc-logging/03/MvcConfig.java"
 @Configuration
 class MvcConfig implements WebMvcConfigurer {
     private final EndpointMdcInterceptor interceptor;
@@ -297,6 +313,10 @@ class MvcConfig implements WebMvcConfigurer {
 }
 ```
 
+<SourceRef project="mdc-logging" file="03/MvcConfig.java" region="example" variant="button">
+  Xem MvcConfig.java cùng các ví dụ khác
+</SourceRef>
+
 Hạn chế của interceptor:
 
 - Không tạo MDC cho log trước `DispatcherServlet`, gồm một phần Spring Security.
@@ -313,7 +333,7 @@ Vì vậy mô hình phổ biến là: **Filter tạo `requestId`/trace context; 
 
 `TaskDecorator` chụp context tại lúc submit, set context trước khi chạy task và khôi phục context cũ trong `finally`:
 
-```java
+```java source="mdc-logging/04/MdcTaskDecorator.java"
 public class MdcTaskDecorator implements TaskDecorator {
 
     @Override
@@ -341,9 +361,13 @@ public class MdcTaskDecorator implements TaskDecorator {
 }
 ```
 
+<SourceRef project="mdc-logging" file="04/MdcTaskDecorator.java" region="example" variant="button">
+  Xem MdcTaskDecorator.java cùng các ví dụ khác
+</SourceRef>
+
 Cấu hình executor riêng:
 
-```java
+```java source="mdc-logging/05/AsyncConfig.java"
 @Configuration
 @EnableAsync
 class AsyncConfig {
@@ -361,6 +385,10 @@ class AsyncConfig {
     }
 }
 ```
+
+<SourceRef project="mdc-logging" file="05/AsyncConfig.java" region="example" variant="button">
+  Xem AsyncConfig.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 @Service
@@ -477,7 +505,7 @@ WebFlux là reactive stack. Một request có thể chạy trên nhiều thread;
 
 Dùng `WebFilter` để đặt ID vào Reactor `Context`:
 
-```java
+```java source="mdc-logging/06/CorrelationWebFilter.java"
 @Component
 class CorrelationWebFilter implements WebFilter {
 
@@ -491,6 +519,10 @@ class CorrelationWebFilter implements WebFilter {
     }
 }
 ```
+
+<SourceRef project="mdc-logging" file="06/CorrelationWebFilter.java" region="example" variant="button">
+  Xem CorrelationWebFilter.java cùng các ví dụ khác
+</SourceRef>
 
 Đọc context trong reactive chain:
 
@@ -516,13 +548,15 @@ WebFlux:     Reactor Context là source of truth; MDC chỉ là projection tạm
 
 MDC correlation ID là logging context; distributed tracing là mô hình quan sát đầy đủ hơn với trace, span, timing và propagation protocol.
 
-```text
-HTTP request
-  traceId=4bf92f...    ← cùng trên nhiều service
-  spanId=a1b2...       ← operation ở gateway
-      │
-      ├── HTTP call → service B, spanId=c3d4...
-      └── Kafka event → consumer spanId=e5f6...
+```d2 title="10. MDC, tracing và OpenTelemetry"
+direction: right
+request: "HTTP request: traceId=4bf92f..."
+gateway: "Gateway: spanId=a1b2..."
+b: "HTTP call: service B, spanId=c3d4..."
+kafka: "Kafka event: consumer, spanId=e5f6..."
+request -> gateway
+gateway -> b: "cùng traceId"
+gateway -> kafka: "cùng traceId"
 ```
 
 Khi có Micrometer Tracing/OpenTelemetry, library thường:
@@ -548,7 +582,7 @@ Vì vậy không nên tự sinh một `traceId` khác trong filter nếu tracing
 
 Test filter để đảm bảo response echo ID và context được dọn sau request. Không nên assert format log text nếu có thể assert MDC/property trực tiếp.
 
-```java
+```java source="mdc-logging/07/CorrelationIdFilterTest.java"
 @WebMvcTest(OrderController.class)
 @Import(CorrelationIdFilter.class)
 class CorrelationIdFilterTest {
@@ -570,6 +604,10 @@ class CorrelationIdFilterTest {
     }
 }
 ```
+
+<SourceRef project="mdc-logging" file="07/CorrelationIdFilterTest.java" region="example" variant="button">
+  Xem CorrelationIdFilterTest.java cùng các ví dụ khác
+</SourceRef>
 
 Test `TaskDecorator` theo hai điều kiện:
 

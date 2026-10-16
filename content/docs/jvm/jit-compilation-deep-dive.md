@@ -59,14 +59,19 @@ interface Shape { double area(); }
 
 ## 3. Tiered Compilation — 5 level từ interpreter đến C2 optimized
 
-```mermaid
-flowchart LR
-    I["Level 0<br/>Interpreter<br/>(profiling)"] --> C1S["Level 1<br/>C1 simple<br/>(no profiling)"]
-    I --> C1P["Level 2<br/>C1 limited profile"]
-    I --> C1F["Level 3<br/>C1 full profile"]
-    C1F --> C2["Level 4<br/>C2 optimized<br/>(peak performance)"]
-    C1S -.->|trivial methods| C1S
-    C1P -.->|C2 queue full| C1P
+```d2 title="3. Tiered Compilation — 5 level từ interpreter đến C2 optimized"
+direction: right
+n_I: "Level 0\nInterpreter\n(profiling)"
+n_C1S: "Level 1\nC1 simple\n(no profiling)"
+n_C1P: "Level 2\nC1 limited profile"
+n_C1F: "Level 3\nC1 full profile"
+n_C2: "Level 4\nC2 optimized\n(peak performance)"
+n_I -> n_C1S
+n_I -> n_C1P
+n_I -> n_C1F
+n_C1F -> n_C2
+n_C1S -> n_C1S: "trivial methods" { style.stroke-dash: 3 }
+n_C1P -> n_C1P: "C2 queue full" { style.stroke-dash: 3 }
 ```
 
 | Level | Compiler | Profiling | Use case |

@@ -76,12 +76,17 @@ public enum Config {
 > [!WARNING]
 > Singleton thường (`private constructor`) vẫn bị **phá** bởi: (1) reflection `setAccessible(true)` gọi constructor lần hai, (2) deserialization tạo instance mới, (3) nhiều classloader. **Enum singleton** (Effective Java Item 3) miễn nhiễm cả ba — JVM đảm bảo enum constant là duy nhất, reflection cấm tạo enum, serialization xử lý enum đặc biệt. Đây là cách Joshua Bloch khuyên dùng.
 
-```mermaid
-flowchart TD
-    Need{"Cần lazy?"} -->|không| Enum["enum INSTANCE (an toàn nhất)"]
-    Need -->|có| Lazy{"Đơn giản?"}
-    Lazy -->|có| Holder["Holder idiom"]
-    Lazy -->|cần kiểm soát chi tiết| DCL["double-checked + volatile"]
+```d2 title="2.3. Enum — chống cả reflection & serialization"
+direction: down
+n_Need: "Cần lazy?" { shape: diamond }
+n_Enum: "enum INSTANCE (an toàn nhất)"
+n_Lazy: "Đơn giản?" { shape: diamond }
+n_Holder: "Holder idiom"
+n_DCL: "double-checked + volatile"
+n_Need -> n_Enum: "không"
+n_Need -> n_Lazy: "có"
+n_Lazy -> n_Holder: "có"
+n_Lazy -> n_DCL: "cần kiểm soát chi tiết"
 ```
 
 > [!NOTE]
@@ -136,11 +141,15 @@ class MacFactory implements GUIFactory {
 // Client chỉ chọn factory 1 lần, mọi widget tạo ra đều ĐỒNG BỘ theo OS
 ```
 
-```mermaid
-flowchart LR
-    Client --> GF["GUIFactory"]
-    GF -.-> WF["WindowsFactory → WindowsButton + WindowsCheckbox"]
-    GF -.-> MF["MacFactory → MacButton + MacCheckbox"]
+```d2 title="4. Abstract Factory"
+direction: right
+n_Client: "Client"
+n_GF: "GUIFactory"
+n_WF: "WindowsFactory → WindowsButton +\nWindowsCheckbox"
+n_MF: "MacFactory → MacButton + MacCheckbox"
+n_Client -> n_GF
+n_GF -> n_WF { style.stroke-dash: 3 }
+n_GF -> n_MF { style.stroke-dash: 3 }
 ```
 
 > [!NOTE]
@@ -236,15 +245,23 @@ class Order implements Cloneable {
 | Builder | xây object nhiều tham số / bất biến | fluent + build() |
 | Prototype | sao chép object có sẵn | clone / copy constructor |
 
-```mermaid
-flowchart TD
-    Q1{"Cần đúng 1 instance?"} -->|có| S["Singleton (ưu tiên enum / Spring bean)"]
-    Q1 -->|không| Q2{"Object nhiều tham số / cần immutable?"}
-    Q2 -->|có| B["Builder (hoặc record nếu đơn giản)"]
-    Q2 -->|không| Q3{"Cần ẩn lớp cụ thể?"}
-    Q3 -->|1 sản phẩm| FM["Factory Method"]
-    Q3 -->|cả họ sản phẩm| AF["Abstract Factory"]
-    Q3 -->|sao chép có sẵn| P["Prototype / copy constructor"]
+```d2 title="8. So sánh & khi nào dùng cái nào"
+direction: down
+n_Q1: "Cần đúng 1 instance?" { shape: diamond }
+n_S: "Singleton (ưu tiên enum / Spring bean)"
+n_Q2: "Object nhiều tham số / cần immutable?" { shape: diamond }
+n_B: "Builder (hoặc record nếu đơn giản)"
+n_Q3: "Cần ẩn lớp cụ thể?" { shape: diamond }
+n_FM: "Factory Method"
+n_AF: "Abstract Factory"
+n_P: "Prototype / copy constructor"
+n_Q1 -> n_S: "có"
+n_Q1 -> n_Q2: "không"
+n_Q2 -> n_B: "có"
+n_Q2 -> n_Q3: "không"
+n_Q3 -> n_FM: "1 sản phẩm"
+n_Q3 -> n_AF: "cả họ sản phẩm"
+n_Q3 -> n_P: "sao chép có sẵn"
 ```
 
 ---

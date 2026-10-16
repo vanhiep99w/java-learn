@@ -115,20 +115,17 @@ void createMap(Thread t, T firstValue) {
 
 Hệ quả của thiết kế đảo ngược:
 
-```
-┌──────────────────┐         ┌──────────────────────────────────┐
-│ Thread-1         │         │ Thread-1.threadLocals            │
-│  threadLocals ───┼────────▶│ (ThreadLocalMap)                 │
-└──────────────────┘         │  [tenantTL → "acme"]             │
-                             │  [userTL   → User(42)]           │
-┌──────────────────┐         └──────────────────────────────────┘
-│ Thread-2         │         ┌──────────────────────────────────┐
-│  threadLocals ───┼────────▶│ Thread-2.threadLocals            │
-└──────────────────┘         │  [tenantTL → "globex"]           │
-                             └──────────────────────────────────┘
-        ▲                              ▲
-        │                              │
-   cùng 1 object `tenantTL` (ThreadLocal) làm KEY trong cả 2 map
+```d2 title="3. Đảo ngược quyền sở hữu — map nằm trong Thread, không nằm trong ThreadLocal"
+direction: right
+t1: "Thread 1"
+t2: "Thread 2"
+m1: "Thread-1.threadLocals\ntenantTL → acme\nuserTL → User(42)"
+m2: "Thread-2.threadLocals\ntenantTL → globex"
+key: "Cùng một object tenantTL (ThreadLocal)\nlàm KEY trong cả hai map"
+t1 -> m1: threadLocals
+t2 -> m2: threadLocals
+key -> m1: key
+key -> m2: key
 ```
 
 > [!IMPORTANT]
@@ -199,23 +196,34 @@ Nghĩa là trong mỗi `Entry`:
 
 **Vì sao key phải yếu?** Hãy tưởng tượng key là strong reference. Chuỗi giữ sống sẽ là:
 
-```
-Thread (sống mãi nếu trong pool)
-  └─▶ threadLocals (ThreadLocalMap)
-        └─▶ Entry
-              └─▶ key = ThreadLocal  (strong)
+```d2 title="5. Entry extends WeakReference — vì sao key yếu, value mạnh"
+direction: right
+thread: "Thread (sống mãi nếu trong pool)"
+map: "ThreadLocalMap"
+entry: "Entry"
+key: "ThreadLocal: key strong (mô hình giả\nđịnh)"
+thread -> map: threadLocals
+map -> entry
+entry -> key: strong
 ```
 
 Khi biến `ThreadLocal` của bạn ra khỏi scope (ví dụ là field của một object đã chết, hoặc ClassLoader bị unload), lẽ ra nó nên được GC. Nhưng nếu key là strong, `Thread` (sống mãi) sẽ giữ `ThreadLocal` sống mãi theo → **leak chính object ThreadLocal**. Dùng **weak reference cho key** cho phép GC thu hồi `ThreadLocal` ngay khi không còn ai dùng, dù `Thread` vẫn sống.
 
 Chuỗi tham chiếu thực tế (chú ý đường nét đứt là weak):
 
-```
-Stack/biến static ──(strong)──▶ ThreadLocal  ◀┄┄(weak)┄┄ Entry.key
-                                                            │
-Thread ──(strong)──▶ ThreadLocalMap ──(strong)──▶ Entry ────┘
-                                                            │
-                                          Entry.value ──(strong)──▶ Object (value)
+```d2 title="5. Entry extends WeakReference — vì sao key yếu, value mạnh"
+direction: right
+root: "Stack / biến static"
+tl: "ThreadLocal"
+thread: "Thread"
+map: "ThreadLocalMap"
+entry: "Entry"
+value: "Object (value)"
+root -> tl: strong
+thread -> map: strong
+map -> entry: strong
+entry -> tl: weak { style.stroke-dash: 3 }
+entry -> value: strong
 ```
 
 > [!WARNING]
@@ -298,19 +306,30 @@ private void set(ThreadLocal<?> key, Object value) {
 
 Luồng `set()`:
 
-```mermaid
-flowchart TD
-    A["i = hash & (len-1)"] --> B{"tab[i] trống?"}
-    B -- "có" --> C["tab[i] = Entry mới<br/>size++"]
-    C --> D{"cleanSomeSlots()<br/>dọn được gì không?"}
-    D -- "không & size>=threshold" --> E["rehash()"]
-    D -- "có hoặc chưa đầy" --> F["xong"]
-    B -- "không" --> G{"k == key?"}
-    G -- "có" --> H["e.value = value (update)"]
-    G -- "không" --> I{"k == null<br/>(stale)?"}
-    I -- "có" --> J["replaceStaleEntry()"]
-    I -- "không" --> K["i = nextIndex(i)"]
-    K --> B
+```d2 title="7. set() chi tiết — probe, replaceStaleEntry, rehash"
+direction: down
+n_A: "i = hash & (len-1)"
+n_B: "tab[i] trống?" { shape: diamond }
+n_C: "tab[i] = Entry mới\nsize++"
+n_D: "cleanSomeSlots()\ndọn được gì không?" { shape: diamond }
+n_E: "rehash()"
+n_F: "xong"
+n_G: "k == key?" { shape: diamond }
+n_H: "e.value = value (update)"
+n_I: "k == null\n(stale)?" { shape: diamond }
+n_J: "replaceStaleEntry()"
+n_K: "i = nextIndex(i)"
+n_A -> n_B
+n_B -> n_C: "có"
+n_C -> n_D
+n_D -> n_E: "không & size>=threshold"
+n_D -> n_F: "có hoặc chưa đầy"
+n_B -> n_G: "không"
+n_G -> n_H: "có"
+n_G -> n_I: "không"
+n_I -> n_J: "có"
+n_I -> n_K: "không"
+n_K -> n_B
 ```
 
 **`cleanSomeSlots(i, n)`** — dọn rác "cơ hội": quét `log2(n)` ô (không quét toàn bộ để khỏi đắt), gặp ô stale (key=null) thì gọi `expungeStaleEntry`. Đây là cách `ThreadLocalMap` dọn dần stale entry mỗi lần ghi.
@@ -442,28 +461,33 @@ try {
 
 Ghép các mảnh ở trên lại, đây là kịch bản leak kinh điển. Điều kiện cần: **(a)** thread sống rất lâu (thread pool), **(b)** value to (vd `byte[]`, kết nối, object đồ thị lớn), **(c)** quên `remove()`.
 
-```mermaid
-sequenceDiagram
-    participant Req as Request 1
-    participant Th as Worker Thread (pool)
-    participant Map as Thread.threadLocals
-    participant GC as Garbage Collector
-
-    Req->>Th: xử lý, set(bigValue)
-    Th->>Map: Entry{key=weak(TL), value=bigValue}
-    Note over Req,Th: Request 1 kết thúc — NHƯNG quên remove()
-    Note over Th: Thread KHÔNG chết → quay lại pool
-    GC->>Map: TL không còn strong ref → clear weak key
-    Note over Map: Entry giờ là STALE: key=null, value=bigValue (vẫn strong!)
-    Note over Map: Không ai gọi get/set lên TL này nữa → expunge KHÔNG chạy
-    Note over Map: bigValue treo mãi → LEAK theo vòng đời thread pool
+```d2 title="10. Memory leak — stale entry trong thread pool"
+shape: sequence_diagram
+n_Req: "Request 1"
+n_Th: "Worker Thread (pool)"
+n_Map: "Thread.threadLocals"
+n_GC: "Garbage Collector"
+n_Req -> n_Th: "xử lý, set(bigValue)"
+n_Th -> n_Map: "Entry{key=weak(TL), value=bigValue}"
+n_Req.note1: "Request 1 / Worker Thread (pool):\nRequest 1 kết thúc — NHƯNG quên\nremove()"
+n_Th.note2: "Thread KHÔNG chết → quay lại pool"
+n_GC -> n_Map: "TL không còn strong ref → clear weak\nkey"
+n_Map.note3: "Entry giờ là STALE: key=null,\nvalue=bigValue (vẫn strong!)"
+n_Map.note4: "Không ai gọi get/set lên TL này nữa →\nexpunge KHÔNG chạy"
+n_Map.note5: "bigValue treo mãi → LEAK theo vòng đời\nthread pool"
 ```
 
 Vì sao key yếu **không cứu** được value:
 
-```
-ThreadLocal (key)  ←┄┄ weak ┄┄  Entry.key         → key bị GC, thành null ✓
-Worker Thread  ──strong──▶ ThreadLocalMap ──strong──▶ Entry ──strong──▶ value  ✗ (value KẸT)
+```d2 title="10. Memory leak — stale entry trong thread pool"
+direction: right
+thread: "Worker Thread"
+map: "ThreadLocalMap"
+entry: "Entry: key = null sau GC"
+key: "ThreadLocal (key) bị GC ✓"
+value: "value KẸT ✗"
+thread -> map -> entry -> value: strong
+entry -> key: "weak (đã clear)" { style.stroke-dash: 3 }
 ```
 
 Chuỗi `Thread → Map → Entry → value` toàn **strong reference**, mà `Thread` trong pool sống mãi → `value` không bao giờ tự do, trừ khi:
@@ -530,12 +554,11 @@ private ThreadLocalMap(ThreadLocalMap parentMap) {
 }
 ```
 
-```
-┌──────────────────────────┐   new Thread()    ┌──────────────────────────┐
-│ Parent Thread            │ ────────────────▶ │ Child Thread             │
-│ inheritableThreadLocals: │   copy lúc TẠO    │ inheritableThreadLocals: │
-│   [traceTL → "abc-123"]  │   (childValue)    │   [traceTL → "abc-123"]  │
-└──────────────────────────┘                   └──────────────────────────┘
+```d2 title="11. InheritableThreadLocal — truyền context sang thread con"
+direction: right
+parent: "Parent Thread\ninheritableThreadLocals: traceTL →\nabc-123"
+child: "Child Thread\ninheritableThreadLocals: traceTL →\nabc-123"
+parent -> child: "new Thread(): copy lúc TẠO, childValue"
 ```
 
 > [!IMPORTANT]
@@ -562,13 +585,16 @@ pool.submit(() -> {
 
 Vì sao `null`? Vì worker thread của pool được tạo **trước khi** bạn `set("trace-xyz")`. Lúc các worker đó ra đời, `trace` của thread request còn chưa có gì để kế thừa. `submit` chỉ **đẩy task** vào hàng đợi cho worker có sẵn chạy — **không tạo thread mới**, nên **không kích hoạt** cơ chế kế thừa.
 
-```
-Khởi động app:  pool tạo worker-1..4   (trace của request CHƯA tồn tại → worker kế thừa rỗng)
-                          │
-Trong request:  http-nio-1 set(trace=xyz)
-                          │  pool.submit(task)   ← chỉ ENQUEUE, không new Thread
-                          ▼
-                worker-2 chạy task → trace.get() = null  ✗
+```d2 title="12. InheritableThreadLocal + thread pool = bẫy"
+direction: right
+startup: "App khởi động: pool tạo worker-1..4"
+empty: "Worker kế thừa rỗng: trace request CHƯA\ntồn tại"
+request: "http-nio-1: set(trace=xyz)"
+submit: "pool.submit(task): chỉ ENQUEUE, không\nnew Thread"
+worker: "worker-2 chạy task\ntrace.get() = null ✗"
+startup -> empty
+request -> submit -> worker
+empty -> worker: "không kế thừa lại"
 ```
 
 > [!WARNING]

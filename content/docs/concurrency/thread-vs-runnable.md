@@ -46,28 +46,20 @@ Thread pool giải quyết 3 vấn đề:
 
 ## 3. Kiến trúc ThreadPoolExecutor — ctl, Worker, BlockingQueue
 
-```
-┌──────────────────────────────────────────────────────┐
-│                 ThreadPoolExecutor                   │
-│                                                      │
-│  ┌─────────┐    ┌────────────────────────┐           │
-│  │  ctl    │    │    BlockingQueue       │           │
-│  │ (state +│    │  ┌────┬────┬────┬───┐  │           │
-│  │  count) │    │  │task│task│task│...│  │           │
-│  └─────────┘    │  └────┴────┴────┴───┘  │           │
-│                 └─────────────┬──────────┘           │
-│                               │ poll/take            │
-│  ┌──────────────────────────┐ │                      │
-│  │       Workers (HashSet)  │◀┘                      │
-│  │  ┌────────┐ ┌────────┐   │                        │
-│  │  │Worker 0│ │Worker 1│...│   ← mỗi Worker wrap    │
-│  │  │ thread │ │ thread │   │     một Thread thật    │
-│  │  └────────┘ └────────┘   │                        │
-│  └──────────────────────────┘                        │
-│                                                      │
-│  corePoolSize / maximumPoolSize / keepAliveTime      │
-│  RejectedExecutionHandler                            │
-└──────────────────────────────────────────────────────┘
+```d2 title="3. Kiến trúc ThreadPoolExecutor — ctl, Worker, BlockingQueue"
+direction: down
+executor: ThreadPoolExecutor {
+  ctl: "ctl: state + worker count"
+  queue: "BlockingQueue: task → task → ..."
+  workers: "Workers (HashSet)" {
+    w0: "Worker 0: wrap Thread 0"
+    w1: "Worker 1: wrap Thread 1"
+    wn: "..."
+  }
+  config: "corePoolSize / maximumPoolSize\nkeepAliveTime / RejectedExecutionHandler"
+  queue -> workers.w0: "poll / take"
+  queue -> workers.w1: "poll / take"
+}
 ```
 
 Tham số constructor:
@@ -114,14 +106,19 @@ private static int ctlOf(int rs, int wc) { return rs | wc; }
 
 Transition:
 
-```mermaid
-flowchart LR
-    R[RUNNING] -->|"shutdown()"| S[SHUTDOWN]
-    R -->|"shutdownNow()"| ST[STOP]
-    S -->|"shutdownNow()"| ST
-    S -->|"queue rỗng + worker = 0"| T[TIDYING]
-    ST -->|"worker = 0"| T
-    T -->|"terminated() done"| TE[TERMINATED]
+```d2 title="4.1. Năm trạng thái run state"
+direction: right
+n_R: "RUNNING"
+n_S: "SHUTDOWN"
+n_ST: "STOP"
+n_T: "TIDYING"
+n_TE: "TERMINATED"
+n_R -> n_S: "shutdown()"
+n_R -> n_ST: "shutdownNow()"
+n_S -> n_ST: "shutdownNow()"
+n_S -> n_T: "queue rỗng + worker = 0"
+n_ST -> n_T: "worker = 0"
+n_T -> n_TE: "terminated() done"
 ```
 
 > [!NOTE]
@@ -194,19 +191,28 @@ public void execute(Runnable command) {
 }
 ```
 
-```mermaid
-flowchart TD
-    A["execute(task)"] --> B{"workerCount < corePoolSize ?"}
-    B -->|có| C["addWorker(task, core=true)"]
-    C -->|thành công| END["return — task được chạy ngay"]
-    C -->|thất bại| D
-    B -->|không| D{"queue.offer(task) ?"}
-    D -->|thành công| E["Task vào queue, đợi worker poll"]
-    D -->|thất bại: queue đầy| F{"workerCount < maxPoolSize ?"}
-    F -->|có| G["addWorker(task, core=false)"]
-    G -->|thành công| END
-    G -->|thất bại| H["reject(task)"]
-    F -->|không| H
+```d2 title="5. Flow execute() — quyết định core, queue hay reject"
+direction: down
+n_A: "execute(task)"
+n_B: "workerCount < corePoolSize ?" { shape: diamond }
+n_C: "addWorker(task, core=true)"
+n_END: "return — task được chạy ngay"
+n_D: "queue.offer(task) ?" { shape: diamond }
+n_E: "Task vào queue, đợi worker poll"
+n_F: "workerCount < maxPoolSize ?" { shape: diamond }
+n_G: "addWorker(task, core=false)"
+n_H: "reject(task)"
+n_A -> n_B
+n_B -> n_C: "có"
+n_C -> n_END: "thành công"
+n_C -> n_D: "thất bại"
+n_B -> n_D: "không"
+n_D -> n_E: "thành công"
+n_D -> n_F: "thất bại: queue đầy"
+n_F -> n_G: "có"
+n_G -> n_END: "thành công"
+n_G -> n_H: "thất bại"
+n_F -> n_H: "không"
 ```
 
 > [!IMPORTANT]
@@ -427,15 +433,19 @@ ThreadPoolExecutor pool = new ThreadPoolExecutor(
 | Dùng bởi | Phần lớn server workload | `parallelStream()`, `CompletableFuture.supplyAsync()` |
 | commonPool | Không | `ForkJoinPool.commonPool()` — shared, `CPU - 1` thread |
 
-```
-ThreadPoolExecutor:                    ForkJoinPool:
-┌──────────────────┐                   ┌──────────┐ ┌──────────┐ ┌──────────┐
-│  Shared Queue    │                   │ Worker 0 │ │ Worker 1 │ │ Worker 2 │
-│ [T1][T2][T3][T4] │                   │ [T1][T2] │ │ [T3]     │ │ []       │
-└────────┬─────────┘                   └──────────┘ └──────────┘ └─────┬────┘
-         │                                                             │
-    All workers                                            steal T3 ◀──┘
-    poll từ cùng queue
+```d2 title="12. ForkJoinPool vs ThreadPoolExecutor"
+direction: right
+executor: ThreadPoolExecutor {
+  queue: "Shared queue: T1, T2, T3, T4"
+  workers: "All workers"
+  queue -> workers: poll
+}
+forkjoin: ForkJoinPool {
+  w0: "Worker 0: deque T1, T2"
+  w1: "Worker 1: deque T3"
+  w2: "Worker 2: deque rỗng"
+  w2 -> w1: "steal T3"
+}
 ```
 
 > [!NOTE]

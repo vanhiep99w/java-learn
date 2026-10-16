@@ -85,11 +85,15 @@ ZigZag:  0→0, -1→1, 1→2, -2→3, 2→4 ...   công thức: (n << 1) ^ (n >
 → số âm nhỏ vẫn mã hoá ngắn gọn
 ```
 
-```mermaid
-flowchart LR
-    F["field_number=2, type=string"] --> T["tag byte 0x12"]
-    T --> L["length=5"]
-    L --> V["bytes: a l i c e"]
+```d2 title="3.2. ZigZag — cứu số âm"
+direction: right
+n_F: "field_number=2, type=string"
+n_T: "tag byte 0x12"
+n_L: "length=5"
+n_V: "bytes: a l i c e"
+n_F -> n_T
+n_T -> n_L
+n_L -> n_V
 ```
 
 > [!TIP]
@@ -159,11 +163,15 @@ Tính năng mạnh nhất của Avro: đọc bằng schema **khác** với schem
 - **Writer schema**: schema lúc dữ liệu được ghi.
 - **Reader schema**: schema mà ứng dụng đọc *muốn* thấy.
 
-```mermaid
-flowchart LR
-    W["Writer schema (lúc ghi)"] --> R["Avro resolution"]
-    RD["Reader schema (lúc đọc)"] --> R
-    R --> Out["dữ liệu khớp reader schema (field thiếu → default)"]
+```d2 title="6. Reader vs writer schema — schema resolution"
+direction: right
+n_W: "Writer schema (lúc ghi)"
+n_R: "Avro resolution"
+n_RD: "Reader schema (lúc đọc)"
+n_Out: "dữ liệu khớp reader schema (field\nthiếu → default)"
+n_W -> n_R
+n_RD -> n_R
+n_R -> n_Out
 ```
 
 Quy tắc resolution: khớp field **theo tên** (không theo vị trí); field reader có mà writer không → dùng `default`; field writer có mà reader không → bỏ qua. Nhờ vậy producer và consumer tiến hoá độc lập.

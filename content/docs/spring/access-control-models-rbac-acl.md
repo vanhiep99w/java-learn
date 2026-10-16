@@ -8,6 +8,9 @@ Authorization trả lời câu hỏi: **một principal đã được xác thự
 > [!NOTE]
 > Ví dụ dùng API của Spring Boot 3.x và Spring Security 6.x. Các khái niệm và phần lớn cấu hình vẫn áp dụng cho Spring Boot 4/Spring Security 7; hãy kiểm tra migration guide nếu API nhỏ thay đổi theo phiên bản.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Mental model chung](#1-mental-model-chung)
@@ -100,16 +103,25 @@ Ví dụ:
 
 Rule này không còn là RBAC thuần túy. Nó kết hợp RBAC, context và relationship. Hệ thống thực tế thường là **hybrid**, không bắt buộc chỉ dùng đúng một mô hình.
 
-```mermaid
-flowchart LR
-    S[Subject] --> PDP[Policy Decision Point]
-    A[Action] --> PDP
-    R[Resource] --> PDP
-    C[Context] --> PDP
-    REL[Relationships] --> PDP
-    P[Policies] --> PDP
-    PDP -->|ALLOW| PEPA[Thực thi action]
-    PDP -->|DENY| PEPD[Trả 403]
+```d2 title="1.2. Một quyết định authorization gồm những gì"
+direction: right
+n_S: "Subject"
+n_PDP: "Policy Decision Point"
+n_A: "Action"
+n_R: "Resource"
+n_C: "Context"
+n_REL: "Relationships"
+n_P: "Policies"
+n_PEPA: "Thực thi action"
+n_PEPD: "Trả 403"
+n_S -> n_PDP
+n_A -> n_PDP
+n_R -> n_PDP
+n_C -> n_PDP
+n_REL -> n_PDP
+n_P -> n_PDP
+n_PDP -> n_PEPA: "ALLOW"
+n_PDP -> n_PEPD: "DENY"
 ```
 
 - **PEP — Policy Enforcement Point**: nơi chặn request, ví dụ `AuthorizationFilter` hoặc method interceptor.
@@ -122,10 +134,13 @@ flowchart LR
 
 Trong DAC, **chủ sở hữu resource tự quyết định** ai được truy cập. Google Drive là ví dụ trực quan: người tạo file chia sẻ file cho user hoặc group khác.
 
-```text
-Alice sở hữu File-1
-└── Alice cấp Bob quyền READ
-    └── tùy policy, Bob có thể hoặc không thể chia sẻ tiếp
+```d2 title="2.1. DAC — Discretionary Access Control"
+direction: right
+alice: "Alice: owner"
+file: "File-1"
+bob: "Bob"
+alice -> file: owns
+alice -> bob: "cấp READ trên File-1"
 ```
 
 ACL thường là cơ chế lưu trữ để hiện thực DAC. Tuy nhiên hai khái niệm không đồng nhất:
@@ -154,9 +169,13 @@ MAC phổ biến trong quốc phòng, chính phủ và hệ điều hành có SE
 
 RBAC gán user vào **role**, rồi role chứa **permission**:
 
-```text
-User ──► Role ──► Permission ──► Action trên Resource Type
-Alice    FINANCE_MANAGER        invoice:approve
+```d2 title="2.3. RBAC — Role-Based Access Control"
+direction: right
+user: "User: Alice"
+role: "Role: FINANCE_MANAGER"
+permission: "Permission: invoice:approve"
+action: "Action trên Resource Type"
+user -> role -> permission -> action
 ```
 
 RBAC phù hợp khi quyền đi theo chức danh hoặc trách nhiệm ổn định: kế toán, hỗ trợ, quản trị viên, kiểm toán viên.
@@ -215,8 +234,15 @@ Context thường là một phần của ABAC/PBAC, không nhất thiết là h�
 
 ReBAC quyết định dựa trên quan hệ giữa subject và resource. Quan hệ có thể trực tiếp hoặc đi qua graph:
 
-```text
-Alice ──member_of──► Team A ──owns──► Project P ──contains──► Document D
+```d2 title="2.7. ReBAC — Relationship-Based Access Control"
+direction: right
+alice: "Alice"
+team: "Team A"
+project: "Project P"
+doc: "Document D"
+alice -> team: member_of
+team -> project: owns
+project -> doc: contains
 ```
 
 Nếu policy nói “member của team sở hữu project được đọc document”, Alice được đọc `D` nhờ đường đi trên graph.
@@ -241,34 +267,38 @@ ReBAC phù hợp với collaboration, social network, organization tree và hệ
 
 RBAC cơ bản có bốn quan hệ:
 
-```mermaid
-erDiagram
-    APP_USER ||--o{ USER_ROLE : assigned
-    ROLE ||--o{ USER_ROLE : contains
-    ROLE ||--o{ ROLE_PERMISSION : grants
-    PERMISSION ||--o{ ROLE_PERMISSION : contains
-
-    APP_USER {
-      bigint id PK
-      varchar username UK
-      boolean enabled
-    }
-    ROLE {
-      bigint id PK
-      varchar code UK
-    }
-    PERMISSION {
-      bigint id PK
-      varchar code UK
-    }
-    USER_ROLE {
-      bigint user_id FK
-      bigint role_id FK
-    }
-    ROLE_PERMISSION {
-      bigint role_id FK
-      bigint permission_id FK
-    }
+```d2 title="3.1. Mô hình dữ liệu"
+direction: right
+n_APP_USER: "APP_USER" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "username": "varchar" { constraint: [unique] }
+  "enabled": "boolean"
+}
+n_ROLE: "ROLE" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "code": "varchar" { constraint: [unique] }
+}
+n_PERMISSION: "PERMISSION" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "code": "varchar" { constraint: [unique] }
+}
+n_USER_ROLE: "USER_ROLE" {
+  shape: sql_table
+  "user_id": "bigint" { constraint: [foreign_key] }
+  "role_id": "bigint" { constraint: [foreign_key] }
+}
+n_ROLE_PERMISSION: "ROLE_PERMISSION" {
+  shape: sql_table
+  "role_id": "bigint" { constraint: [foreign_key] }
+  "permission_id": "bigint" { constraint: [foreign_key] }
+}
+n_APP_USER -> n_USER_ROLE: "assigned (1 → 0..*)"
+n_ROLE -> n_USER_ROLE: "contains (1 → 0..*)"
+n_ROLE -> n_ROLE_PERMISSION: "grants (1 → 0..*)"
+n_PERMISSION -> n_ROLE_PERMISSION: "contains (1 → 0..*)"
 ```
 
 Trong NIST RBAC, có thể mở rộng thêm:
@@ -358,41 +388,41 @@ Tránh permission mơ hồ như `CAN_MANAGE` hoặc `FULL_ACCESS`. Tên permissi
 
 RBAC cần ba bảng chính và hai bảng liên kết:
 
-```mermaid
-erDiagram
-    APP_USER ||--o{ USER_ROLE : "được gán"
-    ROLE ||--o{ USER_ROLE : "có người dùng"
-    ROLE ||--o{ ROLE_PERMISSION : "được cấp"
-    PERMISSION ||--o{ ROLE_PERMISSION : "thuộc role"
-
-    APP_USER {
-        BIGINT id PK
-        VARCHAR username UK
-        VARCHAR password
-        BOOLEAN enabled
-    }
-
-    ROLE {
-        BIGINT id PK
-        VARCHAR code UK
-        VARCHAR description
-    }
-
-    PERMISSION {
-        BIGINT id PK
-        VARCHAR code UK
-        VARCHAR description
-    }
-
-    USER_ROLE {
-        BIGINT user_id PK, FK
-        BIGINT role_id PK, FK
-    }
-
-    ROLE_PERMISSION {
-        BIGINT role_id PK, FK
-        BIGINT permission_id PK, FK
-    }
+```d2 title="4.2. Bước 2 — tạo database schema"
+direction: right
+n_APP_USER: "APP_USER" {
+  shape: sql_table
+  "id": "BIGINT" { constraint: [primary_key] }
+  "username": "VARCHAR" { constraint: [unique] }
+  "password": "VARCHAR"
+  "enabled": "BOOLEAN"
+}
+n_ROLE: "ROLE" {
+  shape: sql_table
+  "id": "BIGINT" { constraint: [primary_key] }
+  "code": "VARCHAR" { constraint: [unique] }
+  "description": "VARCHAR"
+}
+n_PERMISSION: "PERMISSION" {
+  shape: sql_table
+  "id": "BIGINT" { constraint: [primary_key] }
+  "code": "VARCHAR" { constraint: [unique] }
+  "description": "VARCHAR"
+}
+n_USER_ROLE: "USER_ROLE" {
+  shape: sql_table
+  "user_id": "BIGINT" { constraint: [primary_key; foreign_key] }
+  "role_id": "BIGINT" { constraint: [primary_key; foreign_key] }
+}
+n_ROLE_PERMISSION: "ROLE_PERMISSION" {
+  shape: sql_table
+  "role_id": "BIGINT" { constraint: [primary_key; foreign_key] }
+  "permission_id": "BIGINT" { constraint: [primary_key; foreign_key] }
+}
+n_APP_USER -> n_USER_ROLE: "được gán (1 → 0..*)"
+n_ROLE -> n_USER_ROLE: "có người dùng (1 → 0..*)"
+n_ROLE -> n_ROLE_PERMISSION: "được cấp (1 → 0..*)"
+n_PERMISSION -> n_ROLE_PERMISSION: "thuộc role (1 → 0..*)"
 ```
 
 | Bảng | Vai trò | Ví dụ dữ liệu |
@@ -430,7 +460,7 @@ public interface AuthorizationQueryRepository {
 
 Tạo principal chứa `userId` và tập authority:
 
-```java
+```java source="access-control-models-rbac-acl/01/AppPrincipal.java"
 public record AppPrincipal(
         long userId,
         String username,
@@ -446,9 +476,13 @@ public record AppPrincipal(
 }
 ```
 
+<SourceRef project="access-control-models-rbac-acl" file="01/AppPrincipal.java" region="example" variant="button">
+  Xem AppPrincipal.java cùng các ví dụ khác
+</SourceRef>
+
 `UserDetailsService` nạp cả role lẫn permission:
 
-```java
+```java source="access-control-models-rbac-acl/02/DatabaseUserDetailsService.java"
 @Service
 @RequiredArgsConstructor
 public class DatabaseUserDetailsService implements UserDetailsService {
@@ -475,6 +509,10 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     }
 }
 ```
+
+<SourceRef project="access-control-models-rbac-acl" file="02/DatabaseUserDetailsService.java" region="example" variant="button">
+  Xem DatabaseUserDetailsService.java cùng các ví dụ khác
+</SourceRef>
 
 ### 4.4. Bước 4 — cấu hình request và method security
 
@@ -795,13 +833,18 @@ Kết quả:
 | Sửa invoice `43` | có `invoice:update` | thiếu `WRITE` | `DENY` |
 | Xóa invoice `42` | thiếu `invoice:delete` | không quan trọng | `DENY` |
 
-```mermaid
-flowchart TD
-    A[Request update INV-42] --> B{Có invoice:update?}
-    B -->|Không| D[DENY 403]
-    B -->|Có| E{ACL WRITE trên INV-42?}
-    E -->|Không| D
-    E -->|Có| F[ALLOW]
+```d2 title="Cách mô hình hybrid đưa ra quyết định"
+direction: down
+n_A: "Request update INV-42"
+n_B: "Có invoice:update?" { shape: diamond }
+n_D: "DENY 403"
+n_E: "ACL WRITE trên INV-42?" { shape: diamond }
+n_F: "ALLOW"
+n_A -> n_B
+n_B -> n_D: "Không"
+n_B -> n_E: "Có"
+n_E -> n_D: "Không"
+n_E -> n_F: "Có"
 ```
 
 Trong Spring Security, rule tương ứng là:
@@ -894,7 +937,7 @@ public record AclEntryView(String permission, String effect) {
 
 Dùng `NamedParameterJdbcTemplate` để query cả user SID và role SID trong một lần:
 
-```java
+```java source="access-control-models-rbac-acl/03/ResourceAclRepository.java"
 @Repository
 @RequiredArgsConstructor
 public class ResourceAclRepository {
@@ -937,11 +980,15 @@ public class ResourceAclRepository {
 }
 ```
 
+<SourceRef project="access-control-models-rbac-acl" file="03/ResourceAclRepository.java" region="example" variant="button">
+  Xem ResourceAclRepository.java cùng các ví dụ khác
+</SourceRef>
+
 ### 6.3. Authorization service
 
 Service này là PDP của custom ACL:
 
-```java
+```java source="access-control-models-rbac-acl/04/AclAuthorizationService.java"
 @Component("acl")
 @RequiredArgsConstructor
 public class AclAuthorizationService {
@@ -985,6 +1032,10 @@ public class AclAuthorizationService {
     }
 }
 ```
+
+<SourceRef project="access-control-models-rbac-acl" file="04/AclAuthorizationService.java" region="example" variant="button">
+  Xem AclAuthorizationService.java cùng các ví dụ khác
+</SourceRef>
 
 Đây là policy **deny-overrides**. Nếu không dùng explicit deny, bỏ cột `effect` và chỉ kiểm tra sự tồn tại của grant.
 
@@ -1137,7 +1188,7 @@ Dùng ví dụ chỉ có bốn permission:
 
 Mỗi permission phải là một lũy thừa của hai. Nhờ vậy mỗi giá trị chỉ bật đúng một bit.
 
-```java
+```java source="access-control-models-rbac-acl/05/Permission.java"
 public enum Permission {
     READ(1L << 0),    // 0001 = 1
     WRITE(1L << 1),   // 0010 = 2
@@ -1155,6 +1206,10 @@ public enum Permission {
     }
 }
 ```
+
+<SourceRef project="access-control-models-rbac-acl" file="05/Permission.java" region="example" variant="button">
+  Xem Permission.java cùng các ví dụ khác
+</SourceRef>
 
 > [!WARNING]
 > Không dùng `1L << ordinal()`. Nếu đổi thứ tự enum, dữ liệu cũ trong database sẽ mang nghĩa khác. Giá trị bit là một phần của database schema và phải được khai báo cố định.
@@ -1181,7 +1236,7 @@ System.out.println(alicePermissions); // 3
 
 Có thể đóng gói phép toán vào utility:
 
-```java
+```java source="access-control-models-rbac-acl/06/PermissionMask.java"
 public final class PermissionMask {
     private PermissionMask() {
     }
@@ -1223,6 +1278,10 @@ public final class PermissionMask {
     }
 }
 ```
+
+<SourceRef project="access-control-models-rbac-acl" file="06/PermissionMask.java" region="example" variant="button">
+  Xem PermissionMask.java cùng các ví dụ khác
+</SourceRef>
 
 Ba công thức quan trọng:
 
@@ -1607,40 +1666,43 @@ Spring Security cung cấp module `spring-security-acl`. Module này dùng JDBC,
 
 ### 8.1. Bốn bảng cốt lõi
 
-```mermaid
-erDiagram
-    ACL_SID ||--o{ ACL_ENTRY : recipient
-    ACL_CLASS ||--o{ ACL_OBJECT_IDENTITY : classifies
-    ACL_OBJECT_IDENTITY ||--o{ ACL_ENTRY : contains
-    ACL_OBJECT_IDENTITY ||--o{ ACL_OBJECT_IDENTITY : inherits
-
-    ACL_SID {
-      bigint id PK
-      boolean principal
-      varchar sid
-    }
-    ACL_CLASS {
-      bigint id PK
-      varchar class
-    }
-    ACL_OBJECT_IDENTITY {
-      bigint id PK
-      bigint object_id_class FK
-      bigint object_id_identity
-      bigint parent_object FK
-      bigint owner_sid FK
-      boolean entries_inheriting
-    }
-    ACL_ENTRY {
-      bigint id PK
-      bigint acl_object_identity FK
-      int ace_order
-      bigint sid FK
-      int mask
-      boolean granting
-      boolean audit_success
-      boolean audit_failure
-    }
+```d2 title="8.1. Bốn bảng cốt lõi"
+direction: right
+n_ACL_SID: "ACL_SID" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "principal": "boolean"
+  "sid": "varchar"
+}
+n_ACL_CLASS: "ACL_CLASS" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "class": "varchar"
+}
+n_ACL_OBJECT_IDENTITY: "ACL_OBJECT_IDENTITY" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "object_id_class": "bigint" { constraint: [foreign_key] }
+  "object_id_identity": "bigint"
+  "parent_object": "bigint" { constraint: [foreign_key] }
+  "owner_sid": "bigint" { constraint: [foreign_key] }
+  "entries_inheriting": "boolean"
+}
+n_ACL_ENTRY: "ACL_ENTRY" {
+  shape: sql_table
+  "id": "bigint" { constraint: [primary_key] }
+  "acl_object_identity": "bigint" { constraint: [foreign_key] }
+  "ace_order": "int"
+  "sid": "bigint" { constraint: [foreign_key] }
+  "mask": "int"
+  "granting": "boolean"
+  "audit_success": "boolean"
+  "audit_failure": "boolean"
+}
+n_ACL_SID -> n_ACL_ENTRY: "recipient (1 → 0..*)"
+n_ACL_CLASS -> n_ACL_OBJECT_IDENTITY: "classifies (1 → 0..*)"
+n_ACL_OBJECT_IDENTITY -> n_ACL_ENTRY: "contains (1 → 0..*)"
+n_ACL_OBJECT_IDENTITY -> n_ACL_OBJECT_IDENTITY: "inherits (1 → 0..*)"
 ```
 
 Các khái niệm:
@@ -1677,7 +1739,7 @@ Maven:
 
 Cấu hình các component chính:
 
-```java
+```java source="access-control-models-rbac-acl/07/AclSecurityConfig.java"
 @Configuration
 @EnableMethodSecurity
 public class AclSecurityConfig {
@@ -1740,6 +1802,10 @@ public class AclSecurityConfig {
 }
 ```
 
+<SourceRef project="access-control-models-rbac-acl" file="07/AclSecurityConfig.java" region="example" variant="button">
+  Xem AclSecurityConfig.java cùng các ví dụ khác
+</SourceRef>
+
 `ConcurrentMapCache` chỉ phù hợp để minh họa hoặc chạy một instance. Với nhiều application instance, cần distributed cache hoặc event invalidation; nếu không mỗi node có thể giữ quyết định ACL cũ.
 
 Với PostgreSQL dùng `BIGSERIAL`, có thể cần cấu hình identity query tương ứng với schema/version:
@@ -1757,7 +1823,7 @@ service.setSidIdentityQuery(
 
 ACL phải được tạo sau khi domain object đã có ID:
 
-```java
+```java source="access-control-models-rbac-acl/08/InvoiceAclAdminService.java"
 @Service
 @RequiredArgsConstructor
 public class InvoiceAclAdminService {
@@ -1813,6 +1879,10 @@ public class InvoiceAclAdminService {
     }
 }
 ```
+
+<SourceRef project="access-control-models-rbac-acl" file="08/InvoiceAclAdminService.java" region="example" variant="button">
+  Xem InvoiceAclAdminService.java cùng các ví dụ khác
+</SourceRef>
 
 Spring Security ACL không tự tạo/xóa ACL khi JPA entity được tạo/xóa. Application service phải phối hợp domain transaction và ACL lifecycle. Hãy có cleanup job hoặc foreign-key strategy để tránh orphan ACL.
 
@@ -1942,18 +2012,17 @@ user --shared_with--> project
 
 Khi relation graph sâu hoặc nhiều service cùng cần policy, cân nhắc external PDP. Request flow khi đó là:
 
-```mermaid
-sequenceDiagram
-    participant API as Spring Boot API
-    participant PDP as Policy Engine
-    participant DB as Relation/Policy Store
-
-    API->>API: Xác thực token
-    API->>PDP: subject, action, resource, context
-    PDP->>DB: Đọc policy/relationship
-    DB-->>PDP: Attributes + tuples
-    PDP-->>API: ALLOW/DENY + reason + policyVersion
-    API->>API: Enforce, audit decision
+```d2 title="10. Context-Based, PBAC và ReBAC trong Spring"
+shape: sequence_diagram
+n_API: "Spring Boot API"
+n_PDP: "Policy Engine"
+n_DB: "Relation/Policy Store"
+n_API -> n_API: "Xác thực token"
+n_API -> n_PDP: "subject, action, resource, context"
+n_PDP -> n_DB: "Đọc policy/relationship"
+n_DB -> n_PDP: "Attributes + tuples" { style.stroke-dash: 3 }
+n_PDP -> n_API: "ALLOW/DENY + reason + policyVersion" { style.stroke-dash: 3 }
+n_API -> n_API: "Enforce, audit decision"
 ```
 
 Phải quy định timeout và failure mode. Với authorization, policy engine timeout thường phải **fail closed**: từ chối thay vì cho qua.
@@ -2038,23 +2107,34 @@ Với Spring Security ACL/JDBC, integration test nên dùng cùng database engin
 
 ## 13. Chọn mô hình nào
 
-```mermaid
-flowchart TD
-    A{Quyền chủ yếu theo chức danh?} -->|Có| RBAC[RBAC làm nền]
-    A -->|Không| B{Owner chia sẻ từng object?}
-    B -->|Có| ACL[DAC + ACL]
-    B -->|Không| C{Rule phụ thuộc nhiều attribute/context?}
-    C -->|Có| PBAC[ABAC/PBAC]
-    C -->|Không| D{Quyền dựa trên graph quan hệ?}
-    D -->|Có| ReBAC[ReBAC]
-    D -->|Không| E{Có classification bắt buộc?}
-    E -->|Có| MAC[MAC]
-    E -->|Không| SIMPLE[Permission check đơn giản]
-
-    RBAC --> H[Thường kết hợp ACL/context]
-    ACL --> H
-    PBAC --> H
-    ReBAC --> H
+```d2 title="13. Chọn mô hình nào"
+direction: down
+n_A: "Quyền chủ yếu theo chức danh?" { shape: diamond }
+n_RBAC: "RBAC làm nền"
+n_B: "Owner chia sẻ từng object?" { shape: diamond }
+n_ACL: "DAC + ACL"
+n_C: "Rule phụ thuộc nhiều\nattribute/context?" { shape: diamond }
+n_PBAC: "ABAC/PBAC"
+n_D: "Quyền dựa trên graph quan hệ?" { shape: diamond }
+n_ReBAC: "ReBAC"
+n_E: "Có classification bắt buộc?" { shape: diamond }
+n_MAC: "MAC"
+n_SIMPLE: "Permission check đơn giản"
+n_H: "Thường kết hợp ACL/context"
+n_A -> n_RBAC: "Có"
+n_A -> n_B: "Không"
+n_B -> n_ACL: "Có"
+n_B -> n_C: "Không"
+n_C -> n_PBAC: "Có"
+n_C -> n_D: "Không"
+n_D -> n_ReBAC: "Có"
+n_D -> n_E: "Không"
+n_E -> n_MAC: "Có"
+n_E -> n_SIMPLE: "Không"
+n_RBAC -> n_H
+n_ACL -> n_H
+n_PBAC -> n_H
+n_ReBAC -> n_H
 ```
 
 Khuyến nghị thực dụng cho đa số Spring Boot business application:

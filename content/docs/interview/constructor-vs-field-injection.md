@@ -124,10 +124,14 @@ service.placeOrder(command);               // Có thể NPE vì field chưa đư
 
 Giả sử `OrderService` cần `PaymentService`, đồng thời `PaymentService` cần `OrderService`:
 
-```text
-OrderService ──constructor──► PaymentService
-      ▲                              │
-      └────────constructor───────────┘
+```d2 title="Lộ ra circular dependency sớm"
+direction: right
+order: "OrderService"
+payment: "PaymentService"
+cycle: "Constructor injection làm lộ dependency\ncycle khi khởi tạo"
+order -> payment: constructor
+payment -> order: constructor
+cycle -> order
 ```
 
 Constructor injection khiến Spring báo lỗi vòng lặp ngay trong lúc tạo bean, vì không bean nào có thể được tạo trước. Đây thường là tín hiệu thiết kế chưa tốt: hai service đang ôm trách nhiệm quá chặt và nên tách một abstraction hoặc điều phối qua service thứ ba.

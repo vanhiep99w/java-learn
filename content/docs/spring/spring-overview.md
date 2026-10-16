@@ -45,13 +45,17 @@ class OrderService {
 
 Đây chính là hiện thực của **Dependency Inversion Principle** (xem doc SOLID): `OrderService` phụ thuộc *interface* `OrderRepository`, không biết lớp cụ thể. Container quyết định cắm `JdbcOrderRepository` hay (trong test) một mock.
 
-```mermaid
-flowchart TD
-    C["Spring IoC Container"] -->|"tạo + tiêm"| OS["OrderService"]
-    C -->|"tạo"| Repo["OrderRepository (JdbcOrderRepository)"]
-    C -->|"tạo"| Email["EmailSender"]
-    Repo -.tiêm vào.-> OS
-    Email -.tiêm vào.-> OS
+```d2 title="2. IoC & Dependency Injection — trái tim của Spring"
+direction: down
+n_C: "Spring IoC Container"
+n_OS: "OrderService"
+n_Repo: "OrderRepository (JdbcOrderRepository)"
+n_Email: "EmailSender"
+n_C -> n_OS: "tạo + tiêm"
+n_C -> n_Repo: "tạo"
+n_C -> n_Email: "tạo"
+n_Repo -> n_OS: "tiêm vào" { style.stroke-dash: 3 }
+n_Email -> n_OS: "tiêm vào" { style.stroke-dash: 3 }
 ```
 
 > [!TIP]
@@ -89,13 +93,19 @@ Container Spring có hai tầng:
 
 ### 4.1. Vòng đời một bean
 
-```mermaid
-flowchart LR
-    A["Instantiate"] --> B["Populate (DI)"]
-    B --> C["@PostConstruct / InitializingBean"]
-    C --> D["BeanPostProcessor (bọc proxy)"]
-    D --> E["Bean sẵn sàng dùng"]
-    E --> F["@PreDestroy (khi shutdown)"]
+```d2 title="4.1. Vòng đời một bean"
+direction: right
+n_A: "Instantiate"
+n_B: "Populate (DI)"
+n_C: "@PostConstruct / InitializingBean"
+n_D: "BeanPostProcessor (bọc proxy)"
+n_E: "Bean sẵn sàng dùng"
+n_F: "@PreDestroy (khi shutdown)"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
 ```
 
 ```java
@@ -140,12 +150,15 @@ class OrderService {
 
 Điều thực sự xảy ra: Spring tạo một **proxy** bọc `OrderService`. Khi bạn gọi `place()`, bạn gọi proxy trước:
 
-```mermaid
-flowchart LR
-    Caller --> Proxy["Proxy (Spring tạo)"]
-    Proxy -->|"mở transaction"| Real["OrderService thật.place()"]
-    Real --> Proxy
-    Proxy -->|"commit / rollback nếu lỗi"| Caller
+```d2 title="5. AOP — @Transactional hoạt động thế nào"
+direction: right
+n_Caller: "Caller"
+n_Proxy: "Proxy (Spring tạo)"
+n_Real: "OrderService thật.place()"
+n_Caller -> n_Proxy
+n_Proxy -> n_Real: "mở transaction"
+n_Real -> n_Proxy
+n_Proxy -> n_Caller: "commit / rollback nếu lỗi"
 ```
 
 ```
@@ -194,15 +207,20 @@ Spring "thuần" cấu hình rườm rà. **Spring Boot** thêm hai thứ:
 
 ## 7. Các module chính
 
-```mermaid
-flowchart TD
-    Core["Spring Core (IoC + AOP)"] --> MVC["Spring MVC / WebFlux"]
-    Core --> Data["Spring Data (JPA/JDBC/Mongo)"]
-    Core --> Sec["Spring Security"]
-    Core --> Boot["Spring Boot (auto-config)"]
-    Boot --> MVC
-    Boot --> Data
-    Boot --> Sec
+```d2 title="7. Các module chính"
+direction: down
+n_Core: "Spring Core (IoC + AOP)"
+n_MVC: "Spring MVC / WebFlux"
+n_Data: "Spring Data (JPA/JDBC/Mongo)"
+n_Sec: "Spring Security"
+n_Boot: "Spring Boot (auto-config)"
+n_Core -> n_MVC
+n_Core -> n_Data
+n_Core -> n_Sec
+n_Core -> n_Boot
+n_Boot -> n_MVC
+n_Boot -> n_Data
+n_Boot -> n_Sec
 ```
 
 | Module | Vai trò |

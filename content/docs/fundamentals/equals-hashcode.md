@@ -5,6 +5,9 @@ description: "Mổ xẻ hợp đồng giữa equals() và hashCode(): vì sao ph
 
 `equals()` xác định hai object có tương đương về mặt logic hay không, còn `hashCode()` hỗ trợ phân phối object trong cấu trúc dựa trên hash. Hai method có vai trò khác nhau nhưng phải tuân thủ một hợp đồng chung.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -38,13 +41,19 @@ Vi phạm hợp đồng hoặc thay đổi field tham gia equality sau khi inser
 | `hashCode()` | `int` | "Object này thuộc **nhóm/bucket nào**?" (định vị thô, nhanh) |
 | `equals(Object)` | `boolean` | "Hai object này có **bằng nhau về giá trị** không?" (so khớp chính xác) |
 
-```mermaid
-flowchart LR
-    K[object] -->|hashCode| H[int hash]
-    H -->|chọn bucket| B[nhóm ứng viên]
-    B -->|equals từng phần tử| M{trùng?}
-    M -->|có| R[tìm thấy]
-    M -->|không| N[không có]
+```d2 title="2. Hai method, hai vai trò khác nhau"
+direction: right
+n_K: "object"
+n_H: "int hash"
+n_B: "nhóm ứng viên"
+n_M: "trùng?" { shape: diamond }
+n_R: "tìm thấy"
+n_N: "không có"
+n_K -> n_H: "hashCode"
+n_H -> n_B: "chọn bucket"
+n_B -> n_M: "equals từng phần tử"
+n_M -> n_R: "có"
+n_M -> n_N: "không"
 ```
 
 Ý tưởng cốt lõi: `hashCode` **lọc thô** O(1) để thu hẹp từ hàng triệu object xuống vài ứng viên trong một bucket; `equals` **lọc tinh** để chọn đúng object trong số ứng viên đó. Nếu bước lọc thô sai (hashCode không khớp), bước lọc tinh **không bao giờ được chạy** với đúng nhóm.
@@ -95,7 +104,7 @@ System.out.println(System.identityHashCode(a)); // vd 1349393271
 
 Ví dụ vi phạm **đối xứng** kinh điển:
 
-```java
+```java source="equals-hashcode/01/CaseInsensitiveString.java"
 class CaseInsensitiveString {
     private final String s;
     @Override public boolean equals(Object o) {
@@ -110,6 +119,10 @@ String  str = "hello";
 cis.equals(str);   // true
 str.equals(cis);   // false  ← String.equals không biết gì về CaseInsensitiveString
 ```
+
+<SourceRef project="equals-hashcode" file="01/CaseInsensitiveString.java" region="example" variant="button">
+  Xem CaseInsensitiveString.java cùng các ví dụ khác
+</SourceRef>
 
 Hậu quả: cho `cis` vào `List`, gọi `list.contains(str)` cho kết quả **khác nhau tùy thứ tự duyệt** — bug không xác định.
 
@@ -128,11 +141,16 @@ Hậu quả: cho `cis` vào `List`, gọi `list.contains(str)` cho kết quả *
 
 Điều khoản 1 là **một chiều**: `equals` ⇒ `hashCode` bằng. Chiều ngược lại không bắt buộc. Đây là lý do `return 42` (hằng số) vẫn **đúng logic** nhưng biến HashMap thành O(n) — xem chi tiết trong [HashMap Deep Dive](/collections/hashmap-deep-dive/).
 
-```mermaid
-flowchart TD
-    A["a.equals(b) == true"] -->|BẮT BUỘC| B["a.hashCode() == b.hashCode()"]
-    C["a.hashCode() == b.hashCode()"] -.->|KHÔNG bắt buộc| D["a.equals(b)?"]
-    D --> E["collision hợp lệ"]
+```d2 title="5. Hợp đồng hashCode — 3 điều khoản"
+direction: down
+n_A: "a.equals(b) == true"
+n_B: "a.hashCode() == b.hashCode()"
+n_C: "a.hashCode() == b.hashCode()"
+n_D: "a.equals(b)?"
+n_E: "collision hợp lệ"
+n_A -> n_B: "BẮT BUỘC"
+n_C -> n_D: "KHÔNG bắt buộc" { style.stroke-dash: 3 }
+n_D -> n_E
 ```
 
 ---
@@ -246,7 +264,7 @@ Chỉ làm được điều này khi key **bất biến** — nếu field đổi
 
 Đây là cái bẫy tinh vi nhất. Thêm field ở subclass khiến **không thể** vừa giữ đối xứng vừa giữ bắc cầu nếu dùng `instanceof`:
 
-```java
+```java source="equals-hashcode/02/Point.java"
 class Point {
     final int x, y;
     @Override public boolean equals(Object o) {
@@ -268,6 +286,10 @@ p.equals(cp);   // true  (Point.equals thấy cp là Point, x,y khớp)
 cp.equals(p);   // false (ColorPoint.equals thấy p không phải ColorPoint)
 ```
 
+<SourceRef project="equals-hashcode" file="02/Point.java" region="example" variant="button">
+  Xem Point.java cùng các ví dụ khác
+</SourceRef>
+
 → **Vi phạm đối xứng.** Sửa bằng cách "nới lỏng" cho `ColorPoint` so như `Point` lại phá **bắc cầu** (hai ColorPoint khác màu cùng bằng một Point).
 
 Hai lối thoát:
@@ -286,7 +308,7 @@ Hai lối thoát:
 
 `hashCode` được tính **một lần lúc put** và cache trong `Node.hash`. Nếu sau đó bạn đổi field tham gia hashCode, key rơi vào "bucket cũ" nhưng tính ra "bucket mới" → mất:
 
-```java
+```java source="equals-hashcode/03/MutableKey.java"
 class MutableKey {
     int id;
     @Override public int hashCode() { return id; }
@@ -305,6 +327,10 @@ map.get(key);               // hash giờ = 2 → tìm ở bucket 2 → null
 map.containsKey(key);       // false
 map.size();                 // 1  ← entry vẫn còn ở bucket 1, "rò rỉ"
 ```
+
+<SourceRef project="equals-hashcode" file="03/MutableKey.java" region="example" variant="button">
+  Xem MutableKey.java cùng các ví dụ khác
+</SourceRef>
 
 ```
 Lúc put:   bucket[1] -> (Node.hash=1, key, "value")

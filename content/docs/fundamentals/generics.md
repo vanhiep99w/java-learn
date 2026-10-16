@@ -5,6 +5,9 @@ description: "Mổ xẻ Java Generics: type erasure cơ chế biên dịch, brid
 
 Generics cho phép class, interface và method biểu diễn quan hệ kiểu một cách an toàn tại compile time. Chúng giảm cast thủ công và giúp API nói rõ kiểu dữ liệu được nhận, trả về hoặc biến đổi.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -222,10 +225,14 @@ public static void fill(List<? super Integer> dest, int value) {
 }
 ```
 
-```mermaid
-flowchart LR
-    P["Collection là PRODUCER<br/>(bạn ĐỌC từ nó)"] -->|"extends"| E["? extends T"]
-    C["Collection là CONSUMER<br/>(bạn GHI vào nó)"] -->|"super"| S["? super T"]
+```d2 title="5.2. PECS: Producer Extends, Consumer Super"
+direction: right
+n_P: "Collection là PRODUCER\n(bạn ĐỌC từ nó)"
+n_E: "? extends T"
+n_C: "Collection là CONSUMER\n(bạn GHI vào nó)"
+n_S: "? super T"
+n_P -> n_E: "extends"
+n_C -> n_S: "super"
 ```
 
 ### 5.3. Ví dụ thực tế: Collections.copy()
@@ -385,7 +392,7 @@ public static <T extends Comparable<T>> T max(Collection<T> c) { ... }
 
 ### 9.2. Builder pattern với recursive bound
 
-```java
+```java source="generics/01/Builder.java"
 public abstract class Builder<T extends Builder<T>> {
     protected String name;
     
@@ -410,6 +417,10 @@ UserBuilder builder = new UserBuilder()
     .withName("Hiệp")    // trả UserBuilder (không phải Builder)
     .withAge(25);         // OK — vì withName trả T = UserBuilder
 ```
+
+<SourceRef project="generics" file="01/Builder.java" region="example" variant="button">
+  Xem Builder.java cùng các ví dụ khác
+</SourceRef>
 
 ### 9.3. Enum — recursive bound kinh điển
 
@@ -437,7 +448,7 @@ public abstract class Enum<E extends Enum<E>> implements Comparable<E> {
 
 ### 10.2. Ví dụ
 
-```java
+```java source="generics/02/Repository.java"
 // Generic CLASS: type gắn với instance lifecycle
 public class Repository<T> {
     public T findById(long id) { ... }
@@ -454,6 +465,10 @@ public class Converter<S> {
     public <T> T convert(S source, Class<T> targetType) { ... }
 }
 ```
+
+<SourceRef project="generics" file="02/Repository.java" region="example" variant="button">
+  Xem Repository.java cùng các ví dụ khác
+</SourceRef>
 
 ---
 
@@ -474,7 +489,7 @@ User user = deserialize(jsonStr, User.class);  // Class<User> = type token
 
 ### 11.2. Super Type Token (Neal Gafter pattern)
 
-```java
+```java source="generics/03/TypeReference.java"
 // TypeReference giữ generic type info qua anonymous class trick:
 abstract class TypeReference<T> {
     Type getType() {
@@ -488,6 +503,10 @@ abstract class TypeReference<T> {
 TypeReference<List<String>> ref = new TypeReference<>() {};
 // ref.getType() = ParameterizedType{List<String>}  ← full generic info!
 ```
+
+<SourceRef project="generics" file="03/TypeReference.java" region="example" variant="button">
+  Xem TypeReference.java cùng các ví dụ khác
+</SourceRef>
 
 **Tại sao hoạt động?** Anonymous class `new TypeReference<List<String>>() {}` tạo subclass. Compiler lưu superclass type arguments trong class file metadata (không bị erase) — vì đây là **inheritance relationship**, không phải instance variable.
 

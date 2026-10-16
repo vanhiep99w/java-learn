@@ -71,12 +71,17 @@ class Circle implements Shape { public double area() { return Math.PI*r*r; } }
 class Triangle implements Shape { public double area() { ... } }   // chỉ THÊM
 ```
 
-```mermaid
-flowchart TD
-    Client --> Shape["interface Shape"]
-    Shape -.-> Circle
-    Shape -.-> Rectangle
-    Shape -.-> Triangle["Triangle (thêm mới — client không đổi)"]
+```d2 title="3. O — Open/Closed Principle"
+direction: down
+n_Client: "Client"
+n_Shape: "interface Shape"
+n_Circle: "Circle"
+n_Rectangle: "Rectangle"
+n_Triangle: "Triangle (thêm mới — client không đổi)"
+n_Client -> n_Shape
+n_Shape -> n_Circle { style.stroke-dash: 3 }
+n_Shape -> n_Rectangle { style.stroke-dash: 3 }
+n_Shape -> n_Triangle { style.stroke-dash: 3 }
 ```
 
 > [!NOTE]
@@ -174,12 +179,15 @@ class OrderService {
 }
 ```
 
-```mermaid
-flowchart TD
-    subgraph After["Sau DIP — mũi tên phụ thuộc bị ĐẢO"]
-        OS["OrderService (cấp cao)"] --> R["interface OrderRepository"]
-        DB["MySqlOrderDao (cấp thấp)"] -.implements.-> R
-    end
+```d2 title="6. D — Dependency Inversion Principle"
+direction: down
+n_After: "Sau DIP — mũi tên phụ thuộc bị ĐẢO" {
+  n_OS: "OrderService (cấp cao)"
+  n_R: "interface OrderRepository"
+  n_DB: "MySqlOrderDao (cấp thấp)"
+}
+n_After.n_OS -> n_After.n_R
+n_After.n_DB -> n_After.n_R: "implements" { style.stroke-dash: 3 }
 ```
 
 Điểm "đảo ngược": bình thường cấp cao gọi cấp thấp nên *phụ thuộc* cấp thấp. DIP chèn một interface vào giữa và để **cấp thấp implement interface do cấp cao định nghĩa** → mũi tên phụ thuộc bị đảo. Đây chính là nền tảng của **Spring IoC/DI** (xem doc Spring Core).

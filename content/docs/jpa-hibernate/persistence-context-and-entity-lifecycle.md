@@ -8,6 +8,9 @@ Persistence context là nền tảng để hiểu vì sao sửa một Java objec
 > [!NOTE]
 > Bài viết dùng Jakarta Persistence (JPA) làm chuẩn API, Hibernate ORM làm persistence provider, và Spring Data JPA làm lớp repository phía trên. Ví dụ giả định Spring Boot hiện đại với package `jakarta.persistence.*`; tên SQL cụ thể có thể khác theo database dialect và cấu hình naming.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [1. Bức tranh tổng thể](#1-bức-tranh-tổng-thể)
@@ -80,16 +83,17 @@ Persistence context là nền tảng để hiểu vì sao sửa một Java objec
 
 **Spring Data JPA** nằm cao hơn JPA. Nó tạo repository implementation, dẫn xuất query từ tên method và cung cấp `save()`, nhưng cuối cùng vẫn ủy quyền cho `EntityManager` của JPA.
 
-```text
-Application service
-       │
-       ├── Spring Data JPA repository (tiện ích, không phải JPA specification)
-       │            │
-       └──────── EntityManager (Jakarta Persistence API)
-                    │
-              Hibernate Session (implementation)
-                    │
-              JDBC driver → Database
+```d2 title="Ba lớp thường bị gọi lẫn"
+direction: down
+app: "Application service"
+repo: "Spring Data JPA repository: tiện ích,\nkhông phải JPA specification"
+em: "EntityManager: Jakarta Persistence API"
+session: "Hibernate Session: implementation"
+jdbc: "JDBC driver"
+db: "Database"
+app -> repo -> em
+app -> em
+em -> session -> jdbc -> db
 ```
 
 Với Hibernate, một `EntityManager` có thể được unwrap thành `Session`:
@@ -119,7 +123,7 @@ Nó đảm nhiệm ba vai trò chính:
 
 Ví dụ dùng một entity nhỏ để nhìn rõ lifecycle. `@Version` là cột phiên bản phục vụ optimistic locking; Hibernate tăng giá trị này khi entity được cập nhật.
 
-```java
+```java source="persistence-context-and-entity-lifecycle/01/Product.java"
 package com.example.catalog;
 
 import jakarta.persistence.Column;
@@ -188,13 +192,17 @@ public class Product {
 }
 ```
 
+<SourceRef project="persistence-context-and-entity-lifecycle" file="01/Product.java" region="example" variant="button">
+  Xem Product.java cùng các ví dụ khác
+</SourceRef>
+
 Entity giữ invariant trong method nghiệp vụ thay vì public setter cho mọi field. Cách này không thay đổi cơ chế dirty checking: Hibernate vẫn quan sát persistent state ở thời điểm flush.
 
 ### Service dùng EntityManager
 
 Trong Spring Boot, `EntityManager` được inject thường là một shared proxy. Proxy này chuyển lời gọi đến `EntityManager` thực đang gắn với transaction hiện tại.
 
-```java
+```java source="persistence-context-and-entity-lifecycle/02/ProductService.java"
 package com.example.catalog;
 
 import jakarta.persistence.EntityManager;
@@ -234,23 +242,34 @@ public class ProductService {
 }
 ```
 
+<SourceRef project="persistence-context-and-entity-lifecycle" file="02/ProductService.java" region="example" variant="button">
+  Xem ProductService.java cùng các ví dụ khác
+</SourceRef>
+
 ## 3. Bốn trạng thái của entity
 
 Jakarta Persistence gọi bốn trạng thái là **new**, **managed**, **detached** và **removed**. Tài liệu Hibernate thường dùng **transient** gần nghĩa với new và **persistent** gần nghĩa với managed.
 
-```mermaid
-stateDiagram-v2
-    [*] --> New: new Product(...)
-    New --> Managed: persist(entity)
-    New --> ManagedCopy: merge(entity)
-    ManagedCopy --> Managed: kết quả trả về
-    Managed --> Detached: detach / clear / close / context kết thúc
-    Detached --> ManagedCopy: merge(entity)
-    Managed --> Removed: remove(entity)
-    Removed --> Managed: persist(entity) trước flush
-    Removed --> Detached: detach / clear / close
-    Managed --> [*]: flush INSERT hoặc UPDATE và commit
-    Removed --> [*]: flush DELETE và commit
+```d2 title="3. Bốn trạng thái của entity"
+direction: right
+n_New: "New"
+n_Managed: "Managed"
+n_ManagedCopy: "ManagedCopy"
+n_Detached: "Detached"
+n_Removed: "Removed"
+n_start: "Bắt đầu" { shape: circle }
+n_end: "Kết thúc" { shape: circle }
+n_start -> n_New: "new Product(...)"
+n_New -> n_Managed: "persist(entity)"
+n_New -> n_ManagedCopy: "merge(entity)"
+n_ManagedCopy -> n_Managed: "kết quả trả về"
+n_Managed -> n_Detached: "detach / clear / close / context kết\nthúc"
+n_Detached -> n_ManagedCopy: "merge(entity)"
+n_Managed -> n_Removed: "remove(entity)"
+n_Removed -> n_Managed: "persist(entity) trước flush"
+n_Removed -> n_Detached: "detach / clear / close"
+n_Managed -> n_end: "flush INSERT hoặc UPDATE và commit"
+n_Removed -> n_end: "flush DELETE và commit"
 ```
 
 `ManagedCopy` trong sơ đồ không phải trạng thái thứ năm. Nó nhấn mạnh rằng `merge()` trả về một object managed khác, còn object truyền vào vẫn new hoặc detached.
@@ -650,22 +669,21 @@ Với tác vụ xử lý hàng trăm nghìn row, đừng giữ tất cả entity
 
 Persistence context hoạt động như transactional write-behind cache: thay đổi được ghi vào object trước, còn DML được hoãn và gom lại.
 
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant PC as Persistence Context
-    participant DB as Database Transaction
-
-    App->>PC: find(Product, id)
-    PC->>DB: SELECT ... WHERE id = ?
-    DB-->>PC: row
-    App->>PC: product.changePrice(...)
-    Note over PC: State đổi trong memory<br/>chưa nhất thiết có UPDATE
-    App->>PC: flush hoặc auto-flush
-    PC->>DB: UPDATE products ...
-    Note over DB: SQL đã chạy nhưng transaction<br/>chưa chắc đã commit
-    App->>DB: commit
-    DB-->>App: durable nếu commit thành công
+```d2 title="Luồng write-behind"
+shape: sequence_diagram
+n_App: "Application"
+n_PC: "Persistence Context"
+n_DB: "Database Transaction"
+n_App -> n_PC: "find(Product, id)"
+n_PC -> n_DB: "SELECT ... WHERE id = ?"
+n_DB -> n_PC: "row" { style.stroke-dash: 3 }
+n_App -> n_PC: "product.changePrice(...)"
+n_PC.note1: "State đổi trong memory\nchưa nhất thiết có UPDATE"
+n_App -> n_PC: "flush hoặc auto-flush"
+n_PC -> n_DB: "UPDATE products ..."
+n_DB.note2: "SQL đã chạy nhưng transaction\nchưa chắc đã commit"
+n_App -> n_DB: "commit"
+n_DB -> n_App: "durable nếu commit thành công" { style.stroke-dash: 3 }
 ```
 
 Nếu gọi `flush()` rồi transaction rollback, SQL đã gửi vẫn bị rollback:
@@ -1001,7 +1019,7 @@ logging:
 
 Test nên `flush()` rồi `clear()` trước khi assert. Nếu không, lần đọc kiểm tra có thể chỉ lấy object từ first-level cache và tạo cảm giác update đã xuống database dù SQL chưa chạy.
 
-```java
+```java source="persistence-context-and-entity-lifecycle/03/ProductLifecycleTest.java"
 @DataJpaTest
 class ProductLifecycleTest {
 
@@ -1041,6 +1059,10 @@ class ProductLifecycleTest {
     }
 }
 ```
+
+<SourceRef project="persistence-context-and-entity-lifecycle" file="03/ProductLifecycleTest.java" region="example" variant="button">
+  Xem ProductLifecycleTest.java cùng các ví dụ khác
+</SourceRef>
 
 `@DataJpaTest` thường rollback sau mỗi test. Điều đó không cản việc kiểm tra flush trong transaction test; nó chỉ không để dữ liệu tồn tại sau test.
 

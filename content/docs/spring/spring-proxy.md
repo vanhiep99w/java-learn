@@ -5,6 +5,9 @@ description: "Mổ xẻ chi tiết cơ chế proxy trong Spring: JDK Dynamic Pro
 
 Spring proxy là object đại diện đứng trước bean thật để chặn lời gọi method và áp dụng advice. Nhiều tính năng như transaction, cache, retry, async và method security dựa trên cơ chế này.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -35,12 +38,15 @@ Hiểu đường đi của lời gọi quan trọng hơn việc chỉ nhìn anno
 
 Proxy pattern: đặt một **object trung gian** giữa caller và target. Object trung gian (proxy) **cùng kiểu** với target (cùng interface hoặc subclass), nên caller không biết đang nói chuyện với ai:
 
-```
-Caller ──▶ Proxy ──▶ Target
-              │
-              ├── thêm logic trước (begin TX, check cache, log, auth...)
-              ├── gọi target method thật
-              └── thêm logic sau (commit TX, store cache, measure time...)
+```d2 title="2. Proxy Pattern — ý tưởng nền tảng"
+direction: down
+caller: "Caller"
+proxy: "Proxy: intercept method call"
+target: "Target"
+before: "Logic TRƯỚC: log / cache / transaction"
+after: "Logic SAU: commit / metric / error\nhandling"
+caller -> proxy
+proxy -> before -> target -> after
 ```
 
 Trong Java, có **ba** cách tạo proxy:
@@ -61,7 +67,7 @@ Spring dùng **JDK Dynamic Proxy hoặc CGLIB** tuỳ cấu hình. Từ Spring B
 
 JDK Dynamic Proxy chỉ cần **2 thứ**: target implement ít nhất 1 interface, và một `InvocationHandler`:
 
-```java
+```java source="spring-proxy/01/PaymentService.java"
 public interface PaymentService {
     void pay(BigDecimal amount);
 }
@@ -93,11 +99,15 @@ proxy.pay(BigDecimal.TEN);
 // After: pay
 ```
 
+<SourceRef project="spring-proxy" file="01/PaymentService.java" region="example" variant="button">
+  Xem PaymentService.java cùng các ví dụ khác
+</SourceRef>
+
 ### 3.2. Class được sinh ra — $Proxy0
 
 `Proxy.newProxyInstance()` **sinh một class mới tại runtime** (tên kiểu `$Proxy0`, `$Proxy1`...). Class này:
 
-```java
+```java source="spring-proxy/02/GeneratedPaymentProxy.java"
 // Pseudo-code — JVM sinh class tương đương thế này:
 final class $Proxy0 extends java.lang.reflect.Proxy implements PaymentService {
 
@@ -127,6 +137,10 @@ final class $Proxy0 extends java.lang.reflect.Proxy implements PaymentService {
 }
 ```
 
+<SourceRef project="spring-proxy" file="02/GeneratedPaymentProxy.java" region="example" variant="button">
+  Xem GeneratedPaymentProxy.java cùng các ví dụ khác
+</SourceRef>
+
 ### 3.3. Xem class thật bằng cách dump proxy class
 
 ```java
@@ -148,10 +162,13 @@ for (Method m : proxy.getClass().getDeclaredMethods()) {
 
 `$Proxy0` extends `java.lang.reflect.Proxy` — Java là **single inheritance**. Vì đã extends `Proxy`, nó **không thể** extends thêm class nào khác. Nó chỉ có thể **implement interface**.
 
-```
-java.lang.reflect.Proxy (class cha)
-    └── $Proxy0 implements PaymentService
-           └── KHÔNG THỂ extends PaymentServiceImpl
+```d2 title="3.4. Tại sao chỉ proxy interface?"
+direction: right
+t0: "java.lang.reflect.Proxy (class cha)"
+t1: "\$Proxy0 implements PaymentService"
+t0 -> t1
+t2: "KHÔNG THỂ extends PaymentServiceImpl"
+t1 -> t2
 ```
 
 Hệ quả: method chỉ khai báo trong class (không ở interface) → **không** nằm trong proxy → không qua `InvocationHandler` → annotation bị bỏ qua.
@@ -167,7 +184,7 @@ Hệ quả: method chỉ khai báo trong class (không ở interface) → **khô
 
 CGLIB (Code Generation Library) tạo proxy bằng cách **sinh subclass tại runtime** thông qua bytecode manipulation (dựa trên ASM):
 
-```java
+```java source="spring-proxy/03/CglibProxyDemo.java"
 // Tạo CGLIB proxy thủ công (Spring dùng nội bộ)
 Enhancer enhancer = new Enhancer();
 enhancer.setSuperclass(PaymentServiceImpl.class);  // subclass, KHÔNG cần interface
@@ -186,9 +203,13 @@ PaymentServiceImpl proxy = (PaymentServiceImpl) enhancer.create();
 proxy.pay(BigDecimal.TEN);
 ```
 
+<SourceRef project="spring-proxy" file="03/CglibProxyDemo.java" region="example" variant="button">
+  Xem CglibProxyDemo.java cùng các ví dụ khác
+</SourceRef>
+
 ### 4.2. Class được sinh ra — $$EnhancerByCGLIB
 
-```java
+```java source="spring-proxy/04/PaymentServiceImpl.java"
 // Pseudo-code — CGLIB sinh class tương đương:
 public class PaymentServiceImpl$$EnhancerByCGLIB extends PaymentServiceImpl {
 
@@ -209,6 +230,10 @@ public class PaymentServiceImpl$$EnhancerByCGLIB extends PaymentServiceImpl {
     }
 }
 ```
+
+<SourceRef project="spring-proxy" file="04/PaymentServiceImpl.java" region="example" variant="button">
+  Xem PaymentServiceImpl.java cùng các ví dụ khác
+</SourceRef>
 
 ### 4.3. FastClass — tối ưu invoke không qua reflection
 
@@ -328,7 +353,7 @@ PaymentService proxy = (PaymentService) factory.getProxy();
 
 Khi `factory.getProxy()` được gọi, `DefaultAopProxyFactory` quyết định dùng kiểu proxy nào:
 
-```java
+```java source="spring-proxy/05/DefaultAopProxyFactory.java"
 // Rút gọn từ DefaultAopProxyFactory
 public AopProxy createAopProxy(AdvisedSupport config) {
     if (config.isOptimize() ||                        // optimize = true
@@ -345,15 +370,24 @@ public AopProxy createAopProxy(AdvisedSupport config) {
 }
 ```
 
+<SourceRef project="spring-proxy" file="05/DefaultAopProxyFactory.java" region="example" variant="button">
+  Xem DefaultAopProxyFactory.java cùng các ví dụ khác
+</SourceRef>
+
 Flowchart:
 
-```mermaid
-flowchart TD
-    A["ProxyFactory.getProxy()"] --> B{"proxyTargetClass=true?<br/>OR optimize=true?<br/>OR không có interface?"}
-    B -->|"có"| C{"Target là interface<br/>hoặc đã là JDK Proxy?"}
-    C -->|"có"| D["JDK Dynamic Proxy"]
-    C -->|"không"| E["CGLIB Proxy<br/>(ObjenesisCglibAopProxy)"]
-    B -->|"không"| D
+```d2 title="6.1. Quyết định JDK hay CGLIB — DefaultAopProxyFactory"
+direction: down
+n_A: "ProxyFactory.getProxy()"
+n_B: "proxyTargetClass=true?\nOR optimize=true?\nOR không có interface?" { shape: diamond }
+n_C: "Target là interface\nhoặc đã là JDK Proxy?" { shape: diamond }
+n_D: "JDK Dynamic Proxy"
+n_E: "CGLIB Proxy\n(ObjenesisCglibAopProxy)"
+n_A -> n_B
+n_B -> n_C: "có"
+n_C -> n_D: "có"
+n_C -> n_E: "không"
+n_B -> n_D: "không"
 ```
 
 ### 6.2. AdvisedSupport — proxy config lưu ở đâu
@@ -388,13 +422,19 @@ Trong Spring, bạn **không** tự gọi `ProxyFactory`. Thay vào đó, `BeanP
 
 ### 7.1. Vị trí trong bean lifecycle
 
-```mermaid
-flowchart LR
-    A["BeanDefinition"] --> B["Instantiation<br/>(new/Objenesis)"]
-    B --> C["Dependency Injection<br/>(@Autowired)"]
-    C --> D["@PostConstruct /<br/>InitializingBean"]
-    D --> E["⭐ BeanPostProcessor<br/>.postProcessAfterInitialization()"]
-    E --> F["Bean sẵn sàng<br/>(có thể là PROXY)"]
+```d2 title="7.1. Vị trí trong bean lifecycle"
+direction: right
+n_A: "BeanDefinition"
+n_B: "Instantiation\n(new/Objenesis)"
+n_C: "Dependency Injection\n(@Autowired)"
+n_D: "@PostConstruct /\nInitializingBean"
+n_E: "⭐ BeanPostProcessor\n.postProcessAfterInitialization()"
+n_F: "Bean sẵn sàng\n(có thể là PROXY)"
+n_A -> n_B
+n_B -> n_C
+n_C -> n_D
+n_D -> n_E
+n_E -> n_F
 ```
 
 `AbstractAutoProxyCreator.postProcessAfterInitialization()` là nơi proxy được tạo:
@@ -432,18 +472,22 @@ protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) 
 
 ### 7.2. Hierarchy — ai auto-create proxy?
 
-```
-AbstractAutoProxyCreator (BeanPostProcessor)
-├── InfrastructureAdvisorAutoProxyCreator     ← @Transactional, @Cacheable (infrastructure)
-├── DefaultAdvisorAutoProxyCreator            ← tất cả Advisor trong context
-└── AnnotationAwareAspectJAutoProxyCreator    ← @Aspect + @Around/@Before/@After
+```d2 title="7.2. Hierarchy — ai auto-create proxy?"
+direction: right
+t0: "AbstractAutoProxyCreator (BeanPostProcessor)"
+t1: "InfrastructureAdvisorAutoProxyCreator     ← @Transactional, @Cacheable (infrastructure)"
+t0 -> t1
+t2: "DefaultAdvisorAutoProxyCreator            ← tất cả Advisor trong context"
+t0 -> t2
+t3: "AnnotationAwareAspectJAutoProxyCreator    ← @Aspect + @Around/@Before/@After"
+t0 -> t3
 ```
 
 Khi Spring Boot start, `@EnableTransactionManagement` đăng ký `InfrastructureAdvisorAutoProxyCreator`. `@EnableAspectJAutoProxy` đăng ký `AnnotationAwareAspectJAutoProxyCreator`. Nếu cả hai đều có, Spring giữ cái **mạnh nhất** (theo thứ tự ưu tiên).
 
 ### 7.3. getAdvicesAndAdvisorsForBean — scan như thế nào
 
-```java
+```java source="spring-proxy/06/FindEligibleAdvisors.java"
 // Rút gọn — BeanFactoryAdvisorRetrievalHelper
 protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
     // 1) Thu thập TẤT CẢ Advisor từ ApplicationContext
@@ -461,6 +505,10 @@ protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName
     return eligibleAdvisors;
 }
 ```
+
+<SourceRef project="spring-proxy" file="06/FindEligibleAdvisors.java" region="example" variant="button">
+  Xem FindEligibleAdvisors.java cùng các ví dụ khác
+</SourceRef>
 
 > [!IMPORTANT]
 > Mỗi bean đều được **quét** qua tất cả Advisor khi khởi tạo. Nếu **bất kỳ** Advisor nào match (ít nhất 1 method match Pointcut), **toàn bộ bean** được wrap bằng proxy. Proxy sẽ chỉ intercept những method match — method không match được gọi thẳng.
@@ -484,7 +532,7 @@ Advisor = Pointcut + Advice
 
 ### 8.2. Ví dụ Advisor cho @Transactional
 
-```java
+```java source="spring-proxy/07/BeanFactoryTransactionAttributeSourceAdvisor.java"
 // Spring tự đăng ký khi @EnableTransactionManagement
 public class BeanFactoryTransactionAttributeSourceAdvisor extends AbstractBeanFactoryPointcutAdvisor {
 
@@ -501,9 +549,13 @@ public class BeanFactoryTransactionAttributeSourceAdvisor extends AbstractBeanFa
 }
 ```
 
+<SourceRef project="spring-proxy" file="07/BeanFactoryTransactionAttributeSourceAdvisor.java" region="example" variant="button">
+  Xem BeanFactoryTransactionAttributeSourceAdvisor.java cùng các ví dụ khác
+</SourceRef>
+
 ### 8.3. Custom Advisor — execution time logging
 
-```java
+```java source="spring-proxy/08/ServiceTimingAdvisor.java"
 // Pointcut: match mọi method trong package service
 @Component
 public class ServiceTimingAdvisor extends AbstractPointcutAdvisor {
@@ -529,6 +581,10 @@ public class ServiceTimingAdvisor extends AbstractPointcutAdvisor {
     @Override public Advice getAdvice() { return advice; }
 }
 ```
+
+<SourceRef project="spring-proxy" file="08/ServiceTimingAdvisor.java" region="example" variant="button">
+  Xem ServiceTimingAdvisor.java cùng các ví dụ khác
+</SourceRef>
 
 ### 8.4. Advice types trong AOP Alliance
 
@@ -563,31 +619,30 @@ Khi một bean có **nhiều** annotation (`@Transactional` + `@Cacheable` + cus
 
 ### 9.1. Chain execution model
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant P as Proxy
-    participant I1 as CacheInterceptor
-    participant I2 as TransactionInterceptor
-    participant I3 as TimingInterceptor
-    participant T as Target Method
-
-    C->>P: getPrice("SKU-1")
-    P->>I1: invoke(invocation)
-    Note over I1: Check cache → miss
-    I1->>I2: invocation.proceed()
-    Note over I2: BEGIN TX
-    I2->>I3: invocation.proceed()
-    Note over I3: start = nanoTime()
-    I3->>T: invocation.proceed() → target.getPrice()
-    T-->>I3: return 42.00
-    Note over I3: log elapsed time
-    I3-->>I2: return 42.00
-    Note over I2: COMMIT TX
-    I2-->>I1: return 42.00
-    Note over I1: Store in cache
-    I1-->>P: return 42.00
-    P-->>C: return 42.00
+```d2 title="9.1. Chain execution model"
+shape: sequence_diagram
+n_C: "Caller"
+n_P: "Proxy"
+n_I1: "CacheInterceptor"
+n_I2: "TransactionInterceptor"
+n_I3: "TimingInterceptor"
+n_T: "Target Method"
+n_C -> n_P: "getPrice(\"SKU-1\")"
+n_P -> n_I1: "invoke(invocation)"
+n_I1.note1: "Check cache → miss"
+n_I1 -> n_I2: "invocation.proceed()"
+n_I2.note2: "BEGIN TX"
+n_I2 -> n_I3: "invocation.proceed()"
+n_I3.note3: "start = nanoTime()"
+n_I3 -> n_T: "invocation.proceed() →\ntarget.getPrice()"
+n_T -> n_I3: "return 42.00" { style.stroke-dash: 3 }
+n_I3.note4: "log elapsed time"
+n_I3 -> n_I2: "return 42.00" { style.stroke-dash: 3 }
+n_I2.note5: "COMMIT TX"
+n_I2 -> n_I1: "return 42.00" { style.stroke-dash: 3 }
+n_I1.note6: "Store in cache"
+n_I1 -> n_P: "return 42.00" { style.stroke-dash: 3 }
+n_P -> n_C: "return 42.00" { style.stroke-dash: 3 }
 ```
 
 ### 9.2. ReflectiveMethodInvocation — engine của chain
@@ -771,13 +826,19 @@ public class RequestContext { ... }
 
 Spring inject **proxy** vào singleton — không phải `RequestContext` thật:
 
-```
-OrderService (singleton)
-    └── ctx = RequestContext$$Proxy  (proxy, tạo 1 lần lúc startup)
-                    │
-                    └── mỗi khi gọi ctx.getTraceId():
-                        proxy → lấy RequestContext thật từ current HTTP request (ThreadLocal)
-                        → delegate method call sang bean thật
+```d2 title="11.2. Giải pháp: ScopedProxyMode"
+direction: right
+t0: "OrderService (singleton)"
+t1: "ctx = RequestContext\$\$Proxy  (proxy, tạo 1 lần lúc startup)"
+t0 -> t1
+t2: "│"
+t1 -> t2
+t3: "mỗi khi gọi ctx.getTraceId():"
+t2 -> t3
+t4: "proxy → lấy RequestContext thật từ current HTTP request (ThreadLocal)"
+t3 -> t4
+t5: "→ delegate method call sang bean thật"
+t3 -> t5
 ```
 
 ### 11.3. Bên trong — SimpleBeanTargetSource

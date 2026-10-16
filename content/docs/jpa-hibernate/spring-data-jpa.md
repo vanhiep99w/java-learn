@@ -6,6 +6,9 @@ description: "Sử dụng repository abstraction của Spring Data JPA mà khôn
 > [!NOTE]
 > Bài này dành cho ứng dụng Spring Boot hiện đại dùng namespace `jakarta.persistence.*`. Mục tiêu không chỉ là viết repository nhanh, mà còn dự đoán được lúc nào Spring Data tạo query, lúc nào JPA quản lý entity và lúc nào Hibernate thực sự gửi SQL xuống database.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Mục tiêu và phạm vi](#mục-tiêu-và-phạm-vi)
@@ -100,28 +103,27 @@ Nói ngắn gọn: Spring Data chọn *thao tác nào cần làm*, JPA định n
 
 ### Luồng thực thi một lời gọi repository
 
-```mermaid
-sequenceDiagram
-    participant C as Controller
-    participant S as Service proxy
-    participant R as Repository proxy
-    participant EM as EntityManager
-    participant H as Hibernate
-    participant DB as Database
-
-    C->>S: findActiveProducts()
-    S->>S: Mở transaction read only
-    S->>R: findByStatus(ACTIVE)
-    R->>R: Phân tích metadata query
-    R->>EM: Thực thi JPQL hoặc Criteria
-    EM->>H: Provider xử lý query
-    H->>DB: SQL và bind parameters
-    DB-->>H: Result set
-    H-->>EM: Entity hoặc projection
-    EM-->>R: Kết quả
-    R-->>S: List hoặc Page
-    S->>S: Kết thúc transaction
-    S-->>C: DTO response
+```d2 title="Luồng thực thi một lời gọi repository"
+shape: sequence_diagram
+n_C: "Controller"
+n_S: "Service proxy"
+n_R: "Repository proxy"
+n_EM: "EntityManager"
+n_H: "Hibernate"
+n_DB: "Database"
+n_C -> n_S: "findActiveProducts()"
+n_S -> n_S: "Mở transaction read only"
+n_S -> n_R: "findByStatus(ACTIVE)"
+n_R -> n_R: "Phân tích metadata query"
+n_R -> n_EM: "Thực thi JPQL hoặc Criteria"
+n_EM -> n_H: "Provider xử lý query"
+n_H -> n_DB: "SQL và bind parameters"
+n_DB -> n_H: "Result set" { style.stroke-dash: 3 }
+n_H -> n_EM: "Entity hoặc projection" { style.stroke-dash: 3 }
+n_EM -> n_R: "Kết quả" { style.stroke-dash: 3 }
+n_R -> n_S: "List hoặc Page" { style.stroke-dash: 3 }
+n_S -> n_S: "Kết thúc transaction"
+n_S -> n_C: "DTO response" { style.stroke-dash: 3 }
 ```
 
 Có hai proxy khác nhau trong sơ đồ. Service proxy thường áp dụng `@Transactional`; repository proxy thực thi method repository. Bên dưới cả hai vẫn là một `EntityManager` gắn với persistence context của transaction hiện tại.
@@ -132,7 +134,7 @@ Bài viết dùng catalog tối giản: mỗi `Product` thuộc một `Category`
 
 ### Entity Category
 
-```java
+```java source="spring-data-jpa/01/Category.java"
 package com.example.catalog;
 
 import jakarta.persistence.Column;
@@ -171,11 +173,15 @@ public class Category {
 }
 ```
 
+<SourceRef project="spring-data-jpa" file="01/Category.java" region="example" variant="button">
+  Xem Category.java cùng các ví dụ khác
+</SourceRef>
+
 ### Entity Product
 
 `@Version` là cột phiên bản dùng cho optimistic locking. Kiểu wrapper `Long` còn giúp Spring Data nhận biết entity mới vì giá trị ban đầu là `null`.
 
-```java
+```java source="spring-data-jpa/02/Product.java"
 package com.example.catalog;
 
 import jakarta.persistence.Column;
@@ -265,6 +271,10 @@ public class Product {
 }
 ```
 
+<SourceRef project="spring-data-jpa" file="02/Product.java" region="example" variant="button">
+  Xem Product.java cùng các ví dụ khác
+</SourceRef>
+
 ```java
 package com.example.catalog;
 
@@ -349,7 +359,7 @@ Các method riêng của `JpaRepository` như `flush()`, `saveAndFlush()`, `dele
 
 Nếu muốn giới hạn API, tạo một base interface riêng:
 
-```java
+```java source="spring-data-jpa/03/ReadMostlyRepository.java"
 import java.util.Optional;
 import org.springframework.data.repository.NoRepositoryBean;
 import org.springframework.data.repository.Repository;
@@ -361,6 +371,10 @@ public interface ReadMostlyRepository<T, ID> extends Repository<T, ID> {
     <S extends T> S save(S entity);
 }
 ```
+
+<SourceRef project="spring-data-jpa" file="03/ReadMostlyRepository.java" region="example" variant="button">
+  Xem ReadMostlyRepository.java cùng các ví dụ khác
+</SourceRef>
 
 `@NoRepositoryBean` báo cho Spring Data rằng đây là interface nền, không phải repository cần tạo bean trực tiếp.
 
@@ -583,7 +597,7 @@ fetch first ? rows only
 
 Closed interface projection có getter trùng property của entity:
 
-```java
+```java source="spring-data-jpa/04/ProductSummary.java"
 package com.example.catalog;
 
 import java.math.BigDecimal;
@@ -598,6 +612,10 @@ public interface ProductSummary {
 }
 ```
 
+<SourceRef project="spring-data-jpa" file="04/ProductSummary.java" region="example" variant="button">
+  Xem ProductSummary.java cùng các ví dụ khác
+</SourceRef>
+
 ```java
 List<ProductSummary> findByStatusOrderById(ProductStatus status);
 ```
@@ -608,7 +626,7 @@ Spring Data thường dùng tuple query rồi tạo proxy implementation cho int
 
 Record là lựa chọn tốt khi muốn giá trị immutable và constructor tường minh.
 
-```java
+```java source="spring-data-jpa/05/ProductRow.java"
 package com.example.catalog;
 
 import java.math.BigDecimal;
@@ -621,6 +639,10 @@ public record ProductRow(
         String categoryName) {
 }
 ```
+
+<SourceRef project="spring-data-jpa" file="05/ProductRow.java" region="example" variant="button">
+  Xem ProductRow.java cùng các ví dụ khác
+</SourceRef>
 
 JPQL constructor expression dùng tên class đầy đủ:
 
@@ -654,7 +676,7 @@ Kết luận thực dụng: trả DTO/interface projection cho màn hình đọc
 
 `Specification<T>` bọc một predicate của JPA Criteria API. **Predicate** là biểu thức đúng/sai dùng trong `WHERE`. Mỗi specification nhỏ có thể tái sử dụng và ghép bằng `and`, `or`, `not`.
 
-```java
+```java source="spring-data-jpa/06/ProductSpecifications.java"
 package com.example.catalog;
 
 import java.math.BigDecimal;
@@ -695,6 +717,10 @@ public final class ProductSpecifications {
     }
 }
 ```
+
+<SourceRef project="spring-data-jpa" file="06/ProductSpecifications.java" region="example" variant="button">
+  Xem ProductSpecifications.java cùng các ví dụ khác
+</SourceRef>
 
 ```java
 import static com.example.catalog.ProductSpecifications.hasStatus;
@@ -755,17 +781,26 @@ Không có công cụ nào luôn tốt nhất. Hãy chọn abstraction thấp nh
 
 `save()` không đồng nghĩa với SQL `INSERT OR UPDATE`. Implementation nền `SimpleJpaRepository` trước tiên hỏi entity có mới không, rồi chọn một trong hai thao tác JPA.
 
-```mermaid
-flowchart TD
-    A[repository.save entity] --> B{Entity mới hay không}
-    B -->|Mới| C[EntityManager.persist]
-    C --> D[Chính instance trở thành managed]
-    B -->|Đã tồn tại| E[EntityManager.merge]
-    E --> F[Copy state sang instance managed]
-    F --> G[Trả về instance managed]
-    D --> H[Flush khi cần]
-    G --> H
-    H --> I[Hibernate sinh INSERT hoặc UPDATE]
+```d2 title="Save persist và merge"
+direction: down
+n_A: "repository.save entity"
+n_B: "Entity mới hay không" { shape: diamond }
+n_C: "EntityManager.persist"
+n_D: "Chính instance trở thành managed"
+n_E: "EntityManager.merge"
+n_F: "Copy state sang instance managed"
+n_G: "Trả về instance managed"
+n_H: "Flush khi cần"
+n_I: "Hibernate sinh INSERT hoặc UPDATE"
+n_A -> n_B
+n_B -> n_C: "Mới"
+n_C -> n_D
+n_B -> n_E: "Đã tồn tại"
+n_E -> n_F
+n_F -> n_G
+n_D -> n_H
+n_G -> n_H
+n_H -> n_I
 ```
 
 ### Spring Data nhận biết entity mới
@@ -834,7 +869,7 @@ Entity dùng ID do ứng dụng tự gán luôn có ID khác `null`. Nếu khôn
 
 Một base class có thể tự báo trạng thái mới:
 
-```java
+```java source="spring-data-jpa/07/AssignedIdEntity.java"
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
@@ -859,6 +894,10 @@ public abstract class AssignedIdEntity<ID> implements Persistable<ID> {
     }
 }
 ```
+
+<SourceRef project="spring-data-jpa" file="07/AssignedIdEntity.java" region="example" variant="button">
+  Xem AssignedIdEntity.java cùng các ví dụ khác
+</SourceRef>
 
 Chỉ dùng pattern này khi ID thực sự do ứng dụng cấp. `isNew()` sai có thể biến insert thành merge hoặc cố insert một row đã tồn tại.
 
@@ -1048,7 +1087,7 @@ Khi debug “exception xuất hiện muộn”, hãy tìm transaction boundary v
 
 Khi derived query, `@Query`, QBE và `Specification` không còn diễn đạt tốt use case, thêm một **repository fragment**. Fragment là interface nhỏ cùng implementation được ghép vào repository proxy.
 
-```java
+```java source="spring-data-jpa/08/ProductSearchRepository.java"
 package com.example.catalog;
 
 import java.math.BigDecimal;
@@ -1061,6 +1100,10 @@ public interface ProductSearchRepository {
             int limit);
 }
 ```
+
+<SourceRef project="spring-data-jpa" file="08/ProductSearchRepository.java" region="example" variant="button">
+  Xem ProductSearchRepository.java cùng các ví dụ khác
+</SourceRef>
 
 Implementation mang hậu tố `Impl` theo **tên fragment**:
 

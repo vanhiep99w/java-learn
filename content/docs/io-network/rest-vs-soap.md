@@ -114,11 +114,15 @@ Hai tính chất quyết định cách client retry an toàn:
 - **Safe** (an toàn): không đổi state server (GET). Gọi bao nhiêu lần cũng được.
 - **Idempotent** (lũy đẳng): gọi nhiều lần cho cùng kết quả như gọi một lần (PUT, DELETE, GET).
 
-```mermaid
-flowchart TD
-    R["Request timeout (không biết server đã xử lý chưa)"] --> Q{"Method idempotent?"}
-    Q -->|"có (GET/PUT/DELETE)"| Retry["Retry an toàn"]
-    Q -->|"không (POST)"| Risk["Retry → tạo trùng! cần idempotency key"]
+```d2 title="5. Idempotency & an toàn — vì sao quan trọng"
+direction: down
+n_R: "Request timeout (không biết server đã\nxử lý chưa)"
+n_Q: "Method idempotent?" { shape: diamond }
+n_Retry: "Retry an toàn"
+n_Risk: "Retry → tạo trùng! cần idempotency key"
+n_R -> n_Q
+n_Q -> n_Retry: "có (GET/PUT/DELETE)"
+n_Q -> n_Risk: "không (POST)"
 ```
 
 > [!IMPORTANT]

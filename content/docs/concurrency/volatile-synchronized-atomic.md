@@ -5,6 +5,9 @@ description: "Mổ xẻ ba cơ chế đồng bộ: volatile (visibility + memory
 
 `volatile`, `synchronized` và các atomic class đều hỗ trợ lập trình đa luồng, nhưng chúng giải quyết những phạm vi khác nhau. Chọn sai công cụ có thể tạo ra code nhìn có vẻ an toàn nhưng vẫn mất cập nhật hoặc vi phạm invariant.
 
+> [!TIP]
+> Các nút **Xem source** mở những ví dụ trong bài ở drawer để đối chiếu nhiều đoạn code mà không mất vị trí đọc. Mỗi thư mục đánh số là một ví dụ độc lập; code có thể được lược giản, không phải một dự án chạy được nguyên khối.
+
 ## Mục lục
 
 - [Tổng quan](#1-tổng-quan)
@@ -36,23 +39,19 @@ Phần này so sánh các bảo đảm cụ thể, chi phí dưới contention v
 
 CPU hiện đại có **nhiều lớp cache** (L1/L2 per-core, L3 shared):
 
-```
-┌─────────┐  ┌─────────┐  ┌─────────┐
-│  Core 0 │  │  Core 1 │  │  Core 2 │
-│  ┌───┐  │  │  ┌───┐  │  │  ┌───┐  │
-│  │L1 │  │  │  │L1 │  │  │  │L1 │  │
-│  └───┘  │  │  └───┘  │  │  └───┘  │
-│  ┌───┐  │  │  ┌───┐  │  │  ┌───┐  │
-│  │L2 │  │  │  │L2 │  │  │  │L2 │  │
-│  └───┘  │  │  └───┘  │  │  └───┘  │
-└────┬────┘  └────┬────┘  └────┬────┘
-     └────────────┼────────────┘
-              ┌───┴───┐
-              │  L3   │ (shared)
-              └───┬───┘
-              ┌───┴───┐
-              │  RAM  │
-              └───────┘
+```d2 title="2.1. Tại sao thread không thấy giá trị mới nhất?"
+direction: down
+cores: "Cache riêng từng core" {
+  c0: "Core 0" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+  c1: "Core 1" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+  c2: "Core 2" { l1: "L1 data / instruction"; l2: L2; l1 -> l2 }
+}
+l3: "L3 shared"
+ram: "RAM / DRAM: main memory"
+cores.c0.l2 -> l3
+cores.c1.l2 -> l3
+cores.c2.l2 -> l3
+l3 -> ram
 ```
 
 Mỗi core đọc biến vào **L1 cache riêng**. Khi Core 0 ghi `counter = 5`, giá trị nằm trong L1 của Core 0 — Core 1 vẫn thấy giá trị **cũ** trong L1 của mình. Đây là **visibility problem**.
@@ -93,14 +92,19 @@ volatile int data;
    - Ghi volatile = **StoreStore + StoreLoad barrier** (không reorder ghi trước nó, và ghi này flush trước khi đọc tiếp)
    - Đọc volatile = **LoadLoad + LoadStore barrier** (đọc luôn từ main memory, và không reorder các thao tác sau nó)
 
-```
-Timeline:
-Thread 1:                    Thread 2:
-  data = 42         ─┐
-  ready = true  ═══════════▶  if (ready)       // volatile read
-                     │           print(data)   // GUARANTEED thấy 42
-                     └─ StoreStore barrier: data ghi trước ready
-                        StoreLoad barrier: flush tất cả xuống memory
+```d2 title="3.1. volatile đảm bảo gì?"
+shape: sequence_diagram
+t1: "Thread 1"
+mem: "Bộ nhớ chia sẻ"
+t2: "Thread 2"
+t1 -> mem: "data = 42"
+t1.note: "StoreStore: data ghi trước ready"
+t1 -> mem: "ready = true (volatile write)"
+t1.note2: "StoreLoad barrier: flush xuống memory"
+t2 -> mem: "if (ready): volatile read"
+mem -> t2: true
+t2 -> mem: "print(data)"
+mem -> t2: "42 — GUARANTEED (happens-before)"
 ```
 
 ### 3.2. Happens-before từ volatile
@@ -181,19 +185,18 @@ synchronized (lock) {    // ACQUIRE: chỉ 1 thread vào tại một thời đi�
 2. **Visibility** — mọi thay đổi trong synchronized block visible cho thread acquire lock tiếp theo
 3. **Ordering** — không reorder qua boundary của synchronized
 
-```mermaid
-sequenceDiagram
-    participant T1 as Thread 1
-    participant Lock as Monitor
-    participant T2 as Thread 2
-    
-    T1->>Lock: acquire (synchronized enter)
-    T1->>T1: x = 1, y = 2, counter++
-    T1->>Lock: release (synchronized exit)
-    Note over Lock: Happens-before edge
-    T2->>Lock: acquire (synchronized enter)
-    T2->>T2: đọc x, y, counter → thấy giá trị mới
-    T2->>Lock: release
+```d2 title="5.2. Happens-before guarantee"
+shape: sequence_diagram
+n_T1: "Thread 1"
+n_Lock: "Monitor"
+n_T2: "Thread 2"
+n_T1 -> n_Lock: "acquire (synchronized enter)"
+n_T1 -> n_T1: "x = 1, y = 2, counter++"
+n_T1 -> n_Lock: "release (synchronized exit)"
+n_Lock.note1: "Happens-before edge"
+n_T2 -> n_Lock: "acquire (synchronized enter)"
+n_T2 -> n_T2: "đọc x, y, counter → thấy giá trị mới"
+n_T2 -> n_Lock: "release"
 ```
 
 ### 5.3. Reentrant
@@ -216,12 +219,14 @@ JVM dùng **counter** trong object header: mỗi lần cùng thread lock → cou
 
 JVM tối ưu `synchronized` bằng **lock escalation** — chọn cơ chế nhẹ nhất có thể:
 
-```mermaid
-flowchart LR
-    A["Biased Lock"] -->|"contention"| B["Thin Lock (CAS)"]
-    B -->|"spin fail"| C["Fat Lock (OS mutex)"]
-    
-    A -.->|"JDK 15+ deprecated"| B
+```d2 title="6. Biased → Thin → Fat lock — escalation nội bộ"
+direction: right
+n_A: "Biased Lock"
+n_B: "Thin Lock (CAS)"
+n_C: "Fat Lock (OS mutex)"
+n_A -> n_B: "contention"
+n_B -> n_C: "spin fail"
+n_A -> n_B: "JDK 15+ deprecated" { style.stroke-dash: 3 }
 ```
 
 ### 6.1. Biased Lock (JDK 6-14)
@@ -263,17 +268,19 @@ Lock record nằm trên stack frame của owning thread
 
 Nếu spin thất bại (contention cao) → inflate thành **ObjectMonitor** (OS-level mutex + wait queue):
 
-```
-Fat lock state:
-┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [ptr_to_ObjectMonitor:62 | 10]               │
-└─────────────────────────────────────────────────────────┘
-
-ObjectMonitor:
-├── _owner         (thread đang giữ lock)
-├── _EntryList     (threads chờ acquire)
-├── _WaitSet       (threads gọi wait())
-└── _count, _recursions
+```d2 title="6.3. Fat Lock (Heavyweight / OS mutex)"
+direction: right
+mark: "Mark Word: ptr_to_ObjectMonitor:62 | 10"
+monitor: "ObjectMonitor"
+owner: "_owner: thread giữ lock"
+entry: "_EntryList: threads chờ acquire"
+wait: "_WaitSet: threads gọi wait()"
+count: "_count / _recursions"
+mark -> monitor
+monitor -> owner
+monitor -> entry
+monitor -> wait
+monitor -> count
 ```
 
 Fat lock đắt: thread blocked → OS context switch (~1-10μs). Đây là lý do `synchronized` dưới high contention chậm hơn `Atomic*`.
@@ -299,7 +306,7 @@ Tất cả xảy ra trong **1 CPU instruction** — không thể bị interleave
 
 ### 7.2. AtomicInteger internals
 
-```java
+```java source="volatile-synchronized-atomic/01/AtomicInteger.java"
 public class AtomicInteger {
     private volatile int value;    // volatile đảm bảo visibility
 
@@ -318,6 +325,10 @@ public final int getAndAddInt(Object o, long offset, int delta) {
     return v;
 }
 ```
+
+<SourceRef project="volatile-synchronized-atomic" file="01/AtomicInteger.java" region="example" variant="button">
+  Xem AtomicInteger.java cùng các ví dụ khác
+</SourceRef>
 
 **CAS loop**: đọc → tính → CAS. Nếu CAS fail (thread khác đã đổi) → đọc lại → thử lại. **Không lock**, không block, không context switch.
 
@@ -387,7 +398,7 @@ Thread 1: CAS(A, "X", "Z") → THÀNH CÔNG (vì A đang = "X")
 
 ### 9.2. Ví dụ: lock-free stack bị lỗi
 
-```java
+```java source="volatile-synchronized-atomic/02/Node.java"
 // Lock-free stack (Treiber stack):
 class Node { int val; Node next; }
 AtomicReference<Node> top;
@@ -401,6 +412,10 @@ void pop() {
     // nhưng next = B → WRONG! top bây giờ trỏ tới B đã bị pop
 }
 ```
+
+<SourceRef project="volatile-synchronized-atomic" file="02/Node.java" region="example" variant="button">
+  Xem Node.java cùng các ví dụ khác
+</SourceRef>
 
 ### 9.3. Giải pháp: AtomicStampedReference
 
@@ -439,16 +454,13 @@ LongAdder:    N cells, mỗi thread ghi cell riêng → 0% retry
 
 ### 10.2. Kiến trúc LongAdder
 
-```
-LongAdder internals:
-┌──────────┐
-│   base   │ ← CAS nếu contention thấp
-└──────────┘
-┌──────┬──────┬──────┬──────┐
-│cell 0│cell 1│cell 2│cell 3│ ← thread hash vào cell riêng khi contention cao
-└──────┴──────┴──────┴──────┘
-
-sum() = base + Σ cells[i].value
+```d2 title="10.2. Kiến trúc LongAdder"
+direction: right
+base: "base: CAS khi contention thấp"
+cells: "Cell 0 / Cell 1 / Cell 2 / Cell 3\nthread hash vào cell riêng khi\ncontention cao"
+sum: "sum() = base + Σ cells[i].value"
+base -> sum
+cells -> sum
 ```
 
 - **Low contention**: CAS trực tiếp `base` (nhanh như AtomicLong)
@@ -508,7 +520,7 @@ Trước JDK 9, lock-free code dùng `sun.misc.Unsafe` — internal API, không 
 
 ### 11.2. VarHandle API
 
-```java
+```java source="volatile-synchronized-atomic/03/Counter.java"
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
@@ -534,6 +546,10 @@ class Counter {
     }
 }
 ```
+
+<SourceRef project="volatile-synchronized-atomic" file="03/Counter.java" region="example" variant="button">
+  Xem Counter.java cùng các ví dụ khác
+</SourceRef>
 
 ### 11.3. Access modes
 
@@ -566,14 +582,19 @@ class Counter {
 | Performance (high contention) | N/A | Kém (fat lock, context switch) | Tốt (nhưng spin) |
 | Use case | Flag, publish reference | Critical section, complex logic | Counter, CAS trên 1 biến |
 
-```mermaid
-flowchart TD
-    Q["Cần đồng bộ giữa threads?"]
-    Q -->|"Chỉ visibility (1 writer)"| V["volatile"]
-    Q -->|"Compound op (read-modify-write)"| C{"Bao nhiêu biến?"}
-    C -->|"1 biến"| A["Atomic*"]
-    C -->|"nhiều biến / logic phức tạp"| S["synchronized / ReentrantLock"]
-    Q -->|"Counter high-throughput"| L["LongAdder"]
+```d2 title="12. So sánh: volatile vs synchronized vs Atomic"
+direction: down
+n_Q: "Cần đồng bộ giữa threads?"
+n_V: "volatile"
+n_C: "Bao nhiêu biến?" { shape: diamond }
+n_A: "Atomic*"
+n_S: "synchronized / ReentrantLock"
+n_L: "LongAdder"
+n_Q -> n_V: "Chỉ visibility (1 writer)"
+n_Q -> n_C: "Compound op (read-modify-write)"
+n_C -> n_A: "1 biến"
+n_C -> n_S: "nhiều biến / logic phức tạp"
+n_Q -> n_L: "Counter high-throughput"
 ```
 
 ---
@@ -592,7 +613,7 @@ flowchart TD
 
 **Double-checked locking đúng:**
 
-```java
+```java source="volatile-synchronized-atomic/04/Singleton.java"
 class Singleton {
     private static volatile Singleton instance;  // MUST be volatile
 
@@ -608,6 +629,10 @@ class Singleton {
     }
 }
 ```
+
+<SourceRef project="volatile-synchronized-atomic" file="04/Singleton.java" region="example" variant="button">
+  Xem Singleton.java cùng các ví dụ khác
+</SourceRef>
 
 > [!WARNING]
 > Thiếu `volatile` → thread khác có thể thấy **partially constructed** object (JIT reorder: allocate → assign reference → run constructor). Với volatile, ghi reference happens-after constructor hoàn thành.

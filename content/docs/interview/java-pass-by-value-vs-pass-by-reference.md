@@ -43,11 +43,13 @@ Với đoạn code sau, có ba khái niệm cần tách riêng:
 User user = new User("An");
 ```
 
-```text
-(1) Biến `user`                 (2) Giá trị trong biến          (3) Object thật
-┌─────────────────┐             ┌──────────────────┐           ┌──────────────────────┐
-│ user            │  chứa       │ reference U1     │  trỏ tới  │ User { name = "An" } │
-└─────────────────┘             └──────────────────┘           └──────────────────────┘
+```d2 title="1.1 Biến, object và reference là ba thứ khác nhau"
+direction: right
+variable: "1. Biến user"
+reference: "2. Giá trị trong biến: reference R1"
+object: "3. Object thật: User trên heap"
+variable -> reference: "lưu giá trị"
+reference -> object: "trỏ tới"
 ```
 
 - **Biến** `user` là một “ô” có thể giữ một giá trị.
@@ -141,15 +143,14 @@ Khi gọi một method, mỗi argument được dùng để khởi tạo paramet
 
 `reference` không phải object. Nó là giá trị dùng để xác định object mà biến đang trỏ tới. Đừng nhầm **copy reference** với **truyền biến reference bằng tham chiếu**.
 
-```text
-Caller                         Method
-------                         ------
-int age = 20;                  void f(int value)
-                                  value nhận bản sao 20
-
-User user ──ref A──► User      void g(User param)
-                                  param nhận bản sao ref A
-                                  param ──ref A──► cùng User đó
+```d2 title="5. Quy tắc duy nhất: Java copy giá trị"
+direction: right
+caller: "Caller: biến chứa giá trị reference U1"
+parameter: "Method: parameter nhận BẢN SAO reference\nU1"
+object: "User tại U1: object dùng chung"
+caller -> parameter: "copy giá trị reference"
+caller -> object: U1
+parameter -> object: U1
 ```
 
 > [!NOTE]
@@ -181,13 +182,15 @@ Output:
 
 Tại thời điểm gọi `increase(score)`, giá trị `10` được copy vào `number`:
 
-```text
-main frame                 increase frame
-──────────                 ──────────────
-score = 10  ── copy ───►   number = 10
-                             number++ → 11
-
-score vẫn là 10
+```d2 title="6. Primitive: copy dữ liệu"
+direction: right
+main: "main frame: int x = 10"
+increase: "increase frame: int x = 10 (bản sao)"
+modified: "Tăng parameter: x = 11"
+original: "main x vẫn = 10"
+main -> increase: "copy giá trị 10"
+increase -> modified
+main -> original
 ```
 
 ## 7. Object: copy reference, không copy object
