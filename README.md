@@ -61,7 +61,7 @@ Dùng chung options trong `scripts/d2-options.mjs` cho website, kiểm tra và a
 | **Dagre** | Chuỗi ClassLoader trong JVM Architecture và hai ERD RBAC dạng phân tầng. Sau so sánh, các hình này bớt cao mà đường nối vẫn rõ. |
 | **TALA** | Graph strong/weak reference, object layout có container, ERD nhiều nhánh, state machine có cạnh ngược (JPA, executor, connection, Saga). Deadlock ba thread dùng `top`/`left` để giữ các đỉnh và đường chờ dễ theo dõi. |
 
-Đã so sánh 36 sơ đồ đại diện với cả ba engine. Một số kết quả ở scale/font giữ nguyên:
+Đã so sánh 43 sơ đồ đại diện với cả ba engine. Một số kết quả ở scale/font giữ nguyên:
 
 | Sơ đồ | ELK | Layout được chọn |
 |---|---|---|

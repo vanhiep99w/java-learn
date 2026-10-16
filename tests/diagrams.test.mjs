@@ -118,3 +118,31 @@ test('grids explicitly fill rows before columns, so folded paths do not cross ot
     assert.equal(Number(rows[1]), Math.ceil(cells / Number(columns[1])), path);
   }
 });
+
+test('OOP article keeps real bytecode as text, not ASCII teaching diagrams', () => {
+  const document = documents.find((entry) => entry.path === 'fundamentals/oop-4-tinh-chat.md');
+  const text = [];
+  visit(document.tree, 'code', (node) => {
+    if (!node.lang || node.lang === 'text') text.push(node.value);
+  });
+  assert.deepEqual(text, [
+    'new Dog\ndup\ninvokespecial Dog.<init>()V',
+    'aload_0\ninvokespecial Animal.<init>()V',
+    'aload_1\ninvokevirtual Animal.sound:()Ljava/lang/String;',
+  ]);
+});
+
+test('OOP object layout distinguishes heap instance from class metadata', () => {
+  const source = diagram('fundamentals/oop-4-tinh-chat.md', 'instance: "Dog instance trên heap"');
+  assert.match(source, /^metadata: "Dog class metadata/m);
+  assert.match(source, /^instance\.header -> metadata: "Klass pointer"$/m);
+  assert.match(source, /^  inherited: /m);
+  assert.match(source, /^  own: /m);
+});
+
+test('OOP constructor sequence calls Animal before Dog field initializers and returns void', () => {
+  const source = diagram('fundamentals/oop-4-tinh-chat.md', 'dog: "Dog.<init>"');
+  const steps = [...source.matchAll(/^(\w+) -> (\w+):/gm)].map((match) => `${match[1]} -> ${match[2]}`);
+  assert.deepEqual(steps, ['caller -> dog', 'dog -> animal', 'animal -> dog', 'dog -> dog', 'dog -> caller']);
+  assert.match(source, /Dog\.<init> hoàn tất \(void\)/);
+});

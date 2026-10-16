@@ -215,5 +215,47 @@
     "title": "6.1. Quyết định JDK hay CGLIB — DefaultAopProxyFactory",
     "expectedLayout": "tala",
     "reason": "Decision graph JDK/CGLIB dùng chiều ngang tốt hơn mà vẫn vừa khung đọc."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "3.1. Dog instance và metadata của lớp",
+    "expectedLayout": "tala",
+    "reason": "Kiểm tra SVG: ELK vẽ cạnh từ header xuyên qua các ô field trong grid; TALA route vòng ngoài container, giữ pointer tới metadata rõ ràng."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "3.2. Constructor chaining: Animal trước, Dog sau",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "4.1. Từ lời gọi Java đến invokevirtual",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "4.2. Vtable giúp chọn method nhanh như thế nào?",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "4.4. Interface contract và implementation runtime",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "4.6. Compile-time, runtime và tối ưu JIT",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
+  },
+  {
+    "path": "fundamentals/oop-4-tinh-chat.md",
+    "title": "5.2. Default method & bài toán đa kế thừa hành vi",
+    "expectedLayout": "elk",
+    "reason": "Đã so sánh cả 3 engine; ELK giữ hình vừa khung đọc, layout ổn định. Grid/sequence không cần đổi engine."
   }
 ]

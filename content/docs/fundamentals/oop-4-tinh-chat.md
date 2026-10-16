@@ -3,20 +3,32 @@ title: "4 Tính chất OOP"
 description: "Mổ xẻ 4 tính chất OOP ở tầng JVM: Encapsulation và bytecode getter/setter, Inheritance & object layout/super constructor chaining, Polymorphism qua invokevirtual + vtable (vptr, itable), Abstraction abstract class vs interface + default method resolution. Kèm sơ đồ, bytecode thật và bẫy thực tế."
 ---
 
-# 4 Tính chất OOP — Nhìn từ tầng JVM
-
 Lập trình hướng đối tượng trong Java thường được trình bày qua encapsulation, inheritance, polymorphism và abstraction. Bốn khái niệm này mô tả cách quản lý trạng thái, tái sử dụng hành vi và làm việc qua hợp đồng chung.
 
 ## Mục lục
 
-- [Tổng quan — đâu là 4 tính chất OOP?](#1-tổng-quan--đâu-là-4-tính-chất-oop)
-- [Tính chất số 1 — Encapsulation](#2-tính-chất-oop-số-1--encapsulation-đóng-gói)
-- [Tính chất số 2 — Inheritance](#3-tính-chất-oop-số-2--inheritance-kế-thừa)
-- [Tính chất số 3 — Polymorphism](#4-tính-chất-oop-số-3--polymorphism-đa-hình)
-- [Tính chất số 4 — Abstraction](#5-tính-chất-oop-số-4--abstraction-trừu-tượng)
-- [So sánh & khi nào dùng cái nào](#6-so-sánh--khi-nào-dùng-cái-nào)
-- [Anti-patterns cần tránh](#7-anti-patterns-cần-tránh)
-- [Tóm tắt — Cheat sheet](#8-tóm-tắt--cheat-sheet)
+- [1. Tổng quan — đâu là 4 tính chất OOP?](#1-tổng-quan--đâu-là-4-tính-chất-oop)
+- [2. Tính chất OOP số 1 — Encapsulation (Đóng gói)](#2-tính-chất-oop-số-1--encapsulation-đóng-gói)
+  - [2.1. Đóng gói thật sự = bảo vệ bất biến (invariant)](#21-đóng-gói-thật-sự--bảo-vệ-bất-biến-invariant)
+  - [2.2. Bẫy "encapsulation rò rỉ" — trả về tham chiếu mutable](#22-bẫy-encapsulation-rò-rỉ--trả-về-tham-chiếu-mutable)
+- [3. Tính chất OOP số 2 — Inheritance (Kế thừa)](#3-tính-chất-oop-số-2--inheritance-kế-thừa)
+  - [3.1. Object layout — instance và metadata của lớp](#31-object-layout--instance-và-metadata-của-lớp)
+  - [3.2. Super constructor chaining — invokespecial](#32-super-constructor-chaining--invokespecial)
+  - [3.3. Vì sao Java không đa kế thừa (class)?](#33-vì-sao-java-không-đa-kế-thừa-class)
+- [4. Tính chất OOP số 3 — Polymorphism (Đa hình)](#4-tính-chất-oop-số-3--polymorphism-đa-hình)
+  - [4.1. Từ lời gọi Java đến `invokevirtual`](#41-từ-lời-gọi-java-đến-invokevirtual)
+  - [4.2. Vtable giúp chọn method nhanh như thế nào?](#42-vtable-giúp-chọn-method-nhanh-như-thế-nào)
+  - [4.3. Điều gì được dispatch động, điều gì không?](#43-điều-gì-được-dispatch-động-điều-gì-không)
+  - [4.4. Interface dùng `invokeinterface`](#44-interface-dùng-invokeinterface)
+  - [4.5. JIT có thể bỏ luôn bước tra bảng](#45-jit-có-thể-bỏ-luôn-bước-tra-bảng)
+  - [4.6. Tóm tắt luồng dispatch](#46-tóm-tắt-luồng-dispatch)
+  - [4.7. Overriding vs Overloading — runtime vs compile-time](#47-overriding-vs-overloading--runtime-vs-compile-time)
+- [5. Tính chất OOP số 4 — Abstraction (Trừu tượng)](#5-tính-chất-oop-số-4--abstraction-trừu-tượng)
+  - [5.1. Khác biệt cốt lõi](#51-khác-biệt-cốt-lõi)
+  - [5.2. Default method & bài toán đa kế thừa hành vi](#52-default-method--bài-toán-đa-kế-thừa-hành-vi)
+- [6. So sánh & khi nào dùng cái nào](#6-so-sánh--khi-nào-dùng-cái-nào)
+- [7. Anti-patterns cần tránh](#7-anti-patterns-cần-tránh)
+- [8. Tóm tắt — Cheat sheet](#8-tóm-tắt--cheat-sheet)
 
 ---
 
@@ -33,12 +45,7 @@ OOP có đúng **4 tính chất cốt lõi** trong phạm vi tài liệu này:
 
 Có thể nhớ bằng bốn động từ:
 
-```text
-Encapsulation → bảo vệ
-Inheritance   → kế thừa
-Polymorphism  → thay đổi hành vi
-Abstraction   → ẩn chi tiết
-```
+**Encapsulation: bảo vệ** · **Inheritance: kế thừa** · **Polymorphism: chọn hành vi** · **Abstraction: ẩn chi tiết**.
 
 > [!IMPORTANT]
 > Bốn phần chính tiếp theo được ghi rõ **“Tính chất OOP số 1”** đến **“Tính chất OOP số 4”**. Overriding và overloading không phải tính chất thứ năm; chúng được giải thích bên trong phần Polymorphism để tránh nhầm lẫn.
@@ -103,34 +110,61 @@ public List<Player> players() {
 
 **Inheritance** cho phép một class tái sử dụng và mở rộng class khác. Nhưng điều ít người để ý: kế thừa ảnh hưởng tới **bố cục bộ nhớ** của object và **thứ tự khởi tạo**.
 
-### 3.1. Object layout — field cha nằm trước field con
+### 3.1. Object layout — instance và metadata của lớp
 
-Một `Dog extends Animal` được layout trong heap như sau (HotSpot, 64-bit, compressed oops):
+Một instance `Dog extends Animal` chứa cả field kế thừa từ `Animal` và field của `Dog`. Ví dụ khái niệm dưới đây dùng object header kiểu HotSpot 64-bit với compressed class pointers:
 
+```d2 layout="tala" title="3.1. Dog instance và metadata của lớp"
+direction: right
+instance: "Dog instance trên heap" {
+  grid-rows: 4
+  grid-columns: 1
+  header: "Object header (ví dụ minh họa)\nMark Word: 8 byte (hash, GC age, lock)\nKlass pointer: 4 byte nén"
+  inherited: "Field kế thừa từ Animal\nví dụ: name"
+  own: "Field khai báo ở Dog\nví dụ: breed"
+  padding: "Padding / alignment\ntùy layout thực tế"
+}
+metadata: "Dog class metadata\nMetaspace: thông tin lớp, vtable"
+instance.header -> metadata: "Klass pointer"
 ```
-┌──────────────────────────────────────┐  địa chỉ object Dog
-│ Mark Word        (8 byte)            │  ← object header
-│ Klass Pointer    (4 byte, nén)       │  ← trỏ tới metadata lớp Dog (chứa vtable)
-├──────────────────────────────────────┤
-│ field của Animal (vd: name)          │  ← field LỚP CHA nằm trước
-├──────────────────────────────────────┤
-│ field của Dog    (vd: breed)         │  ← field lớp con nằm sau
-└──────────────────────────────────────┘
-```
 
-Field lớp cha luôn nằm trước → một tham chiếu `Animal a = dog` đọc field `name` ở **cùng offset** dù object thật là `Dog`. Đây là nền tảng để upcasting an toàn mà không cần copy.
+Upcasting như `Animal a = dog` **không tạo bản sao** và không thay đổi object: biến `a` vẫn trỏ tới chính instance `Dog`. Field kế thừa vẫn thuộc instance đó.
+
+> [!NOTE]
+> Đây là sơ đồ thành phần, không phải bản dump offset. [JVMS §2.7](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html#jvms-2.7) không bắt buộc một cấu trúc object cụ thể. Thứ tự packing, padding và kích thước header phụ thuộc JVM/cấu hình; không nên suy ra rằng mọi field cha luôn chiếm một khối liên tục trước field con.
 
 ### 3.2. Super constructor chaining — invokespecial
 
 Constructor con **bắt buộc** gọi constructor cha (ngầm định `super()` nếu bạn không viết). Bytecode của `new Dog()`:
 
-```
+```text
 new Dog
 dup
 invokespecial Dog.<init>()V
-   └─ trong Dog.<init>: aload_0; invokespecial Animal.<init>()V   ← gọi cha TRƯỚC
-   └─ rồi mới khởi tạo field của Dog
 ```
+
+Trong constructor `Dog.<init>`, lời gọi constructor cha có dạng:
+
+```text
+aload_0
+invokespecial Animal.<init>()V
+```
+
+Với constructor thông thường trong ví dụ này, trình tự là:
+
+```d2 title="3.2. Constructor chaining: Animal trước, Dog sau"
+shape: sequence_diagram
+caller: Caller
+dog: "Dog.<init>"
+animal: "Animal.<init>"
+caller -> dog: "invokespecial Dog.<init>()"
+dog -> animal: "invokespecial Animal.<init>()"
+animal -> dog: "Constructor cha hoàn tất" { style.stroke-dash: 3 }
+dog -> dog: "Khởi tạo field của Dog\nrồi chạy phần thân constructor"
+dog -> caller: "Dog.<init> hoàn tất (void)" { style.stroke-dash: 3 }
+```
+
+Constructor không trả về object. `new` tạo instance; `dup` giữ thêm một bản reference trên operand stack trước lời gọi `invokespecial`.
 
 > [!IMPORTANT]
 > Constructor cha chạy **trước** khi field của con được khởi tạo. Bẫy kinh điển: gọi method bị override từ trong constructor cha sẽ chạy bản con — nhưng field con **chưa init**:
@@ -211,17 +245,13 @@ Khi thực thi `invokevirtual`, có thể hình dung JVM làm bốn bước:
 
 ```d2 title="4.1. Từ lời gọi Java đến invokevirtual"
 direction: right
-n_Call: "animal.sound()"
-n_Compile: "Compile-time\nAnimal có sound()?"
-n_Bytecode: "invokevirtual\nAnimal.sound"
-n_Runtime: "Runtime object\nlà lớp nào?" { shape: diamond }
-n_Dog: "Dog.sound()"
-n_Cat: "Cat.sound()"
-n_Call -> n_Compile
-n_Compile -> n_Bytecode
-n_Bytecode -> n_Runtime
-n_Runtime -> n_Dog: "Dog"
-n_Runtime -> n_Cat: "Cat"
+compile: "Compile-time (Animal)\nanimal.sound() hợp lệ\ninvokevirtual Animal.sound"
+runtime: "Object thật là lớp nào?" { shape: diamond }
+dog: "Dog.sound()"
+cat: "Cat.sound()"
+compile -> runtime
+runtime -> dog: Dog
+runtime -> cat: Cat
 ```
 
 > [!IMPORTANT]
@@ -247,18 +277,16 @@ Object `Dog` chứa thông tin để JVM biết nó thuộc lớp `Dog`. Từ me
 
 ```d2 title="4.2. Vtable giúp chọn method nhanh như thế nào?"
 direction: right
-animal: "Tham chiếu animal"
-object: "Object Dog: class → Dog"
-vtable: "Vtable của Dog: sound → Dog.sound"
+animal: "Reference animal"
+object: "Dog instance"
+vtable: "Dog class metadata\nvtable: sound → Dog.sound"
 animal -> object
 object -> vtable: "class metadata"
 ```
 
 Do đó có thể ghi nhớ `invokevirtual` theo mô hình đơn giản sau:
 
-```text
-object thật → class thật → slot method trong vtable → implementation cần chạy
-```
+**Object thật → metadata lớp thật → slot method trong vtable → implementation cần chạy.**
 
 > [!NOTE]
 > JVM Specification quy định **kết quả của method lookup**, không bắt buộc JVM phải cài đặt bằng vtable. Vtable là mô hình triển khai phổ biến trong HotSpot và là cách trực quan để hiểu dispatch.
@@ -332,9 +360,14 @@ Bytecode thường dùng `invokeinterface` thay vì `invokevirtual`. JVM phải 
 
 Điểm cần nhớ không đổi:
 
-```text
-Speaker quyết định lời gọi hợp lệ
-Dog quyết định implementation chạy ở runtime
+```d2 title="4.4. Interface contract và implementation runtime"
+grid-rows: 1
+grid-columns: 3
+horizontal-gap: 48
+contract: "Compile-time\nSpeaker khai báo sound()"
+instruction: "Bytecode\ninvokeinterface Speaker.sound"
+target: "Runtime: object Dog\nchạy Dog.sound()"
+contract -> instruction -> target
 ```
 
 ### 4.5. JIT có thể bỏ luôn bước tra bảng
@@ -352,21 +385,23 @@ Vì vậy vtable giải thích đúng **ngữ nghĩa dispatch**, nhưng code má
 
 ### 4.6. Tóm tắt luồng dispatch
 
-```text
-Animal animal = new Dog();
-animal.sound();
+Với `Animal animal = new Dog(); animal.sound();`, ba giai đoạn đầu giữ nguyên ngữ nghĩa gọi method. JIT có thể tối ưu cách thực hiện ở giai đoạn sau:
 
-Compile-time: Animal có sound() không?  → Có, cho phép compile
-Bytecode:     invokevirtual Animal.sound
-Runtime:      object thật là Dog         → chọn Dog.sound()
-JIT:          nếu call site ổn định       → có thể inline Dog.sound()
+```d2 title="4.6. Compile-time, runtime và tối ưu JIT"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 64
+vertical-gap: 48
+compile: "1. Compile-time\nAnimal khai báo sound(): hợp lệ"
+bytecode: "2. Bytecode\ninvokevirtual Animal.sound"
+jit: "4. JIT (nếu đủ điều kiện)\nCó thể inline Dog.sound()"
+runtime: "3. Runtime: object Dog\nChọn Dog.sound()"
+compile -> bytecode -> runtime -> jit
 ```
 
 Nếu chỉ nhớ một dòng, hãy nhớ:
 
-```text
-Kiểu biến kiểm tra lời gọi; kiểu object chọn bản override.
-```
+**Kiểu biến kiểm tra lời gọi; kiểu object chọn bản override.**
 
 ### 4.7. Overriding vs Overloading — runtime vs compile-time
 
@@ -489,12 +524,12 @@ n_C2 -> n_Force: "mơ hồ"
 
 **4 tính chất ↔ cơ chế JVM:**
 
-```
-Encapsulation  → ACC_PRIVATE access flag + verifier; bảo vệ invariant
-Inheritance    → object layout (field cha trước) + invokespecial gọi <init> cha
-Polymorphism   → invokevirtual + vtable (slot cố định) / invokeinterface + itable
-Abstraction    → abstract method (no body) + default method resolution rule
-```
+| Tính chất | Cơ chế JVM liên quan |
+|---|---|
+| Encapsulation | Access control (`ACC_PRIVATE`) và kiểm tra truy cập; API bảo vệ invariant. |
+| Inheritance | Instance chứa field kế thừa; `invokespecial` gọi constructor cha. |
+| Polymorphism | `invokevirtual` / `invokeinterface`; HotSpot có thể dùng vtable / itable và JIT có thể tối ưu dispatch. |
+| Abstraction | Abstract method không có thân; compiler áp dụng quy tắc giải quyết default method. |
 
 | Khái niệm | Thời điểm quyết định | Cơ chế |
 |-----------|---------------------|--------|
