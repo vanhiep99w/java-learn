@@ -1,0 +1,124 @@
+[
+  {
+    "path": "jvm/jvm-architecture.md",
+    "captions": [
+      "JVM: biên dịch và nạp class",
+      "JVM: interpreter, JIT và CPU"
+    ],
+    "maxWidth": 700,
+    "maxHeight": 350
+  },
+  {
+    "path": "jvm/jvm-jdk-jre.md",
+    "captions": [
+      "Chạy java Hello: khởi động, load/link/init và gọi main",
+      "Trong runtime: interpreter, profiling và JIT"
+    ],
+    "maxWidth": 800,
+    "maxHeight": 350
+  },
+  {
+    "path": "spring/bean-lifecycle.md",
+    "captions": [
+      "Container preparation: steps 1–2",
+      "Bean creation: steps 3–6",
+      "Initialization: steps 7–10",
+      "Use và destroy: steps 11–14"
+    ],
+    "maxWidth": 650,
+    "maxHeight": 250
+  },
+  {
+    "path": "concurrency/aqs-deep-dive.md",
+    "captions": [
+      "Condition.signal: trước khi chuyển t4",
+      "Condition.signal: sau khi chuyển t4"
+    ],
+    "maxWidth": 650,
+    "maxHeight": 300
+  },
+  {
+    "path": "spring/filter-va-interceptor.md",
+    "captions": [
+      "4. Luồng request end-to-end"
+    ],
+    "maxWidth": 800,
+    "maxHeight": 800
+  },
+  {
+    "path": "spring/spring-ioc-container.md",
+    "captions": [
+      "Circular dependency (1/4): tạo A, cần B",
+      "Circular dependency (2/4): tạo B, lấy early reference của A",
+      "Circular dependency (3/4): inject A và hoàn tất B",
+      "Circular dependency (4/4): hoàn tất A và kiểm tra early reference"
+    ],
+    "maxWidth": 900,
+    "maxHeight": 1000
+  },
+  {
+    "path": "concurrency/deadlock.md",
+    "captions": [
+      "1. Tổng quan",
+      "Mô hình wait-for graph"
+    ],
+    "maxWidth": 600,
+    "maxHeight": 300
+  },
+  {
+    "path": "fundamentals/heap-vs-stack.md",
+    "captions": [
+      "4. Heap — object layout, header và reference"
+    ],
+    "maxWidth": 700,
+    "maxHeight": 600
+  },
+  {
+    "path": "spring/connection-pool.md",
+    "captions": [
+      "3. HikariCP Architecture — tổng quan kiến trúc"
+    ],
+    "maxWidth": 1100,
+    "maxHeight": 500
+  },
+  {
+    "path": "spring/connection-pool.md",
+    "captions": [
+      "6. Connection Lifecycle — từ creation đến eviction"
+    ],
+    "maxWidth": 1000,
+    "maxHeight": 450
+  },
+  {
+    "path": "concurrency/threadpool-executor-deep-dive.md",
+    "captions": [
+      "9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED"
+    ],
+    "maxWidth": 1000,
+    "maxHeight": 450
+  },
+  {
+    "path": "jpa-hibernate/persistence-context-and-entity-lifecycle.md",
+    "captions": [
+      "3. Bốn trạng thái của entity"
+    ],
+    "maxWidth": 950,
+    "maxHeight": 700
+  },
+  {
+    "path": "jvm/jvm-architecture.md",
+    "captions": [
+      "3.1. Ba ClassLoader mặc định"
+    ],
+    "maxWidth": 350,
+    "maxHeight": 450
+  },
+  {
+    "path": "spring/access-control-models-rbac-acl.md",
+    "captions": [
+      "8.1. Bốn bảng cốt lõi"
+    ],
+    "maxWidth": 800,
+    "maxHeight": 650
+  }
+]

@@ -158,13 +158,19 @@ Mọi thứ inject vào nơi khác (`@Autowired OrderService`) thực chất là
 Đây là trái tim của câu trả lời. Bên trong object thật, từ khóa `this` trỏ tới **chính object thật đó** — **không phải** proxy. Proxy chỉ là một object *khác* bọc bên ngoài; object thật **không hề biết** proxy tồn tại.
 
 ```d2 title="6. Vì sao this.method() bỏ qua proxy"
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 caller: "Caller bên ngoài"
 proxy: "proxy.processOrder()"
-outer: "target.processOrder(): chạy TRONG target"
 inner: "this.saveWithTransaction(): this =\nTARGET, không phải proxy"
+outer: "target.processOrder(): chạy TRONG target"
 result: "Bỏ qua proxy advice: không begin /\ncommit / rollback; @Transactional vô\nhiệu"
-caller -> proxy -> outer -> inner -> result
+caller -> proxy
+proxy -> outer
+outer -> inner
+inner -> result
 ```
 
 ```d2 title="6. Vì sao this.method() bỏ qua proxy"

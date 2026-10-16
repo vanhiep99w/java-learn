@@ -148,11 +148,16 @@ count++;   // ← BUG: không phải một thao tác
 
 Với volatile, mỗi bước riêng lẻ là visible. Nhưng **giữa** READ và WRITE, thread khác có thể chen vào:
 
-```
-Thread 1:  READ count = 5
-Thread 2:  READ count = 5     ← cùng đọc 5
-Thread 1:  WRITE count = 6
-Thread 2:  WRITE count = 6    ← ghi đè! Mất 1 increment
+```d2 title="4. volatile KHÔNG phải atomic — count++ vẫn race"
+shape: sequence_diagram
+t1: "Thread 1"
+count: "count (ban đầu = 5)"
+t2: "Thread 2"
+t1 -> count: "READ 5"
+t2 -> count: "READ 5"
+t1 -> count: "WRITE 6"
+t2 -> count: "WRITE 6"
+count.note: "Kết quả 6 thay vì 7: mất một increment"
 ```
 
 > [!IMPORTANT]
@@ -388,12 +393,17 @@ Khi contention quá cao, CAS loop **spin nhiều lần** → cache line bouncing
 
 CAS chỉ kiểm tra **giá trị** — không biết giá trị có **bị đổi rồi đổi lại** không:
 
-```
-Thread 1: đọc A (= "X")
-Thread 2: đổi A = "Y"
-Thread 2: đổi A = "X" (lại)
-Thread 1: CAS(A, "X", "Z") → THÀNH CÔNG (vì A đang = "X")
-           nhưng semantic sai — A đã bị modify giữa chừng!
+```d2 title="9.1. Vấn đề"
+shape: sequence_diagram
+t1: "Thread 1"
+memory: "Reference A"
+t2: "Thread 2"
+t1 -> memory: "đọc X"
+t2 -> memory: "đổi X → Y"
+t2 -> memory: "đổi Y → X"
+t1 -> memory: "CAS(expected=X, new=Z)"
+memory -> t1: "true: hiện tại vẫn là X"
+t1.note: "Giá trị đã bị đổi ở giữa nhưng CAS không phát hiện"
 ```
 
 ### 9.2. Ví dụ: lock-free stack bị lỗi

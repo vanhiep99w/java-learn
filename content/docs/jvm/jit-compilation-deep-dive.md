@@ -262,14 +262,17 @@ Vấn đề: loop chạy 1 triệu iteration trong 1 method call. Invocation cou
 
 **OSR**: compile method **NGAY GIỮA LÚC loop đang chạy**, rồi **transfer** execution từ interpreter frame sang compiled code:
 
-```
-Interpreter đang chạy iteration 5000 / 1000000
-  ↓ back-edge counter > threshold
-  ↓ trigger C1/C2 compilation (OSR entry point = loop header)
-  ↓ compiled code sẵn sàng
-  ↓ transfer state (local vars, stack) từ interpreter → compiled frame
-  ↓ tiếp tục từ iteration 5001 trong compiled code
-  → Remaining 995000 iterations chạy ở native speed
+```d2 title="9. On-Stack Replacement (OSR) — compile loop đang chạy"
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+interpret: "1. Interpreter\niteration 5000 / 1000000"
+trigger: "2. Back-edge counter vượt ngưỡng\ntrigger C1 / C2: OSR entry = loop header"
+transfer: "4. Transfer locals / stack\nsang compiled frame"
+compiled: "3. Compiled code sẵn sàng"
+continue: "5. Tiếp tục từ iteration 5001\n995000 iterations còn lại chạy native"
+interpret -> trigger -> compiled -> transfer -> continue
 ```
 
 ```text

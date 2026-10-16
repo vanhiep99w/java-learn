@@ -100,7 +100,7 @@ Ta dùng hệ thống blog nhỏ:
 - Một bài có tối đa một bộ metadata chi tiết.
 - Một bài được gắn nhiều tag. Khi quan hệ tag cần thêm thời điểm gắn, join row trở thành entity `PostTag`.
 
-```d2 title="2. Mô hình ví dụ và lược đồ"
+```d2 title="2. Mô hình ví dụ và lược đồ" layout="tala"
 direction: right
 n_AUTHORS: "AUTHORS" {
   shape: sql_table

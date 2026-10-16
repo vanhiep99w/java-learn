@@ -835,30 +835,27 @@ Ba lựa chọn:
 
 Entity đi qua bốn trạng thái chính. Chi tiết thao tác `persist`, `merge`, `detach` và dirty checking nằm trong [Persistence Context & Entity Lifecycle](./persistence-context-and-entity-lifecycle).
 
-```mermaid
-stateDiagram-v2
-    [*] --> Transient: new Product()
-    Transient --> Managed: persist()
-    Managed --> Detached: clear() / detach() / transaction kết thúc
-    Detached --> Managed: merge() trả về managed copy
-    Managed --> Removed: remove()
-    Removed --> [*]: flush / commit DELETE
-
-    note right of Transient
-      generated id thường chưa có
-      business key phải ổn định nếu dùng equality
-    end note
-
-    note right of Managed
-      identity map đảm bảo
-      một type + id có một instance
-    end note
-
-    note right of Detached
-      cùng row có thể được load
-      thành object khác ở context mới
-    end note
+```d2 title="9. Identity qua vòng đời entity" layout="tala"
+direction: right
+start: "new Product()" { shape: circle }
+transient: Transient
+managed: Managed
+detached: Detached
+removed: Removed
+end: "DELETE hoàn tất" { shape: circle }
+start -> transient
+transient -> managed: persist
+managed -> detached: "clear / detach / đóng context"
+detached -> managed: "merge: trả managed copy"
+managed -> removed: remove
+removed -> end: "flush / commit"
 ```
+
+| State | Ghi chú identity |
+|---|---|
+| Transient | Generated id thường chưa có; business key phải ổn định nếu dùng equality. |
+| Managed | Identity map đảm bảo một type + id có một instance trong persistence context. |
+| Detached | Cùng row có thể được load thành object khác ở context mới. `merge()` trả managed copy, không quản lý lại chính object đầu vào. |
 
 Điểm dễ nhầm nhất của `merge()` là object truyền vào không tự trở thành managed. `merge()` trả về một managed copy:
 

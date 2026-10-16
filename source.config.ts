@@ -1,6 +1,8 @@
 import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
 import { visit } from 'unist-util-visit';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { docsPageSchema } from './src/lib/docs-schema.mjs';
+import { d2Options } from './scripts/d2-options.mjs';
 import { remarkSourceReferences } from './scripts/source-references.mjs';
 
 const admonitionTypeMap: Record<string, string> = {
@@ -69,6 +71,9 @@ function remarkMermaid() {
 
 export const docs = defineDocs({
   dir: 'content/docs',
+  docs: {
+    schema: docsPageSchema,
+  },
 });
 
 export default defineConfig({
@@ -77,7 +82,7 @@ export default defineConfig({
       remarkGithubCallouts,
       remarkSourceReferences,
       remarkMermaid,
-      [remarkD2, { cacheDir: '.next/cache/docs-kit/d2', defaultCaption: 'Sơ đồ' }],
+      [remarkD2, d2Options],
     ],
   },
 });

@@ -134,14 +134,22 @@ System.out.println(s);   // [banana, apple, cherry]  — đúng thứ tự chèn
 
 `TreeSet` backing bằng `TreeMap` — một **cây đỏ-đen (Red-Black Tree)**, cây nhị phân tìm kiếm **tự cân bằng**. Không có bucket, không hash; phần tử được giữ **luôn sắp xếp** theo `compareTo`/`Comparator`.
 
-```
-Red-Black Tree (luôn cân bằng, cao ~log n):
-            [50,B]
-           /      \
-      [30,R]      [70,R]
-      /    \      /    \
-  [20,B] [40,B][60,B] [80,B]
-  → duyệt in-order = 20,30,40,50,60,70,80 (đã sort)
+```d2 title="5. TreeSet — Red-Black Tree qua TreeMap"
+direction: down
+n50: "50 (Black)" { style.fill: "#24292e"; style.font-color: white }
+n30: "30 (Red)" { style.fill: "#b42318"; style.font-color: white }
+n70: "70 (Red)" { style.fill: "#b42318"; style.font-color: white }
+n20: "20 (Black)" { style.fill: "#24292e"; style.font-color: white }
+n40: "40 (Black)" { style.fill: "#24292e"; style.font-color: white }
+n60: "60 (Black)" { style.fill: "#24292e"; style.font-color: white }
+n80: "80 (Black)" { style.fill: "#24292e"; style.font-color: white }
+n50 -> n30
+n50 -> n70
+n30 -> n20
+n30 -> n40
+n70 -> n60
+n70 -> n80
+order: "In-order: 20, 30, 40, 50, 60, 70, 80" { near: bottom-center }
 ```
 
 - `add`/`contains`/`remove` = **O(log n)** (đi từ gốc xuống, so sánh mỗi mức).

@@ -3,6 +3,7 @@ import { unified } from 'unified';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
 import { visit } from 'unist-util-visit';
 import { collectExamples, projectRoot, readDocuments } from './build-source-examples.mjs';
+import { d2Options } from './d2-options.mjs';
 
 const documents = await readDocuments(resolve(projectRoot, 'content/docs'));
 const { projects, references } = collectExamples(documents);
@@ -16,8 +17,6 @@ for (const document of documents) {
     if (node.lang === 'd2') { d2++; hasD2 = true; }
     if (node.lang === 'mermaid') mermaid++;
   });
-  if (hasD2) await unified().use(remarkD2, {
-    cacheDir: '.next/cache/docs-kit/d2', defaultCaption: 'Sơ đồ',
-  }).run(document.tree, { path: resolve(projectRoot, 'content/docs', document.path), value: document.value });
+  if (hasD2) await unified().use(remarkD2, d2Options).run(document.tree, { path: resolve(projectRoot, 'content/docs', document.path), value: document.value });
 }
 console.log(`[docs] ${documents.length} pages; ${d2} D2 diagrams validated; ${mermaid} Mermaid diagrams retained; ${projects.size} source projects, ${references.length} references validated`);

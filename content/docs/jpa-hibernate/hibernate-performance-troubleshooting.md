@@ -88,15 +88,23 @@ Các cấu hình có tiền tố `hibernate.*`, `SessionFactory`, `Statistics`, 
 **Spring Data JPA** xây abstraction repository phía trên JPA. `JpaRepository`, derived query, `@Query`, `Specification` và `@EntityGraph` trên repository giúp giảm code lặp. Cuối cùng, repository vẫn gọi `EntityManager`, và Hibernate vẫn là bên sinh SQL nếu ứng dụng chọn Hibernate làm provider.
 
 ```d2 title="Spring Data JPA"
-direction: down
+grid-rows: 4
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 app: "Application service"
 repo: "Spring Data JPA repository: abstraction\ntiện dụng"
-jpa: "Jakarta Persistence API: hợp đồng chuẩn"
 hibernate: "Hibernate ORM: provider sinh SQL và quản\nlý entity"
+jpa: "Jakarta Persistence API: hợp đồng chuẩn"
 jdbc: "JDBC driver"
 pool: "Connection pool"
 db: "Database"
-app -> repo -> jpa -> hibernate -> jdbc -> pool -> db
+app -> repo
+repo -> jpa
+jpa -> hibernate
+hibernate -> jdbc
+jdbc -> pool
+pool -> db
 ```
 
 > [!NOTE]

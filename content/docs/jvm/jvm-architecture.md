@@ -39,22 +39,37 @@ Hiểu các thành phần và luồng thực thi giúp liên kết hiện tượ
 
 ## 2. JVM tổng quan — từ .java đến machine code
 
-```d2 title="2. JVM tổng quan — từ .java đến machine code"
-direction: down
-n_A: ".java source"
-n_B: ".class bytecode"
-n_C: "Runtime Data Areas"
-n_D: "Execute bytecode"
-n_E: "JIT Compiler (C1/C2)"
-n_F: "Code Cache"
-n_G: "CPU"
-n_A -> n_B: "javac"
-n_B -> n_C: "ClassLoader"
-n_C -> n_D: "Interpreter"
-n_D -> n_E: "Hot method detected"
-n_E -> n_F: "Native code"
-n_F -> n_G: "Direct execution"
-n_D -> n_G: "Cold path"
+Tách luồng thành hai giai đoạn để phân biệt việc **biên dịch/nạp class** với việc **thực thi bytecode**.
+
+```d2 title="JVM: biên dịch và nạp class"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 80
+vertical-gap: 48
+source: ".java source"
+bytecode: ".class bytecode"
+data: "Runtime Data Areas\ngiữ code và trạng thái runtime"
+loader: "ClassLoader\nload / link / initialize"
+source -> bytecode: javac
+bytecode -> loader
+loader -> data
+```
+
+Sau khi class được nạp, execution engine chạy bytecode. Code lạnh có thể tiếp tục qua interpreter; code nóng được JIT compile và lưu trong Code Cache.
+
+```d2 title="JVM: interpreter, JIT và CPU"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 80
+vertical-gap: 48
+interpreter: "Interpreter\nchạy bytecode, thu profiling"
+jit: "JIT Compiler C1 / C2\ncompile method / loop nóng"
+cpu: "CPU\nchạy JVM interpreter hoặc compiled code"
+cache: "Code Cache\nlưu native code đã compile"
+interpreter -> cpu: cold
+interpreter -> jit: hot
+jit -> cache: compile
+cache -> cpu: execute
 ```
 
 | Component | Vai trò |
@@ -72,7 +87,7 @@ n_D -> n_G: "Cold path"
 
 ### 3.1. Ba ClassLoader mặc định
 
-```d2 title="3.1. Ba ClassLoader mặc định"
+```d2 title="3.1. Ba ClassLoader mặc định" layout="dagre"
 direction: up
 bootstrap: "Bootstrap ClassLoader\nnative code, null parent\njava.lang.*, java.util.* (modules /\nrt.jar)"
 platform: "Platform ClassLoader\njdk.internal.loader\njava.sql.*, javax.*, extensions"

@@ -39,14 +39,19 @@ Hiểu đường đi của lời gọi quan trọng hơn việc chỉ nhìn anno
 Proxy pattern: đặt một **object trung gian** giữa caller và target. Object trung gian (proxy) **cùng kiểu** với target (cùng interface hoặc subclass), nên caller không biết đang nói chuyện với ai:
 
 ```d2 title="2. Proxy Pattern — ý tưởng nền tảng"
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 caller: "Caller"
 proxy: "Proxy: intercept method call"
 target: "Target"
 before: "Logic TRƯỚC: log / cache / transaction"
 after: "Logic SAU: commit / metric / error\nhandling"
 caller -> proxy
-proxy -> before -> target -> after
+proxy -> before
+before -> target
+target -> after
 ```
 
 Trong Java, có **ba** cách tạo proxy:
@@ -376,7 +381,7 @@ public AopProxy createAopProxy(AdvisedSupport config) {
 
 Flowchart:
 
-```d2 title="6.1. Quyết định JDK hay CGLIB — DefaultAopProxyFactory"
+```d2 title="6.1. Quyết định JDK hay CGLIB — DefaultAopProxyFactory" layout="tala"
 direction: down
 n_A: "ProxyFactory.getProxy()"
 n_B: "proxyTargetClass=true?\nOR optimize=true?\nOR không có interface?" { shape: diamond }
@@ -827,18 +832,19 @@ public class RequestContext { ... }
 Spring inject **proxy** vào singleton — không phải `RequestContext` thật:
 
 ```d2 title="11.2. Giải pháp: ScopedProxyMode"
-direction: right
-t0: "OrderService (singleton)"
-t1: "ctx = RequestContext\$\$Proxy  (proxy, tạo 1 lần lúc startup)"
-t0 -> t1
-t2: "│"
-t1 -> t2
-t3: "mỗi khi gọi ctx.getTraceId():"
-t2 -> t3
-t4: "proxy → lấy RequestContext thật từ current HTTP request (ThreadLocal)"
-t3 -> t4
-t5: "→ delegate method call sang bean thật"
-t3 -> t5
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
+service: "OrderService (singleton)"
+proxy: "ctx = RequestContext proxy\nTạo một lần lúc startup"
+resolve: "Proxy lấy RequestContext thật\ntừ current HTTP request (ThreadLocal)"
+call: "Mỗi lần gọi ctx.getTraceId()"
+delegate: "Delegate method call sang bean thật"
+service -> proxy: giữ reference
+proxy -> call
+call -> resolve
+resolve -> delegate
 ```
 
 ### 11.3. Bên trong — SimpleBeanTargetSource

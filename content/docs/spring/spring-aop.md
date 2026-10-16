@@ -135,7 +135,7 @@ Khi ApplicationContext tạo bean, một `BeanPostProcessor` tìm các advisor/a
 
 Luồng của một lần gọi có thể tóm tắt như sau:
 
-```d2 title="3. Spring AOP chạy một lời gọi method như thế nào?"
+```d2 title="AOP: tìm advisor và tạo proxy lúc khởi tạo bean"
 direction: down
 n_A: "ApplicationContext tạo target bean"
 n_B: "AutoProxyCreator tìm advisor phù hợp"
@@ -143,16 +143,26 @@ n_C: "Có pointcut khớp?" { shape: diamond }
 n_D: "Đăng ký target bean gốc"
 n_E: "Tạo proxy + interceptor chain"
 n_F: "Caller inject/nhận proxy"
-n_G: "Caller gọi method"
-n_H: "Proxy chạy advice theo thứ tự"
-n_I: "Target method"
-n_J: "Advice hoàn tất theo chiều ngược lại"
-n_K: "Trả kết quả hoặc ném lại exception"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D: "Không"
 n_C -> n_E: "Có"
 n_E -> n_F
+```
+
+Khi đã nhận bean, luồng runtime tiếp tục như sau (bean không được proxy sẽ gọi target trực tiếp):
+
+```d2 title="AOP: lời gọi đi vào advice chain và quay ra"
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
+n_F: "Caller inject/nhận proxy"
+n_G: "Caller gọi method"
+n_I: "Target method"
+n_H: "Proxy chạy advice theo thứ tự"
+n_J: "Advice hoàn tất theo chiều ngược lại"
+n_K: "Trả kết quả hoặc ném lại exception"
 n_F -> n_G
 n_G -> n_H
 n_H -> n_I

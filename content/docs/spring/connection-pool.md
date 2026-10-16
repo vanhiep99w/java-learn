@@ -1,6 +1,7 @@
 ---
 title: "Connection Pool (HikariCP)"
 description: "Mổ xẻ HikariCP: ConcurrentBag lock-free connection borrowing, FastList, housekeeping thread, connection lifecycle, leak detection, pool sizing formula, suspend/resume, metrics, và migration từ legacy pools. Kèm benchmark, tuning guide, và anti-patterns."
+d2Layout: tala
 ---
 
 Connection pool duy trì một tập database connection có thể tái sử dụng để tránh chi phí mở kết nối cho từng request. HikariCP là implementation mặc định phổ biến trong Spring Boot nhờ thiết kế gọn và overhead thấp.
@@ -58,7 +59,7 @@ Pool **giới hạn** connection count, **queue** excess requests → bảo vệ
 
 ## 3. HikariCP Architecture — tổng quan kiến trúc
 
-```d2 title="3. HikariCP Architecture — tổng quan kiến trúc"
+```d2 title="3. HikariCP Architecture — tổng quan kiến trúc" layout="elk"
 direction: down
 pool: HikariCP {
   bag: ConcurrentBag {

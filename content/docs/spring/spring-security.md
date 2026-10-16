@@ -464,35 +464,34 @@ public Authentication authenticate(Authentication authentication) {
 
 ### 7.2. Pre/Post authentication checks timeline
 
-```d2 title="7.2. Pre/Post authentication checks timeline"
+Sau `loadUserByUsername()`, pre-check chạy theo thứ tự dưới đây. Điều kiện đầu tiên không đạt sẽ dừng và ném exception tương ứng:
+
+```d2 title="Authentication: pre-check trước khi kiểm tra password"
 direction: right
-n_A: "loadUserByUsername()"
-n_B: "preAuthenticationChecks"
-n_B1: "isAccountNonLocked?" { shape: diamond }
-n_X1: "LockedException"
-n_B2: "isEnabled?" { shape: diamond }
-n_X2: "DisabledException"
-n_B3: "isAccountNonExpired?" { shape: diamond }
-n_X3: "AccountExpiredException"
-n_C: "additionalAuthenticationChecks\n(verify password)"
-n_X4: "BadCredentialsException"
-n_D: "postAuthenticationChecks"
-n_D1: "isCredentialsNonExpired?" { shape: diamond }
-n_X5: "CredentialsExpiredException"
-n_E: "✓ Authentication success"
-n_A -> n_B
-n_B -> n_B1
-n_B1 -> n_X1: "locked"
-n_B1 -> n_B2: "OK"
-n_B2 -> n_X2: "disabled"
-n_B2 -> n_B3: "OK"
-n_B3 -> n_X3: "expired"
-n_B3 -> n_C: "OK"
-n_C -> n_X4: "wrong password"
-n_C -> n_D: "OK"
-n_D -> n_D1
-n_D1 -> n_X5: "expired"
-n_D1 -> n_E: "OK"
+pre: "preAuthenticationChecks\n1. isAccountNonLocked()\n2. isEnabled()\n3. isAccountNonExpired()"
+locked: LockedException
+disabled: DisabledException
+expired: AccountExpiredException
+password: "Tiếp theo:\nverify password"
+pre -> locked: "1 = false"
+pre -> disabled: "2 = false"
+pre -> expired: "3 = false"
+pre -> password: "tất cả pass"
+```
+
+Chỉ khi các pre-check pass, provider mới kiểm tra password rồi kiểm tra hạn sử dụng credentials:
+
+```d2 title="Authentication: password và post-check"
+direction: right
+verify: "additionalAuthenticationChecks\nverify password"
+bad: BadCredentialsException
+post: "postAuthenticationChecks\nisCredentialsNonExpired()?"
+expired: CredentialsExpiredException
+success: "Authentication success"
+verify -> bad: "wrong password"
+verify -> post: OK
+post -> expired: false
+post -> success: true
 ```
 
 ### 7.3. UserCache — tối ưu cho UserDetailsService chậm

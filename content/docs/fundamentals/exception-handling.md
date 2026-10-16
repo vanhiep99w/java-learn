@@ -31,31 +31,43 @@ Exception dành cho tình huống bất thường, không phải cơ chế đi�
 
 ## 2. Cây phân cấp Throwable — Error, Exception, RuntimeException
 
+Mũi tên đi từ **lớp cha sang lớp con**. `Exception` chứa cả checked exception và `RuntimeException` (unchecked); “checked” không phải một class riêng trong cây.
+
 ```d2 title="2. Cây phân cấp Throwable — Error, Exception, RuntimeException"
 direction: right
-t0: "Object"
-t1: "│"
-t0 -> t1
-t2: "Throwable"
-t0 -> t2
-t3: "┌────┴────┐"
-t0 -> t3
-t4: "Error    Exception"
-t0 -> t4
-t5: "│       ┌────┴────────────────┐"
-t4 -> t5
-t6: "│   RuntimeException    (checked exceptions)"
-t4 -> t6
-t7: "│       │                     │"
-t4 -> t7
-t8: "OutOfMemory  NullPointer      IOException"
-t0 -> t8
-t9: "StackOverflow IllegalArgument  SQLException"
-t0 -> t9
-t10: "LinkageError  IndexOutOf       FileNotFoundException"
-t0 -> t10
-t11: "ClassCast         InterruptedException"
-t10 -> t11
+object: Object
+throwable: Throwable
+error: "Error\n(unchecked)"
+exception: Exception
+vmError: VirtualMachineError
+outOfMemory: OutOfMemoryError
+stackOverflow: StackOverflowError
+linkage: LinkageError
+runtime: "RuntimeException\n(unchecked)"
+nullPointer: NullPointerException
+illegalArgument: IllegalArgumentException
+indexOutOfBounds: IndexOutOfBoundsException
+classCast: ClassCastException
+io: "IOException\n(checked)"
+fileNotFound: FileNotFoundException
+sql: "SQLException\n(checked)"
+interrupted: "InterruptedException\n(checked)"
+object -> throwable
+throwable -> error
+throwable -> exception
+error -> vmError
+error -> linkage
+vmError -> outOfMemory
+vmError -> stackOverflow
+exception -> runtime
+exception -> io
+exception -> sql
+exception -> interrupted
+runtime -> nullPointer
+runtime -> illegalArgument
+runtime -> indexOutOfBounds
+runtime -> classCast
+io -> fileNotFound
 ```
 
 | Loại | Phải catch/declare? | Khi nào dùng | Ví dụ |

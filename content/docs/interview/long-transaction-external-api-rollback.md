@@ -400,7 +400,7 @@ Nếu gửi trùng, dùng idempotency hoặc deduplication ở consumer.
 
 ### 9.1. State machine
 
-```d2 title="9.1. State machine"
+```d2 title="9.1. State machine" layout="tala"
 direction: right
 n_NEW: "NEW"
 n_PROCESSING: "PROCESSING"
@@ -614,19 +614,18 @@ Cách xử lý:
 4. Nếu crash giữa bước 2 và 3, worker retry bằng **cùng idempotency key**.
 5. Remote service trả lại kết quả cũ thay vì thực hiện lần hai.
 
-```text
-DB: step STARTED
-      │
-      ├─ call remote với key K
-      │      └─ remote lưu K → success
-      │
-      └─ app crash
-
-Recovery:
-  retry key K
-  → remote tìm thấy K
-  → trả lại success + externalRef cũ
-  → local DB ghi SUCCEEDED
+```d2 title="12. Crash window: API thành công nhưng chưa kịp lưu DB"
+shape: sequence_diagram
+app: "App / recovery worker"
+db: "Local DB"
+remote: "Remote API"
+app -> db: "step = STARTED"
+app -> remote: "call với idempotency key K"
+remote -> remote: "lưu K → success + externalRef"
+app.note: "App crash trước khi lưu SUCCEEDED"
+app -> remote: "Recovery: retry cùng key K"
+remote -> app: "success + externalRef cũ (không làm lại side effect)"
+app -> db: "step = SUCCEEDED"
 ```
 
 Nếu remote API không hỗ trợ idempotency, cần ít nhất một endpoint tra cứu theo business key hoặc merchant reference:

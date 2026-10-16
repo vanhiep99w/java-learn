@@ -86,15 +86,18 @@ public interface ApplicationContext extends
 ### 2.4. Startup flow tổng quan
 
 ```d2 title="2.4. Startup flow tổng quan"
-direction: down
-n_A: "SpringApplication.run()"
-n_B: "Tạo ApplicationContext\n(chọn implementation theo classpath)"
-n_C: "prepareContext()\n— đăng ký @Configuration source"
-n_D: "refreshContext() → refresh()"
-n_E: "invokeBeanFactoryPostProcessors()\n— scan @Component, @Bean, @Import\n→ tạo BeanDefinition"
-n_F: "registerBeanPostProcessors()\n— đăng ký BPP (AutoProxyCreator, etc.)"
-n_G: "finishBeanFactoryInstantiation()\n— ⭐ tạo TẤT CẢ singleton bean"
-n_H: "finishRefresh()\n— publish ContextRefreshedEvent"
+grid-rows: 4
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+n_A: "1. SpringApplication.run()"
+n_B: "2. Tạo ApplicationContext\n(chọn implementation theo classpath)"
+n_D: "4. refreshContext() → refresh()"
+n_C: "3. prepareContext()\n— đăng ký @Configuration source"
+n_E: "5. invokeBeanFactoryPostProcessors()\n— scan @Component, @Bean, @Import\n→ tạo BeanDefinition"
+n_F: "6. registerBeanPostProcessors()\n— đăng ký BPP (AutoProxyCreator, etc.)"
+n_H: "8. finishRefresh()\n— publish ContextRefreshedEvent"
+n_G: "7. finishBeanFactoryInstantiation()\n— ⭐ tạo TẤT CẢ singleton bean"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D
@@ -128,23 +131,23 @@ public class GenericApplicationContext extends AbstractApplicationContext {
 
 ```d2 title="3.1. Hierarchy"
 direction: right
-t0: "BeanFactory (interface)"
-t1: "ListableBeanFactory (liệt kê bean)"
-t0 -> t1
-t2: "ConfigurableListableBeanFactory (config + liệt kê)"
-t1 -> t2
-t3: "DefaultListableBeanFactory (CONCRETE — ~4000 dòng)"
-t2 -> t3
-t4: "extends AbstractAutowireCapableBeanFactory"
-t3 -> t4
-t5: "extends AbstractBeanFactory"
-t4 -> t5
-t6: "extends DefaultSingletonBeanRegistry"
-t5 -> t6
-t7: "⭐ chứa singletonObjects map (bean cache)"
-t6 -> t7
-t8: "implements ConfigurableListableBeanFactory, BeanDefinitionRegistry"
-t3 -> t8
+beanFactory: "BeanFactory\n(interface)"
+listable: "ListableBeanFactory\n(liệt kê bean)"
+configurable: "ConfigurableListableBeanFactory\n(config + liệt kê)"
+registry: "BeanDefinitionRegistry\n(interface)"
+concrete: "DefaultListableBeanFactory\n(concrete)"
+autowire: AbstractAutowireCapableBeanFactory
+abstractFactory: AbstractBeanFactory
+factorySupport: FactoryBeanRegistrySupport
+singletonRegistry: "DefaultSingletonBeanRegistry\nchứa singletonObjects map"
+listable -> beanFactory: extends
+configurable -> listable: extends
+concrete -> configurable: implements
+concrete -> registry: implements
+concrete -> autowire: extends
+autowire -> abstractFactory: extends
+abstractFactory -> factorySupport: extends
+factorySupport -> singletonRegistry: extends
 ```
 
 ### 3.2. Các data structure quan trọng
@@ -534,11 +537,12 @@ private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(1
 
 ### 7.3. Flow chi tiết
 
-```d2 title="7.3. Flow chi tiết"
+Bốn hình tiếp nối **cùng một lần khởi tạo context**; cache và các bean được giữ xuyên suốt, không khởi tạo lại giữa các hình.
+
+```d2 title="Circular dependency (1/4): tạo A, cần B"
 shape: sequence_diagram
 n_C: "Container"
 n_A: "ServiceA"
-n_B: "ServiceB"
 n_Cache: "Three-level Cache"
 n_C.note1: "Bắt đầu tạo ServiceA"
 n_C -> n_A: "instantiate (new ServiceA())"
@@ -546,6 +550,13 @@ n_C -> n_Cache: "Level 3: put(\"serviceA\", () →\ngetEarlyBeanReference(A))"
 n_Cache.note2: "A chưa inject, chưa init\nnhưng đã có ObjectFactory"
 n_C.note3: "Inject dependencies cho A"
 n_C -> n_C: "A cần ServiceB → getBean(\"serviceB\")"
+```
+
+```d2 title="Circular dependency (2/4): tạo B, lấy early reference của A"
+shape: sequence_diagram
+n_C: "Container"
+n_B: "ServiceB"
+n_Cache: "Three-level Cache"
 n_C.note4: "Bắt đầu tạo ServiceB"
 n_C -> n_B: "instantiate (new ServiceB())"
 n_C -> n_Cache: "Level 3: put(\"serviceB\", () →\ngetEarlyBeanReference(B))"
@@ -555,10 +566,24 @@ n_C -> n_Cache: "getSingleton(\"serviceA\")\nLevel 1: miss\nLevel 2: miss\nLevel
 n_Cache -> n_Cache: "ObjectFactory.getObject()\n→ getEarlyBeanReference(A)\n→ có thể wrap bằng AOP proxy"
 n_Cache -> n_Cache: "Move A: Level 3 → Level 2"
 n_Cache -> n_C: "Trả early reference của A (có thể là\nproxy)" { style.stroke-dash: 3 }
+```
+
+```d2 title="Circular dependency (3/4): inject A và hoàn tất B"
+shape: sequence_diagram
+n_C: "Container"
+n_B: "ServiceB"
+n_Cache: "Three-level Cache"
 n_C -> n_B: "inject A (early reference) vào B"
 n_C -> n_B: "@PostConstruct, init callbacks"
 n_C -> n_Cache: "Level 1: put(\"serviceB\",\nfully-initialized B)\nRemove from Level 2, 3"
 n_C.note6: "ServiceB hoàn tất"
+```
+
+```d2 title="Circular dependency (4/4): hoàn tất A và kiểm tra early reference"
+shape: sequence_diagram
+n_C: "Container"
+n_A: "ServiceA"
+n_Cache: "Three-level Cache"
 n_C -> n_C: "Quay lại inject B cho A" { style.stroke-dash: 3 }
 n_C -> n_A: "inject B (fully initialized) vào A"
 n_C -> n_A: "@PostConstruct, init callbacks"
@@ -742,11 +767,14 @@ META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
 File này liệt kê tất cả auto-configuration class. `AutoConfigurationImportSelector` load danh sách, filter theo `@Conditional`, rồi import:
 
 ```d2 title="9.3. Auto-Configuration mechanism"
-direction: down
+grid-rows: 4
+grid-columns: 2
+horizontal-gap: 80
+vertical-gap: 48
 n_A: "SpringApplication.run()"
 n_B: "@EnableAutoConfiguration\n→\n@Import(AutoConfigurationImportSelector.class)"
-n_C: "Load danh sách từ\nAutoConfiguration.imports\n(~150 class trong\nspring-boot-autoconfigure)"
 n_D: "Filter bằng @ConditionalOnClass\n→ loại bỏ class không có trên\nclasspath\n(ví dụ: không có MongoDB driver → skip\nMongoAutoConfiguration)"
+n_C: "Load danh sách từ\nAutoConfiguration.imports\n(~150 class trong\nspring-boot-autoconfigure)"
 n_E: "Sắp xếp theo @AutoConfigureOrder,\n@AutoConfigureBefore,\n@AutoConfigureAfter"
 n_F: "Cho từng class: evaluate\n@ConditionalOnBean,\n@ConditionalOnMissingBean,\n@ConditionalOnProperty..."
 n_G: "Class pass → đăng ký BeanDefinition\nClass fail → skip hoàn toàn"
@@ -1099,21 +1127,17 @@ Spring cho phép **lồng** ApplicationContext: child context có thể tham chi
 
 ```d2 title="13.1. Khi nào dùng"
 direction: right
-t0: "Parent ApplicationContext"
-t1: "shared beans (DataSource, common services)"
-t0 -> t1
-t2: "│"
-t0 -> t2
-t3: "Child Context 1 (DispatcherServlet — web endpoints)"
-t2 -> t3
-t4: "Controllers, ViewResolvers"
-t3 -> t4
-t5: "│"
-t0 -> t5
-t6: "Child Context 2 (Admin DispatcherServlet)"
-t5 -> t6
-t7: "Admin Controllers"
-t6 -> t7
+parent: "Parent ApplicationContext"
+shared: "Shared beans:\nDataSource, common services"
+web: "Child Context 1\nDispatcherServlet: web endpoints"
+webBeans: "Controllers, ViewResolvers"
+admin: "Child Context 2\nAdmin DispatcherServlet"
+adminBeans: "Admin Controllers"
+parent -> shared
+parent -> web
+parent -> admin
+web -> webBeans
+admin -> adminBeans
 ```
 
 ### 13.2. Lookup order

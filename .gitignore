@@ -21,6 +21,7 @@ __pycache__/
 next-env.d.ts
 
 # Generated documentation assets
+/diagrams/
 /public/source-examples/
 .cache/
 *.tsbuildinfo

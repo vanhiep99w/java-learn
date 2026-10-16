@@ -262,28 +262,32 @@ java Hello
 
 Luồng tổng quát là **load → link → initialize → execute**. JVM không nhất thiết load và resolve toàn bộ class của ứng dụng ngay lúc khởi động. Nhiều class và symbolic reference chỉ được xử lý khi code thật sự sử dụng chúng.
 
-```d2 title="7. JVM hoạt động như thế nào khi chạy một file .class?"
-direction: down
+```d2 title="Chạy java Hello: khởi động, load/link/init và gọi main"
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
 n_A: "java Hello"
 n_B: "Khởi tạo JVM\nvà main thread"
-n_C: "Load\nApplication ClassLoader tìm\nHello.class"
 n_D: "Link\nVerify → Prepare → Resolve"
+n_C: "Load\nApplication ClassLoader tìm\nHello.class"
 n_E: "Initialize\nchạy <clinit> nếu có"
 n_F: "Gọi main(String[])\ntạo stack frame"
-n_G: "Interpreter chạy bytecode\nvà thu profiling"
-n_H: "Method hoặc loop đủ nóng?" { shape: diamond }
-n_I: "JIT compile\nvào Code Cache"
-n_J: "CPU chạy native code"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D
 n_D -> n_E
 n_E -> n_F
-n_F -> n_G
-n_G -> n_H
-n_H -> n_G: "Chưa"
-n_H -> n_I: "Rồi"
-n_I -> n_J
+```
+
+```d2 title="Trong runtime: interpreter, profiling và JIT"
+direction: right
+interpreter: "Interpreter\nbytecode + profiling"
+jit: "JIT C1 / C2\ncompile vào Code Cache"
+cpu: "CPU chạy\ncompiled code"
+interpreter -> interpreter: "chưa đủ hot"
+interpreter -> jit: "đủ hot"
+jit -> cpu
 ```
 
 Các bước cụ thể:

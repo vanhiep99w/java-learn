@@ -281,15 +281,26 @@ w == a;                      // false
 
 G1 GC (JDK 8u20+) có feature **String Deduplication** (`-XX:+UseStringDeduplication`, default OFF):
 
-```
-Trước dedup:
-  String A ("Hello") → byte[]{72,101,108,108,111}   ← object riêng
-  String B ("Hello") → byte[]{72,101,108,108,111}   ← object riêng, cùng nội dung
-  
-Sau dedup:
-  String A ("Hello") ──┐
-                       ├──→ byte[]{72,101,108,108,111}   ← SHARE cùng array
-  String B ("Hello") ──┘
+```d2 title="8. String Deduplication — G1 GC tự gộp string trùng"
+direction: right
+grid-rows: 3
+grid-columns: 1
+vertical-gap: 24
+before: "Trước dedup: hai array cùng nội dung" {
+  a: "String A: Hello"
+  b: "String B: Hello"
+  av: "byte[] 72,101,108,108,111 (array A)"
+  bv: "byte[] 72,101,108,108,111 (array B)"
+  a -> av: value
+  b -> bv: value
+}
+after: "Sau dedup: hai String object vẫn riêng" {
+  a: "String A: Hello"
+  b: "String B: Hello"
+  shared: "byte[] 72,101,108,108,111 (shared)"
+  a -> shared: value
+  b -> shared: value
+}
 ```
 
 **Cách hoạt động:**

@@ -29,7 +29,7 @@ Thiết kế đúng cần phối hợp key, partition count, concurrency, retry,
 
 ## 2. Kafka Architecture — Broker, Topic, Partition, Replica
 
-```d2 title="2. Kafka Architecture — Broker, Topic, Partition, Replica"
+```d2 title="2. Kafka Architecture — Broker, Topic, Partition, Replica" layout="tala"
 direction: right
 producer: Producer
 cluster: "Kafka Cluster: topic orders" {

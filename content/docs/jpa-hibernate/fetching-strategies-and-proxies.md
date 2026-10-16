@@ -79,7 +79,7 @@ Cần tách hai câu hỏi:
 
 Ta dùng ba entity: khách hàng, đơn hàng và dòng hàng. Một khách hàng có nhiều đơn; một đơn có nhiều dòng hàng.
 
-```d2 title="2.1. Quan hệ dữ liệu"
+```d2 title="2.1. Quan hệ dữ liệu" layout="tala"
 direction: right
 n_CUSTOMER: "CUSTOMER" {
   shape: sql_table
@@ -362,30 +362,18 @@ Hibernate.initialize(order.getLines());
 
 Sơ đồ sau cho thấy sự khác nhau giữa truy cập lazy association trong và ngoài persistence context. **Persistence context** là vùng mà `EntityManager` theo dõi entity managed và liên kết proxy với Session Hibernate bên dưới.
 
-```mermaid
-sequenceDiagram
-    participant API as Controller
-    participant SVC as Transactional service
-    participant EM as EntityManager
-    participant PX as Customer proxy
-    participant DB as Database
-
-    API->>SVC: getOrder(42)
-    SVC->>EM: find(PurchaseOrder, 42)
-    EM->>DB: SELECT purchase_order
-    DB-->>EM: order row and customer_id
-    EM-->>SVC: Order with uninitialized Customer proxy
-
-    alt Access customer inside transaction
-        SVC->>PX: getName()
-        PX->>DB: SELECT customer WHERE id = ?
-        DB-->>PX: customer row
-        PX-->>SVC: name
-    else Return entity, then access after EntityManager closes
-        SVC-->>API: detached Order
-        API->>PX: getName()
-        PX--xAPI: LazyInitializationException
-    end
+```d2 title="5. Lifecycle tải dữ liệu"
+direction: down
+load: "Controller → transactional service\ngetOrder(42): EM.find, SELECT purchase_order\nreturn Order + customer_id"
+proxy: "Order giữ Customer proxy\nchưa initialize"
+boundary: "getName() khi context còn mở?" { shape: diamond }
+sql: "Proxy SELECT customer WHERE id = ?\nreturn customer row → name"
+detached: "Service trả detached Order\ncontext đã đóng"
+error: "Controller gọi proxy.getName()\nLazyInitializationException"
+load -> proxy -> boundary
+boundary -> sql: Có
+boundary -> detached: Không
+detached -> error
 ```
 
 Sau khi transaction kết thúc, entity thường trở thành **detached**: object vẫn còn trong bộ nhớ nhưng không còn được persistence context quản lý. Dữ liệu đã tải vẫn đọc được. Dữ liệu lazy chưa tải thì không còn Session để truy vấn.

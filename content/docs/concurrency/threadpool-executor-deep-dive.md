@@ -325,7 +325,7 @@ Khi nào dùng:
 
 ## 9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED
 
-```d2 title="9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED"
+```d2 title="9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED" layout="tala"
 direction: right
 n_RUNNING: "RUNNING"
 n_SHUTDOWN: "SHUTDOWN"

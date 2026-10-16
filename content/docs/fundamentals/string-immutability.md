@@ -169,26 +169,18 @@ table.b2 -> heap.world: "ordinary object pointer"
 
 **Flow chi tiết khi JVM gặp String literal `"hello"` lần đầu:**
 
-```mermaid
-sequenceDiagram
-    participant CL as ClassLoader
-    participant CP as Constant Pool (.class)
-    participant ST as StringTable (C++)
-    participant Heap as Java Heap
-
-    CL->>CP: resolve CONSTANT_String "hello"
-    CP->>ST: StringTable::intern("hello")
-    ST->>ST: hash = java_lang_String::hash_code(bytes)
-    ST->>ST: bucket_index = hash & (table_size - 1)
-    ST->>ST: scan bucket for equals match
-    alt Không tìm thấy
-        ST->>Heap: allocate String object + byte[]
-        Heap-->>ST: oop* (object pointer)
-        ST->>ST: CAS insert oop* vào bucket (lock-free)
-        ST-->>CL: return oop*
-    else Đã có String equals "hello"
-        ST-->>CL: return existing oop* (zero allocation)
-    end
+```d2 title="4.2. StringTable — cấu trúc bên trong JVM (C++ level)"
+direction: right
+resolve: "ClassLoader resolve\nCONSTANT_String hello"
+lookup: "Constant Pool → StringTable.intern\nHash bytes, chọn bucket, so equals"
+found: "Tìm thấy String hello?" { shape: diamond }
+existing: "Return existing oop*\nzero allocation"
+allocate: "Allocate String + byte[]\ntrong Java Heap"
+insert: "CAS insert vào StringTable\nreturn interned oop*"
+resolve -> lookup -> found
+found -> existing: Có
+found -> allocate: Không
+allocate -> insert
 ```
 
 ### 4.3. intern() — từ Java xuống native code
@@ -506,25 +498,18 @@ abstract class AbstractStringBuilder {
 
 ### 7.2. Flow append() chi tiết
 
-```mermaid
-sequenceDiagram
-    participant Caller
-    participant SB as StringBuilder
-    participant Arr as byte[] value
-
-    Caller->>SB: append("world")
-    SB->>SB: ensureCapacity(count + 5)
-    alt capacity đủ
-        SB->>Arr: System.arraycopy(src, 0, value, count, 5)
-        SB->>SB: count += 5
-    else capacity không đủ
-        SB->>SB: newCap = (oldCap << 1) + 2
-        SB->>Arr: value = Arrays.copyOf(value, newCap)
-        Note over Arr: Old array → GC eligible
-        SB->>Arr: System.arraycopy(src, 0, value, count, 5)
-        SB->>SB: count += 5
-    end
-    SB-->>Caller: return this (fluent API)
+```d2 title="7.2. Flow append() chi tiết"
+direction: right
+append: "Caller: append(world)"
+capacity: "ensureCapacity(count + 5)\nCapacity đủ?" { shape: diamond }
+grow: "newCap = (oldCap << 1) + 2\nvalue = Arrays.copyOf(value, newCap)\nold array: GC eligible"
+copy: "System.arraycopy(src, 0, value, count, 5)\ncount += 5"
+ret: "return this\nfluent API"
+append -> capacity
+capacity -> copy: Có
+capacity -> grow: Không
+grow -> copy
+copy -> ret
 ```
 
 ### 7.3. toString() — copy hay share?
@@ -636,18 +621,25 @@ private boolean hashIsZero; // KHÔNG volatile!
 
 G1 GC (JDK 8u20+) có thể **tự động** phát hiện String có cùng nội dung `byte[]` và **chia sẻ** backing array:
 
-```
-Trước dedup:
-  String "VN" (obj1) → byte[] {86, 78} (array1)   28 bytes
-  String "VN" (obj2) → byte[] {86, 78} (array2)   28 bytes ← duplicate!
-  String "VN" (obj3) → byte[] {86, 78} (array3)   28 bytes ← duplicate!
-  Total byte[] memory: 84 bytes
-
-Sau dedup:
-  String "VN" (obj1) ─┐
-  String "VN" (obj2) ──┼─→ byte[] {86, 78} (shared)  28 bytes
-  String "VN" (obj3) ─┘
-  Total byte[] memory: 28 bytes  (giảm 67%!)
+```d2 title="9.1. Cơ chế hoạt động"
+direction: right
+grid-rows: 3
+grid-columns: 1
+vertical-gap: 24
+before: "Trước dedup: 3 array riêng (theo số đo ví dụ)" {
+  s1: "String VN (obj1)"; s2: "String VN (obj2)"; s3: "String VN (obj3)"
+  a1: "byte[] 86,78 (array1)"; a2: "byte[] 86,78 (array2)"; a3: "byte[] 86,78 (array3)"
+  s1 -> a1: value
+  s2 -> a2: value
+  s3 -> a3: value
+}
+after: "Sau dedup: share array, không gộp String object" {
+  s1: "String VN (obj1)"; s2: "String VN (obj2)"; s3: "String VN (obj3)"
+  shared: "byte[] 86,78 (shared)"
+  s1 -> shared: value
+  s2 -> shared: value
+  s3 -> shared: value
+}
 ```
 
 ### 9.2. Dedup process — step by step

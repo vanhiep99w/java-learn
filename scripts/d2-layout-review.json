@@ -1,0 +1,219 @@
+[
+  {
+    "path": "collections/collection-framework-overview.md",
+    "title": "2. Hệ phân cấp interface — Collection vs Map",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "collections/collection-framework-overview.md",
+    "title": "9. Bảng chọn cấu trúc phù hợp",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "collections/concurrent-collections.md",
+    "title": "2.2. Java 8+ — Bin-level lock",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "collections/concurrenthashmap-deep-dive.md",
+    "title": "4. put() internals — CAS + synchronized + treeify",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "concurrency/deadlock.md",
+    "title": "1. Tổng quan",
+    "expectedLayout": "tala",
+    "reason": "Hai cạnh chờ được tách rõ; graph không phải hierarchy."
+  },
+  {
+    "path": "concurrency/deadlock.md",
+    "title": "Mô hình wait-for graph",
+    "expectedLayout": "tala",
+    "reason": "Cycle ba thread: dùng top/left để giữ ba đỉnh, giảm chiều cao."
+  },
+  {
+    "path": "concurrency/threadlocal-deep-dive.md",
+    "title": "3. Đảo ngược quyền sở hữu — map nằm trong Thread, không nằm trong ThreadLocal",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "concurrency/threadlocal-deep-dive.md",
+    "title": "5. Entry extends WeakReference — vì sao key yếu, value mạnh",
+    "expectedLayout": "tala",
+    "reason": "Đường strong/weak tách rõ, reference graph vừa chiều rộng đọc.",
+    "signature": "root: \"Stack / biến static\""
+  },
+  {
+    "path": "fundamentals/exception-handling.md",
+    "title": "2. Cây phân cấp Throwable — Error, Exception, RuntimeException",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "fundamentals/heap-vs-stack.md",
+    "title": "2. Bản đồ bộ nhớ runtime của JVM",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "fundamentals/heap-vs-stack.md",
+    "title": "4. Heap — object layout, header và reference",
+    "expectedLayout": "tala",
+    "reason": "Container header/fields/padding gọn trong khung đọc thay vì kéo ngang."
+  },
+  {
+    "path": "jpa-hibernate/relationships-mapping.md",
+    "title": "2. Mô hình ví dụ và lược đồ",
+    "expectedLayout": "tala",
+    "reason": "ERD nhiều nhánh cân đối hơn, giữ đầy đủ cardinality và constraints."
+  },
+  {
+    "path": "jvm/jvm-architecture.md",
+    "title": "3.1. Ba ClassLoader mặc định",
+    "expectedLayout": "dagre",
+    "reason": "Hierarchy ba classloader: tuyến delegate đơn giản, giảm khoảng trống dọc."
+  },
+  {
+    "path": "jvm/jvm-architecture.md",
+    "title": "5. Runtime Data Areas — memory layout",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/connection-pool.md",
+    "title": "3. HikariCP Architecture — tổng quan kiến trúc",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/connection-pool.md",
+    "title": "6. Connection Lifecycle — từ creation đến eviction",
+    "expectedLayout": "tala",
+    "reason": "State machine có quay lại IN_USE: giảm gần một nửa chiều rộng."
+  },
+  {
+    "path": "spring/kafka-spring-boot.md",
+    "title": "2. Kafka Architecture — Broker, Topic, Partition, Replica",
+    "expectedLayout": "tala",
+    "reason": "Broker trong container xếp cân đối, routing leader/consumer rõ."
+  },
+  {
+    "path": "spring/spring-aop.md",
+    "title": "AOP: tìm advisor và tạo proxy lúc khởi tạo bean",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/spring-security.md",
+    "title": "2. Kiến trúc tổng quan — Filter Chain Architecture",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/spring-security.md",
+    "title": "12.3. JwtDecoder — verify signature",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/spring-transaction.md",
+    "title": "8.2. REQUIRED — flow nội bộ",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "concurrency/forkjoin-deep-dive.md",
+    "title": "5. ForkJoinTask lifecycle — fork(), join(), compute()",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "concurrency/threadpool-executor-deep-dive.md",
+    "title": "9. Lifecycle — RUNNING → SHUTDOWN → STOP → TIDYING → TERMINATED",
+    "expectedLayout": "tala",
+    "reason": "Lifecycle executor có nhiều cạnh trạng thái/cạnh ngược; chiều rộng giảm rõ."
+  },
+  {
+    "path": "interview/long-transaction-external-api-rollback.md",
+    "title": "9.1. State machine",
+    "expectedLayout": "tala",
+    "reason": "Saga state machine nhiều vòng retry/compensation: giảm kéo ngang."
+  },
+  {
+    "path": "jpa-hibernate/entity-mapping-and-identity.md",
+    "title": "9. Identity qua vòng đời entity",
+    "expectedLayout": "tala",
+    "reason": "Entity lifecycle là graph có merge/detach, không phải một cây."
+  },
+  {
+    "path": "jpa-hibernate/fetching-strategies-and-proxies.md",
+    "title": "2.1. Quan hệ dữ liệu",
+    "expectedLayout": "tala",
+    "reason": "Ba bảng ERD gọn hơn; không cần thu nhỏ chữ."
+  },
+  {
+    "path": "jpa-hibernate/jpa-hibernate-overview.md",
+    "title": "Trạng thái entity",
+    "expectedLayout": "tala",
+    "reason": "State graph có merge/detach phù hợp layout không phân cấp."
+  },
+  {
+    "path": "jpa-hibernate/jpql-criteria-and-native-query.md",
+    "title": "1.2 Domain dùng trong ví dụ",
+    "expectedLayout": "tala",
+    "reason": "ERD ba bảng: cùng chiều cao với Dagre nhưng ít kéo ngang hơn."
+  },
+  {
+    "path": "jpa-hibernate/persistence-context-and-entity-lifecycle.md",
+    "title": "3. Bốn trạng thái của entity",
+    "expectedLayout": "tala",
+    "reason": "Các transition qua ManagedCopy/Detached bố trí gọn trong khung đọc."
+  },
+  {
+    "path": "jvm/classloader-deep-dive.md",
+    "title": "3. Parent Delegation Model — tìm class từ trên xuống",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "jvm/memory-leak.md",
+    "title": "4.1. Tri-color marking algorithm",
+    "expectedLayout": "tala",
+    "reason": "Vòng tri-color marking được gấp lại, giảm cột dọc và phân biệt nhánh lặp."
+  },
+  {
+    "path": "jvm/object-reference-memory-address.md",
+    "title": "4. Từ biến Java đến object graph",
+    "expectedLayout": "elk",
+    "reason": "ELK hiện rõ/gọn hơn hoặc lợi ích đổi engine không đáng kể; giữ layout ổn định."
+  },
+  {
+    "path": "spring/access-control-models-rbac-acl.md",
+    "title": "3.1. Mô hình dữ liệu",
+    "expectedLayout": "dagre",
+    "reason": "Quan hệ RBAC dạng phân tầng; Dagre giảm chiều cao, vẫn vừa khung đọc."
+  },
+  {
+    "path": "spring/access-control-models-rbac-acl.md",
+    "title": "4.2. Bước 2 — tạo database schema",
+    "expectedLayout": "dagre",
+    "reason": "ERD RBAC chi tiết dạng phân tầng: ít cao hơn ELK và ít rộng hơn TALA."
+  },
+  {
+    "path": "spring/access-control-models-rbac-acl.md",
+    "title": "8.1. Bốn bảng cốt lõi",
+    "expectedLayout": "tala",
+    "reason": "ACL ERD có self-reference: giảm đáng kể cả chiều rộng lẫn chiều cao."
+  },
+  {
+    "path": "spring/spring-proxy.md",
+    "title": "6.1. Quyết định JDK hay CGLIB — DefaultAopProxyFactory",
+    "expectedLayout": "tala",
+    "reason": "Decision graph JDK/CGLIB dùng chiều ngang tốt hơn mà vẫn vừa khung đọc."
+  }
+]

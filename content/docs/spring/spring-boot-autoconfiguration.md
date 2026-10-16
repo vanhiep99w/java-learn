@@ -218,14 +218,17 @@ public interface DeferredImportSelector extends ImportSelector {
 `AutoConfigurationImportSelector` implement `DeferredImportSelector` → Spring **hoãn** xử lý nó đến **cuối cùng** trong `ConfigurationClassParser`:
 
 ```d2 title="4.2. Giải pháp: DeferredImportSelector"
-direction: down
-n_A: "ConfigurationClassParser.parse()"
+grid-rows: 4
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+n_A: "1. ConfigurationClassParser.parse()"
 n_B: "1. Parse user @Configuration classes\n(từ @SpringBootApplication base\npackage)"
-n_C: "2. Parse @Import classes thường"
 n_D: "3. Xử lý @ComponentScan → tìm thêm\n@Configuration"
+n_C: "2. Parse @Import classes thường"
 n_E: "4. Đệ quy parse mọi @Configuration mới\ntìm được"
 n_F: "5. ⭐ CUỐI CÙNG: xử lý\nDeferredImportSelector\n→ AutoConfigurationImportSelector\n→ parse auto-config classes"
-n_G: "Auto-config class kiểm tra\n@ConditionalOnMissingBean\n→ user bean ĐÃ đăng ký → skip ✅"
+n_G: "7. Auto-config class kiểm tra\n@ConditionalOnMissingBean\n→ user bean ĐÃ đăng ký → skip ✅"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D
@@ -644,21 +647,20 @@ spring.datasource.hikari.minimum-idle=5
 
 ```d2 title="9.2. Dependency chain example"
 direction: right
-t0: "WebMvcAutoConfiguration"
-t1: "requires: DispatcherServletAutoConfiguration (DispatcherServlet bean)"
-t0 -> t1
-t2: "requires: ServletWebServerFactoryAutoConfiguration (embedded Tomcat/Jetty/Undertow)"
-t1 -> t2
-t3: "requires: EmbeddedWebServerFactoryCustomizerAutoConfiguration"
-t2 -> t3
-t4: "JpaRepositoriesAutoConfiguration"
-t0 -> t4
-t5: "requires: HibernateJpaAutoConfiguration (EntityManagerFactory)"
-t4 -> t5
-t6: "requires: DataSourceAutoConfiguration (DataSource)"
-t5 -> t6
-t7: "requires: spring.datasource.url property OR embedded DB"
-t6 -> t7
+web: WebMvcAutoConfiguration
+dispatcher: "DispatcherServletAutoConfiguration\nDispatcherServlet bean"
+server: "ServletWebServerFactoryAutoConfiguration\nEmbedded Tomcat / Jetty / Undertow"
+customizer: EmbeddedWebServerFactoryCustomizerAutoConfiguration
+jpa: JpaRepositoriesAutoConfiguration
+hibernate: "HibernateJpaAutoConfiguration\nEntityManagerFactory"
+datasource: "DataSourceAutoConfiguration\nDataSource"
+config: "spring.datasource.url\nhoặc embedded DB"
+web -> dispatcher: requires
+dispatcher -> server: requires
+server -> customizer: requires
+jpa -> hibernate: requires
+hibernate -> datasource: requires
+datasource -> config: requires
 ```
 
 ### 9.3. Starter = dependency aggregation + auto-config trigger

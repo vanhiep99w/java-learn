@@ -107,11 +107,13 @@ private transient volatile Node head;   // head (dummy node, thread = null)
 private transient volatile Node tail;   // tail
 ```
 
-```
-Queue structure:
-head (dummy) ←→ Node[t1, SIGNAL] ←→ Node[t2, SIGNAL] ←→ Node[t3, 0] = tail
-                     ↑                      ↑                    ↑
-                thread t1 park         thread t2 park       thread t3 park (hoặc vừa enqueue)
+```d2 title="4. CLH Queue biến thể — hàng đợi thread chờ lock"
+direction: right
+head: "head: dummy"
+t1: "Node t1\nSIGNAL: thread t1 park"
+t2: "Node t2\nSIGNAL: thread t2 park"
+t3: "tail: Node t3\nstatus 0: park hoặc vừa enqueue"
+head <-> t1 <-> t2 <-> t3
 ```
 
 **waitStatus = SIGNAL (-1)**: nghĩa là "khi node này release/cancel, phải `unpark` successor". Thread chỉ park khi predecessor có `waitStatus == SIGNAL` — đảm bảo sẽ được đánh thức.
@@ -176,27 +178,19 @@ final boolean acquireQueued(final Node node, int arg) {
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant T as Thread
-    participant AQS as AQS
-    participant Q as Queue
-    
-    T->>AQS: acquire(1)
-    AQS->>AQS: tryAcquire(1) → false
-    AQS->>Q: addWaiter() — thêm node vào tail
-    loop acquireQueued
-        AQS->>AQS: predecessor == head?
-        alt có
-            AQS->>AQS: tryAcquire(1) → thành công
-            AQS->>Q: setHead(node) — node mới thành head
-            AQS-->>T: acquire thành công!
-        else không
-            AQS->>AQS: set predecessor.waitStatus = SIGNAL
-            AQS->>T: LockSupport.park() — thread ngủ
-            Note over T: ZZZ... chờ unpark
-        end
-    end
+```d2 title="5.1. acquire()"
+direction: right
+acquire: "acquire(1)\ntryAcquire thất bại"
+queue: "addWaiter()\nthêm node vào tail"
+retry: "predecessor == head\nvà tryAcquire thành công?" { shape: diamond }
+done: "setHead(node)\nreturn acquire thành công"
+signal: "Chưa acquire được:\nshouldParkAfterFailedAcquire\nđặt predecessor SIGNAL khi cần"
+park: "Nếu đủ điều kiện: park()\nchờ unpark / interrupt rồi thử lại"
+acquire -> queue -> retry
+retry -> done: Có
+retry -> signal: Không
+signal -> park
+park -> retry: retry
 ```
 
 ### 5.2. release()
@@ -490,15 +484,38 @@ private void doSignal(Node first) {
 }
 ```
 
+```d2 title="Condition.signal: trước khi chuyển t4"
+grid-rows: 2
+grid-columns: 3
+horizontal-gap: 32
+vertical-gap: 64
+head: "Sync queue\nhead (dummy)"
+t2: "t2: SIGNAL"
+t3: "t3: 0"
+t4: "Condition queue\nt4"
+t5: t5
+nil: null
+head <-> t2 <-> t3
+t4 -> t5 -> nil
 ```
-TRƯỚC signal:
-  Sync queue: [head] ←→ [t2, SIGNAL] ←→ [t3, 0]
-  Condition queue: [t4] → [t5] → null
 
-SAU signal(t4):
-  Sync queue: [head] ←→ [t2, SIGNAL] ←→ [t3, SIGNAL] ←→ [t4, 0]
-  Condition queue: [t5] → null
-  → t4 chuyển từ condition queue sang cuối sync queue, chờ acquire lock
+`signal(t4)` chuyển t4 sang **tail của sync queue**, không trao lock ngay. t4 vẫn phải chờ acquire lại lock:
+
+```d2 title="Condition.signal: sau khi chuyển t4"
+grid-rows: 2
+grid-columns: 4
+horizontal-gap: 32
+vertical-gap: 64
+head: "Sync queue\nhead (dummy)"
+t2: "t2: SIGNAL"
+t3: "t3: SIGNAL"
+t4: "t4: 0"
+t5: "Condition queue\nt5"
+nil: null
+spacer1: "" { style.opacity: 0 }
+spacer2: "" { style.opacity: 0 }
+head <-> t2 <-> t3 <-> t4
+t5 -> nil
 ```
 
 > [!IMPORTANT]

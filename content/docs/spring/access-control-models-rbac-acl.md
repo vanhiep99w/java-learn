@@ -267,7 +267,7 @@ ReBAC phù hợp với collaboration, social network, organization tree và hệ
 
 RBAC cơ bản có bốn quan hệ:
 
-```d2 title="3.1. Mô hình dữ liệu"
+```d2 title="3.1. Mô hình dữ liệu" layout="dagre"
 direction: right
 n_APP_USER: "APP_USER" {
   shape: sql_table
@@ -388,7 +388,7 @@ Tránh permission mơ hồ như `CAN_MANAGE` hoặc `FULL_ACCESS`. Tên permissi
 
 RBAC cần ba bảng chính và hai bảng liên kết:
 
-```d2 title="4.2. Bước 2 — tạo database schema"
+```d2 title="4.2. Bước 2 — tạo database schema" layout="dagre"
 direction: right
 n_APP_USER: "APP_USER" {
   shape: sql_table
@@ -1666,7 +1666,7 @@ Spring Security cung cấp module `spring-security-acl`. Module này dùng JDBC,
 
 ### 8.1. Bốn bảng cốt lõi
 
-```d2 title="8.1. Bốn bảng cốt lõi"
+```d2 title="8.1. Bốn bảng cốt lõi" layout="tala"
 direction: right
 n_ACL_SID: "ACL_SID" {
   shape: sql_table

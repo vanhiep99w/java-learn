@@ -66,39 +66,58 @@ Instantiate → Populate → Initialize → Use → Destroy
 
 Khi cần debug startup, circular dependency hoặc AOP proxy, dùng phiên bản chi tiết dưới đây:
 
-```d2 title="2.2. Luồng đầy đủ: container preparation + bean lifecycle"
-direction: down
-n_P: "Container preparation — bean instance\nchưa tồn tại" {
-  n_A: "1. BeanDefinition Loading\n(scan @Component, @Bean, XML)"
-  n_B: "2. BeanFactoryPostProcessor\n(modify definitions)"
-}
-n_L: "Bean lifecycle" {
-  n_C: "3. Instantiate\n(constructor / factory method)"
-  n_D: "4. Populate Properties\n(@Autowired, @Value injection)"
-  n_E: "5. Aware callbacks\n(BeanNameAware, BeanFactoryAware...)"
-  n_F: "6.\nBeanPostProcessor.beforeInitialization"
-  n_G: "7. @PostConstruct"
-  n_H: "8.\nInitializingBean.afterPropertiesSet()"
-  n_I: "9. Custom init-method"
-  n_J: "10.\nBeanPostProcessor.afterInitialization\n(thường tạo AOP proxy)"
-  n_K: "11. Use — bean ready"
-  n_L1: "12. @PreDestroy"
-  n_M: "13. DisposableBean.destroy()"
-  n_N: "14. Custom destroy-method"
-}
-n_P.n_A -> n_P.n_B
-n_L.n_C -> n_L.n_D
-n_L.n_D -> n_L.n_E
-n_L.n_E -> n_L.n_F
-n_L.n_F -> n_L.n_G
-n_L.n_G -> n_L.n_H
-n_L.n_H -> n_L.n_I
-n_L.n_I -> n_L.n_J
-n_L.n_J -> n_L.n_K
-n_L.n_K -> n_L.n_L1
-n_L.n_L1 -> n_L.n_M
-n_L.n_M -> n_L.n_N
-n_P.n_B -> n_L.n_C
+Các pha tiếp nối theo thứ tự **1 → 14**; tách hình để không kéo dài một cột callback.
+
+```d2 title="Container preparation: steps 1–2"
+grid-rows: 1
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+definition: "1. BeanDefinition Loading\nscan @Component / @Bean / XML"
+factory: "2. BeanFactoryPostProcessor\nmodify definitions"
+definition -> factory
+```
+
+```d2 title="Bean creation: steps 3–6"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+instantiate: "3. Instantiate\nconstructor / factory method"
+populate: "4. Populate Properties\n@Autowired / @Value injection"
+before: "6. BeanPostProcessor\nbeforeInitialization"
+aware: "5. Aware callbacks\nBeanNameAware / BeanFactoryAware"
+instantiate -> populate
+populate -> aware
+aware -> before
+```
+
+```d2 title="Initialization: steps 7–10"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+post: "7. @PostConstruct"
+initializing: "8. InitializingBean\nafterPropertiesSet()"
+after: "10. BeanPostProcessor\nafterInitialization: có thể tạo proxy"
+custom: "9. Custom init-method"
+post -> initializing
+initializing -> custom
+custom -> after
+```
+
+```d2 title="Use và destroy: steps 11–14"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+use: "11. Use: bean ready"
+pre: "12. @PreDestroy"
+custom: "14. Custom destroy-method"
+dispose: "13. DisposableBean.destroy()"
+use -> pre
+pre -> dispose
+dispose -> custom
 ```
 
 **`Initialize` trong bản rút gọn bao gồm steps 5–10**. Đây là lý do hai cách biểu diễn không mâu thuẫn: một cách nhóm các callback kỹ thuật dưới một pha, cách còn lại bung chúng ra để thấy thứ tự chính xác.

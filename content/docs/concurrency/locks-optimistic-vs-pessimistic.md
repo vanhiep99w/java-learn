@@ -101,18 +101,17 @@ CAS(địa_chỉ, expected, newValue):
 
 Toàn bộ "so sánh rồi ghi" thực hiện **trong một lệnh nguyên tử** — không thread nào chen ngang được giữa chừng. Đây là **primitive không khóa (lock-free)** mà mọi optimistic lock xây trên đó.
 
-```mermaid
-sequenceDiagram
-    participant T as Thread
-    participant M as Memory (value=5)
-    T->>M: đọc value = 5 (expected)
-    Note over T: tính newValue = 6
-    T->>M: CAS(addr, expected=5, new=6)
-    alt value vẫn = 5
-        M-->>T: true → value=6
-    else value đã bị thread khác đổi (vd =7)
-        M-->>T: false → đọc lại, thử lại
-    end
+```d2 title="4. CAS — trái tim của optimistic lock"
+direction: right
+read: "Thread đọc expected = 5\ntính newValue = 6"
+cas: "CAS(address, expected=5, new=6)"
+match: "Memory vẫn bằng 5?" { shape: diamond }
+write: "true: ghi value = 6"
+retry: "false: không ghi\nđọc lại, tính lại, thử CAS lại"
+read -> cas -> match
+match -> write: Có
+match -> retry: "Không, ví dụ value = 7"
+retry -> read
 ```
 
 > [!IMPORTANT]
@@ -154,11 +153,17 @@ Thread B: prev=5, next=6, CAS(5→6) ✗ (A đã đổi thành 6)
 
 CAS chỉ kiểm tra "giá trị có **bằng** expected không", **không** biết "giá trị có **từng bị đổi** không". Sinh ra **ABA problem**:
 
-```
-Thread 1: đọc A, chuẩn bị CAS(A → C)
-Thread 2: đổi A → B → rồi đổi lại B → A
-Thread 1: CAS(A → C) THÀNH CÔNG (vì giá trị vẫn "là A")
-          nhưng thực tế đã có 2 lần thay đổi xảy ra ở giữa!
+```d2 title="6. ABA problem & AtomicStampedReference"
+shape: sequence_diagram
+t1: "Thread 1"
+memory: Memory
+t2: "Thread 2"
+t1 -> memory: "đọc A, chuẩn bị CAS(A → C)"
+t2 -> memory: "đổi A → B"
+t2 -> memory: "đổi B → A"
+t1 -> memory: "CAS(A → C)"
+memory -> t1: "THÀNH CÔNG: hiện tại vẫn là A"
+t1.note: "CAS không thấy hai lần đổi ở giữa: ABA"
 ```
 
 Với số đếm thuần túy, ABA thường vô hại. Nhưng với **cấu trúc dữ liệu lock-free** (stack/queue dùng con trỏ), ABA có thể nối lại một node đã bị giải phóng → hỏng cấu trúc.

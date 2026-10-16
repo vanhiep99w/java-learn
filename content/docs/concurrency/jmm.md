@@ -41,11 +41,14 @@ Từ các quy tắc đó có thể giải thích chính xác vai trò của `vol
 JMM **không** mô tả kiến trúc phần cứng cụ thể. Nó là **hợp đồng trừu tượng**:
 
 ```d2 title="2. JMM là gì — hợp đồng giữa lập trình viên và JVM"
-direction: down
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 80
+vertical-gap: 48
 dev: "Lập trình viên: dùng volatile /\nsynchronized / final đúng → visibility\nvà ordering"
 jmm: "JMM (specification): happens-before,\nfinal field semantics"
-jvm: "JVM implementation (HotSpot): chèn\nmemory barrier, cấm JIT reorder vi phạm\nJMM"
 cpu: "Hardware: x86-TSO / ARM-weak có memory\nmodel riêng; JVM bù bằng barrier phù hợp"
+jvm: "JVM implementation (HotSpot): chèn\nmemory barrier, cấm JIT reorder vi phạm\nJMM"
 dev -> jmm: hợp đồng
 jmm -> jvm: triển khai
 jvm -> cpu: barrier
@@ -130,10 +133,15 @@ Khi core 0 ghi biến `x` (cache line chuyển sang **M**), nó gửi **invalida
 
 Vấn đề: gửi invalidate message và đợi **acknowledge** từ các core khác rất **chậm** (hàng chục nanosecond). CPU **không đợi** — nó đẩy ghi vào **Store Buffer** rồi tiếp tục thực thi:
 
-```
-Core 0:
-  STORE x = 1  → [Store Buffer] → ... → eventually → L1 → bus invalidate → Core 1 ack
-  LOAD  y      → đọc ngay từ L1 (không đợi store buffer flush)
+```d2 title="4.3. Store Buffer & Invalidate Queue — nguồn gốc \"trễ\" visibility"
+direction: right
+store: "Core 0: STORE x = 1"
+buffer: "Store Buffer"
+cache: "Eventually flush → L1"
+bus: "Bus invalidate\nCore 1 ACK"
+load: "Core 0: LOAD y từ L1\nkhông đợi store buffer flush"
+store -> buffer -> cache -> bus
+store -> load: "LOAD có thể chạy trước khi STORE flush"
 ```
 
 Hệ quả: từ góc nhìn core 1, ghi `x = 1` có thể **tới sau** ghi `y = 2` dù core 0 ghi `x` trước `y`. Đây chính là **store-store reordering** ở mức phần cứng.

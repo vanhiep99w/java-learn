@@ -176,13 +176,19 @@ Vì vậy, câu trả lời phỏng vấn tốt là: **chúng cùng là Spring b
 ## 6. Ví dụ thực tế
 
 ```d2 title="6. Ví dụ thực tế"
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 http: "HTTP request"
 controller: "@Controller / @RestController: nhận\nrequest"
-service: "@Service: nghiệp vụ, transaction\nboundary"
 repo: "@Repository: truy cập dữ liệu, exception\ntranslation"
+service: "@Service: nghiệp vụ, transaction\nboundary"
 db: "Database"
-http -> controller -> service -> repo -> db
+http -> controller
+controller -> service
+service -> repo
+repo -> db
 ```
 
 ```java

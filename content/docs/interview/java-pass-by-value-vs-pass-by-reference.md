@@ -197,21 +197,23 @@ main -> original
 
 Giả sử `user` là một biến reference. Nó giữ một giá trị reference trỏ tới object `User`. Khi gọi `change(user)`, Java copy **reference đó** vào `param`.
 
-```text
-Trước khi gọi change(user):
-
-main frame                             heap
-┌────────────────────┐                 ┌───────────────────────┐
-│ user = ref U1      │ ─────────────►  │ User { name = "An" }  │
-└────────────────────┘                 └───────────────────────┘
-
-Bên trong change(User param):
-
-main frame             change frame                    heap
-┌──────────────┐      ┌───────────────┐                ┌───────────────────────┐
-│ user = ref U1│──┐   │ param = ref U1│ ──┐            │ User { name = "An" }  │
-└──────────────┘  │   └───────────────┘   │            └───────────────────────┘
-                  └───────────────────────┴──────────► cùng một object
+```d2 title="7. Object: copy reference, không copy object"
+direction: right
+grid-rows: 3
+grid-columns: 1
+vertical-gap: 24
+before: "Trước change(user)" {
+  user: "main frame: user = U1"
+  object: "Heap: User(name = An)"
+  user -> object: U1
+}
+during: "Trong change(User param): copy reference, cùng object" {
+  user: "main frame: user = U1"
+  param: "change frame: param = U1"
+  object: "Heap: cùng User(name = An)"
+  user -> object: U1
+  param -> object: U1
+}
 ```
 
 Hai biến `user` và `param` là hai ô nhớ khác nhau. Chúng chỉ tình cờ chứa cùng một giá trị reference `U1` khi method vừa bắt đầu.
@@ -268,19 +270,31 @@ An
 
 Diễn biến:
 
-```text
-(1) Trước replace(user)
-user  = ref U1 ──► User("An")
-
-(2) Khi vào method: param nhận bản sao ref U1
-user  = ref U1 ──► User("An")
-param = ref U1 ──► User("An")
-
-(3) param = new User("Bình")
-user  = ref U1 ──► User("An")
-param = ref U2 ──► User("Bình")
-
-(4) Method return: param biến mất. user chưa từng bị gán lại.
+```d2 title="7.2 Gán lại tham số: người gọi không thấy thay đổi"
+direction: right
+grid-rows: 4
+grid-columns: 1
+vertical-gap: 24
+entry: "1–2. Trước replace và khi vừa vào method" {
+  user: "caller.user = U1"
+  param: "param nhận bản sao U1"
+  object: "User An"
+  user -> object
+  param -> object
+}
+reassign: "3. param = new User(Bình)" {
+  user: "caller.user = U1"
+  param: "param = U2"
+  an: "User An"
+  binh: "User Bình"
+  user -> an
+  param -> binh
+}
+returned: "4. Return: parameter biến mất, caller chưa từng bị gán lại" {
+  user: "caller.user = U1"
+  an: "User An"
+  user -> an
+}
 ```
 
 > [!IMPORTANT]
@@ -314,14 +328,18 @@ A, B
 
 `swap` chỉ hoán đổi hai **bản sao** `first` và `second`. Nó không thể hoán đổi hai reference `a`, `b` của caller.
 
-```text
-Caller trước swap:        Trong swap sau khi đổi local parameter:
-a = ref U1 ─► User A      first  = ref U2 ─► User B
-b = ref U2 ─► User B      second = ref U1 ─► User A
-
-Caller sau khi return:
-a = ref U1 ─► User A      // không đổi
-b = ref U2 ─► User B      // không đổi
+```d2 title="7.3 Vì sao không thể swap hai object qua method?"
+direction: right
+caller: "Caller: trước và sau swap đều như nhau" {
+  a: "a = U1"; b: "b = U2"; ua: "User A"; ub: "User B"
+  a -> ua
+  b -> ub
+}
+method: "Trong swap: chỉ đổi local parameters" {
+  first: "first = U2"; second: "second = U1"; ua: "User A"; ub: "User B"
+  first -> ub
+  second -> ua
+}
 ```
 
 ## 8. Pass-by-reference thật sự là gì?

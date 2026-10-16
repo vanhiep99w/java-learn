@@ -112,11 +112,15 @@ w21: "Tomcat worker-21" {
 
 Nhưng thread trong server là **thread pool**: khi request kết thúc, worker thread không biến mất mà được tái sử dụng. Nếu không clear MDC, request sau có thể thừa hưởng context cũ.
 
-```text
-Request A trên worker-17: MDC.put("tenantId", "acme")
-Request A xong nhưng quên clear
-Request B tái sử dụng worker-17
-→ log Request B vẫn có tenantId=acme  ❌
+```d2 title="2.2. Vì sao ThreadLocal vừa hữu ích vừa nguy hiểm"
+shape: sequence_diagram
+a: "Request A"
+worker: "Tomcat worker-17 / MDC"
+b: "Request B"
+a -> worker: "MDC.put(tenantId, acme)"
+a -> worker: "Request A kết thúc nhưng QUÊN clear"
+b -> worker: "Request B tái sử dụng worker-17"
+worker -> b: "Log vẫn có tenantId=acme: rò context"
 ```
 
 > [!WARNING]

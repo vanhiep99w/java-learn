@@ -102,7 +102,7 @@ JPQL không đồng nghĩa với HQL. **HQL** — Hibernate Query Language — l
 
 Các ví dụ dùng ba entity: `Customer`, `PurchaseOrder` và `OrderItem`. Tên `PurchaseOrder` tránh đụng từ khóa `ORDER` trong SQL.
 
-```d2 title="1.2 Domain dùng trong ví dụ"
+```d2 title="1.2 Domain dùng trong ví dụ" layout="tala"
 direction: right
 n_CUSTOMER: "CUSTOMER" {
   shape: sql_table
@@ -1070,26 +1070,24 @@ spring.jpa.properties.hibernate.query.fail_on_pagination_over_collection_fetch=t
 
 Một query không đi thẳng từ chuỗi JPQL tới database. Hibernate parse query, resolve mapping, tạo SQL theo dialect, flush khi cần, bind parameter, chạy JDBC rồi materialize kết quả.
 
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant EM as EntityManager
-    participant PC as Persistence Context
-    participant H as Hibernate Query Engine
-    participant DB as Database
-
-    App->>EM: createQuery và bind parameter
-    App->>EM: getResultList
-    EM->>PC: kiểm tra flush mode và pending changes
-    opt AUTO flush cần thiết
-        PC->>DB: INSERT UPDATE DELETE đang chờ
-    end
-    EM->>H: parse JPQL hoặc Criteria tree
-    H->>H: resolve entity mapping và tạo SQL AST
-    H->>DB: prepared SQL và bind values
-    DB-->>H: result set
-    H->>PC: resolve identity và hydrate entity
-    PC-->>App: entity DTO scalar hoặc Tuple
+```d2 title="7 Luồng thực thi và SQL Hibernate sinh ra"
+shape: sequence_diagram
+app: Application
+em: EntityManager
+pc: "Persistence Context"
+hibernate: "Hibernate Query Engine"
+db: Database
+app -> em: "createQuery và bind parameter"
+app -> em: getResultList
+em -> pc: "kiểm tra flush mode và pending changes"
+pc.note: "Bước SQL kế tiếp chỉ xảy ra\nnếu AUTO flush cần thiết"
+pc -> db: "Nếu cần AUTO flush: INSERT / UPDATE / DELETE đang chờ"
+em -> hibernate: "parse JPQL hoặc Criteria tree"
+hibernate -> hibernate: "resolve entity mapping, tạo SQL AST"
+hibernate -> db: "prepared SQL và bind values"
+db -> hibernate: "result set" { style.stroke-dash: 3 }
+hibernate -> pc: "resolve identity và hydrate entity"
+pc -> app: "entity / DTO / scalar / Tuple" { style.stroke-dash: 3 }
 ```
 
 Nếu kết quả là entity, Hibernate tra persistence context theo identity trước. Cùng một entity id trong một persistence context sẽ trỏ tới cùng Java object. DTO, scalar và `Tuple` không trở thành managed entity.

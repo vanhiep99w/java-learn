@@ -211,7 +211,7 @@ Khi biến `ThreadLocal` của bạn ra khỏi scope (ví dụ là field của m
 
 Chuỗi tham chiếu thực tế (chú ý đường nét đứt là weak):
 
-```d2 title="5. Entry extends WeakReference — vì sao key yếu, value mạnh"
+```d2 title="5. Entry extends WeakReference — vì sao key yếu, value mạnh" layout="tala"
 direction: right
 root: "Stack / biến static"
 tl: "ThreadLocal"

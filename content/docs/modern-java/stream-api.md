@@ -107,11 +107,18 @@ spliterator.forEachRemaining(pipeline::accept);    // source push vào filter
 pipeline.end();
 ```
 
-```
-Sink chain (push-based):
-Source.forEachRemaining(element) → Filter.accept(element)
-    → if pass: Map.accept(element)
-        → Collect.accept(transformed)
+```d2 title="3.1. Sink chain — wrapSink mechanism"
+direction: right
+source: "Source.forEachRemaining(element)"
+filter: "Filter.accept(element)"
+pass: "Predicate pass?"
+map: "Map.accept(element)"
+collect: "Collect.accept(transformed)"
+skip: "Bỏ element, lấy element kế tiếp"
+source -> filter -> pass
+pass -> map: Có
+map -> collect
+pass -> skip: Không
 ```
 
 Mỗi Sink có 3 method: `begin(size)`, `accept(element)`, `end()` — cho phép short-circuit (vd `limit(5)` reject sau 5 accept) và stateful ops (vd `sorted()` buffer tất cả trong `accept`, emit trong `end`).

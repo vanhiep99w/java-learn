@@ -103,7 +103,7 @@ frame: "Stack Frame (một method call)" {
 
 **Mọi object** (`new`) và **mọi mảng** sống trên **heap**, chia sẻ giữa các thread, do GC quản lý. Một object trong HotSpot có layout:
 
-```d2 title="4. Heap — object layout, header và reference"
+```d2 title="4. Heap — object layout, header và reference" layout="tala"
 object: "Object trên Heap" {
   header: "Object Header" {
     mark: "Mark Word (8B): hash, GC age, lock state"
@@ -236,22 +236,33 @@ Ba dòng đáng chép nhớ: `mutate` nhận **đúng địa chỉ** mà `a` đa
 
 ### Từng bước trong bộ nhớ
 
-```text
-BƯỚC 0 — trước khi gọi:
-   stack main                       heap
-   a ──[ref @6646153]──────▶  [ StringBuilder "hello" ]
+Trước lời gọi, `main.a` trỏ tới `StringBuilder("hello")`. Khi gọi `mutate(a)`, parameter `sb` nhận bản sao reference R1 và sửa cùng object:
 
-BƯỚC 1 — gọi mutate(a): copy CON SỐ @6646153 vào slot sb
-   stack main:            a ──[@6646153]──┐
-   stack mutate:          sb ──[@6646153]─┤
-                                          ▼
-                              [ StringBuilder "hello" ]  ← CHỈ MỘT object
-   sb.append(" world") sửa object này → a cũng thấy ✓
+```d2 title="mutate: hai bản sao reference, một object"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 64
+vertical-gap: 40
+a: "main.a = R1"
+sb: "mutate.sb = R1"
+object: "StringBuilder hello → hello world"
+a -> object: R1
+sb -> object: append
+```
 
-BƯỚC 2 — gọi reassign(a): copy như trên, nhưng method chạy sb = new ...
-   stack main:            a ──[@6646153]─────────▶ [ "hello world" ]  ← vô sự
-   stack mutate:          sb ──[@21507a04]──▶ [ "new" ]  ← object mới
-   method return → slot sb bị vứt bỏ → object "new" thành rác chờ GC
+Ngược lại, `reassign(a)` chỉ đổi reference trong parameter. Sau khi method return, slot `sb` biến mất; object mới có thể được GC nếu không còn reference khác.
+
+```d2 title="reassign: đổi parameter, không đổi reference của caller"
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 64
+vertical-gap: 40
+a: "main.a = R1"
+sb: "reassign.sb = R2"
+old: "StringBuilder hello world"
+fresh: "StringBuilder new\nmethod return: có thể GC"
+a -> old: R1
+sb -> fresh: R2
 ```
 
 ### Bài test phát hiện pass-by-reference thật

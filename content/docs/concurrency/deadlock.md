@@ -1,6 +1,7 @@
 ---
 title: "Deadlock trong Java"
 description: "Hiểu, tái hiện, phát hiện và phòng tránh deadlock trong Java và database: điều kiện Coffman, lock ordering, thread dump, ThreadMXBean, tryLock và quy trình xử lý production."
+d2Layout: tala
 ---
 
 <Callout type="info" title="Phạm vi">
@@ -68,9 +69,9 @@ Cách mô hình hóa đơn giản nhất là **wait-for graph**:
 
 ```d2 title="Mô hình wait-for graph"
 direction: down
-n_A: "T1 giữ L1"
-n_B: "T2 giữ L2"
-n_C: "T3 giữ L3"
+n_A: "T1 giữ L1" { left: 170; top: 0 }
+n_B: "T2 giữ L2" { left: 0; top: 160 }
+n_C: "T3 giữ L3" { left: 340; top: 160 }
 n_A -> n_B: "đợi L2 do T2 giữ"
 n_B -> n_C: "đợi L3 do T3 giữ"
 n_C -> n_A: "đợi L1 do T1 giữ"

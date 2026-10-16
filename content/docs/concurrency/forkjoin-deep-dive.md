@@ -369,17 +369,26 @@ Bên trong:
 3. Pipeline operations (filter, map) chạy sequential **trong mỗi chunk**.
 4. Results merge (reduce, collect) qua combiner.
 
-```
-Original list: [1, 2, 3, 4, 5, 6, 7, 8]
-trySplit() → [1,2,3,4] | [5,6,7,8]
-trySplit() → [1,2] | [3,4] | [5,6] | [7,8]
-
-Worker 0: filter+map+reduce [1,2] → 4
-Worker 1: filter+map+reduce [3,4] → 14
-Worker 2: filter+map+reduce [5,6] → 22
-Worker 3: filter+map+reduce [7,8] → 30
-
-Merge: 4 + 14 + 22 + 30 = 70
+```d2 title="10. Parallel Stream dùng Fork/Join thế nào"
+direction: down
+all: "[1, 2, 3, 4, 5, 6, 7, 8]"
+leftHalf: "[1, 2, 3, 4]"
+right: "[5, 6, 7, 8]"
+w0: "Worker 0\n[1,2] → 4"
+w1: "Worker 1\n[3,4] → 14"
+w2: "Worker 2\n[5,6] → 22"
+w3: "Worker 3\n[7,8] → 30"
+merge: "Merge: 4 + 14 + 22 + 30 = 70"
+all -> leftHalf: trySplit
+all -> right: trySplit
+leftHalf -> w0: trySplit
+leftHalf -> w1: trySplit
+right -> w2: trySplit
+right -> w3: trySplit
+w0 -> merge
+w1 -> merge
+w2 -> merge
+w3 -> merge
 ```
 
 > [!NOTE]

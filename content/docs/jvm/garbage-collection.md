@@ -694,11 +694,14 @@ E = Eden, S = Survivor, O = Old, H = Humongous, F = Free
 ### 9.2. Mixed GC — chỉ thu regions "rác nhiều nhất"
 
 ```d2 title="9.2. Mixed GC — chỉ thu regions \"rác nhiều nhất\""
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 n_A: "Concurrent Marking"
 n_B: "Xác định liveness ratio mỗi region"
-n_C: "Sắp xếp: region nào rác nhiều nhất?"
 n_D: "Chọn N regions sao cho pause ≤ target"
+n_C: "Sắp xếp: region nào rác nhiều nhất?"
 n_E: "Evacuation (copy sống sang region mới)"
 n_F: "Free regions cũ"
 n_A -> n_B
@@ -726,10 +729,15 @@ Vấn đề: khi GC Young Gen, làm sao biết Old Gen có reference tới Young
 
 G1 dùng **Remembered Set (RSet)**: mỗi region giữ set "ai trỏ vào tôi". Khi GC một region, chỉ cần scan RSet thay vì toàn bộ heap:
 
-```
-Region A (Old) có field trỏ tới Region B (Young)
-→ Region B's RSet ghi nhận: "Region A, offset X trỏ vào tôi"
-→ Minor GC chỉ scan roots + RSets → không cần scan toàn Old
+```d2 title="9.4. Remembered Set & Card Table"
+direction: right
+old: "Region A (Old)\nfield tại offset X"
+young: "Region B (Young)"
+rset: "Region B's RSet\nghi nhận A, offset X"
+gc: "Minor GC scan roots + RSets\nkhông cần scan toàn Old"
+old -> young: reference
+old -> rset: "incoming reference được ghi nhận"
+rset -> gc
 ```
 
 **Write barrier**: mỗi lần app ghi reference (`obj.field = other`), JVM insert code kiểm tra cross-region reference → cập nhật RSet. Đây là overhead của G1 (~5-10% throughput).

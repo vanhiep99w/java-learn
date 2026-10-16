@@ -432,7 +432,7 @@ Tên method `findBySku` được Spring Data phân tích để tạo query. Hibe
 
 Một entity không chỉ là POJO có annotation. Nó có trạng thái so với persistence context:
 
-```d2 title="Trạng thái entity"
+```d2 title="Trạng thái entity" layout="tala"
 direction: right
 n_Transient: "Transient"
 n_Managed: "Managed"

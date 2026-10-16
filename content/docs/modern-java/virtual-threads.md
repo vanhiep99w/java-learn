@@ -96,16 +96,19 @@ Virtual Threads không rút thời gian DB trả lời từ 95 ms xuống 10 ms.
 | Hợp với | Mọi loại task, nhất là CPU-bound/affinity | Nhiều task I/O-bound, blocking |
 | Có cần pool? | Thường cần vì OS thread là tài nguyên hiếm | Không pool VT; tạo một VT cho mỗi concurrent task |
 
-```text
-Nhiều virtual thread dùng chung một nhóm platform thread carrier:
-
- VT request A ──┐
- VT request B ──┼──► JVM scheduler ──► Carrier 1 ──► OS thread
- VT request C ──┤                        Carrier 2 ──► OS thread
- VT request D ──┘                        Carrier 3 ──► OS thread
-
-Khi VT request A chờ socket/JDBC I/O được JVM hỗ trợ:
-VT A unmount khỏi Carrier 1 → Carrier 1 chạy VT request D.
+```d2 title="Platform thread và virtual thread khác nhau ở đâu?"
+direction: right
+requests: "Virtual threads" { a: "VT A"; b: "VT B"; c: "VT C"; d: "VT D" }
+scheduler: "JVM scheduler"
+carriers: "Platform thread carriers" { c1: "Carrier 1 = OS thread"; c2: "Carrier 2 = OS thread"; c3: "Carrier 3 = OS thread" }
+requests.a -> scheduler
+requests.b -> scheduler
+requests.c -> scheduler
+requests.d -> scheduler
+scheduler -> carriers.c1
+scheduler -> carriers.c2
+scheduler -> carriers.c3
+waiting: "VT A chờ I/O được hỗ trợ:\nunmount → Carrier 1 có thể chạy VT D" { near: bottom-center }
 ```
 
 Carrier là platform thread thật. Hệ điều hành vẫn chỉ schedule platform thread; JVM quyết định virtual thread nào được mount lên carrier nào. Một virtual thread không có “OS thread riêng” cố định.
@@ -494,15 +497,13 @@ Ví dụ nghiệp vụ: một request dashboard cần gọi user service và ord
 
 ```d2 title="Structured Concurrency: dùng khi một request tách thành nhiều subtask"
 direction: right
-t0: "handleDashboard request"
-t1: "fetchUser"
-t0 -> t1
-t2: "fetchOrders"
-t0 -> t2
-t3: "Nếu request cha timeout/cancel hoặc một subtask fail:"
-t0 -> t3
-t4: "→ các subtask cùng scope phải được cancel và được join trước khi cha rời scope."
-t0 -> t4
+request: "handleDashboard request"
+user: fetchUser
+orders: fetchOrders
+cancel: "Nếu request cha timeout / cancel\nhoặc một subtask fail:\ncancel các subtask cùng scope\nvà join trước khi cha rời scope"
+request -> user: subtask
+request -> orders: subtask
+request -> cancel: "quản lý vòng đời scope" { style.stroke-dash: 3 }
 ```
 
 `StructuredTaskScope` là **preview API**. JDK 21 dùng constructor và `ShutdownOnFailure`; JDK 25 đã đổi sang factory `StructuredTaskScope.open(...)` và joiner. Vì API preview không ổn định, chỉ copy code đúng với JDK đang chạy và bật preview ở compile lẫn runtime.

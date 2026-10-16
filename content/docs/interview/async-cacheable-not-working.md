@@ -125,13 +125,19 @@ Vì logic nằm trong proxy, **mọi nguyên nhân khiến lời gọi không đ
 Hệt như `@Transactional`: gọi `this.method()` từ bên trong cùng class đi thẳng tới object thật, bỏ qua proxy.
 
 ```d2 title="5. Nguyên nhân #1: self-invocation"
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 caller: "Caller"
 proxy: "proxy.handleRequest()"
-outer: "target.handleRequest()"
 inner: "this.generateAsync(): this = TARGET"
+outer: "target.handleRequest()"
 result: "Gọi thẳng target: đồng bộ, không cache,\nkhông đi qua proxy"
-caller -> proxy -> outer -> inner -> result
+caller -> proxy
+proxy -> outer
+outer -> inner
+inner -> result
 ```
 
 **Cách sửa** (giống `@Transactional`):

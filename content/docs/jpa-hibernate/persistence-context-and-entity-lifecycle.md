@@ -250,7 +250,7 @@ public class ProductService {
 
 Jakarta Persistence gọi bốn trạng thái là **new**, **managed**, **detached** và **removed**. Tài liệu Hibernate thường dùng **transient** gần nghĩa với new và **persistent** gần nghĩa với managed.
 
-```d2 title="3. Bốn trạng thái của entity"
+```d2 title="3. Bốn trạng thái của entity" layout="tala"
 direction: right
 n_New: "New"
 n_Managed: "Managed"

@@ -244,19 +244,18 @@ Trong ứng dụng Spring MVC truyền thống, có thể có hai context:
 
 ```d2 title="5.1. Servlet container và ApplicationContext"
 direction: right
-t0: "Servlet container"
-t1: "Root WebApplicationContext"
-t0 -> t1
-t2: "service, repository, datasource, security beans..."
-t1 -> t2
-t3: "│"
-t0 -> t3
-t4: "DispatcherServlet named \"app\""
-t3 -> t4
-t5: "Child WebApplicationContext của servlet \"app\""
-t4 -> t5
-t6: "controller, HandlerMapping, ViewResolver, MVC beans..."
-t5 -> t6
+container: "Servlet container"
+root: "Root WebApplicationContext"
+shared: "Service, repository, datasource,\nsecurity beans..."
+servlet: "DispatcherServlet named app"
+child: "Child WebApplicationContext\ncủa servlet app"
+mvc: "Controller, HandlerMapping,\nViewResolver, MVC beans..."
+container -> root
+root -> shared
+container -> servlet
+servlet -> child
+child -> mvc
+child -> root: "parent: tìm bean khi không có ở child" { style.stroke-dash: 3 }
 ```
 
 Context con nhìn thấy bean của parent, nhưng parent không nhìn thấy bean của child. Điều này tách web layer khỏi service/data layer.

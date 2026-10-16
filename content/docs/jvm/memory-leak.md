@@ -125,7 +125,7 @@ Gray   | Đã visit nhưng chưa scan hết children
 Black  | Đã visit + đã scan tất cả children → CHẮC CHẮN SỐNG
 ```
 
-```d2 title="4.1. Tri-color marking algorithm"
+```d2 title="4.1. Tri-color marking algorithm" layout="tala"
 direction: down
 n_A: "Bắt đầu: Tất cả object = WHITE"
 n_B: "Đánh dấu GC Roots = GRAY"
@@ -304,19 +304,27 @@ Object trở thành phantom reachable (chỉ PhantomReference trỏ tới)
 JVM có một **daemon thread** tên `Reference Handler` (priority MAX_PRIORITY - 2) chuyên xử lý reference:
 
 ```d2 title="6.1. Reference Handler Thread"
-direction: down
+grid-rows: 5
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 mark: "GC Mark Phase"
 reachable: "1. Mark reachable objects (tri-color)"
-reference: "2. Phát hiện objects chỉ reachable qua\nReference"
 classify: "3. Phân loại: Soft / Weak / Phantom"
+reference: "2. Phát hiện objects chỉ reachable qua\nReference"
 clear: "4. Quyết định clear theo memory pressure"
 handler: "Reference Handler Thread: nhận\ndiscovered references"
-nullref: "Clear referent: set referent = null"
 queue: "Enqueue vào ReferenceQueue nếu có"
+nullref: "Clear referent: set referent = null"
 notify: "Notify waiting threads: FinalReference →\nFinalizer"
-mark -> reachable -> reference -> classify -> clear
+mark -> reachable
+reachable -> reference
+reference -> classify
+classify -> clear
 clear -> handler: "discovered list"
-handler -> nullref -> queue -> notify
+handler -> nullref
+nullref -> queue
+queue -> notify
 ```
 
 ### 6.2. Processing order
@@ -607,15 +615,18 @@ bean.dumpHeap("/tmp/heap.hprof", true);  // true = chỉ dump live objects
 ### 11.2. Workflow tìm leak — step by step
 
 ```d2 title="11.2. Workflow tìm leak — step by step"
-direction: down
+grid-rows: 4
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
 n_A: "1. Mở heap dump trong MAT"
 n_B: "2. Leak Suspects Report\n(MAT tự phân tích)"
-n_C: "3. Histogram → sort by Retained Size"
 n_D: "4. Dominator Tree → object nào giữ\nsống nhiều nhất?"
+n_C: "3. Histogram → sort by Retained Size"
 n_E: "5. Right-click suspect → Path to GC\nRoots"
 n_F: "6. Exclude weak/soft/phantom refs\n(chỉ giữ strong path)"
-n_G: "7. Đọc chain: Static field →\nCollection → Leak"
 n_H: "8. Fix: remove entry, bound\ncollection, weak ref"
+n_G: "7. Đọc chain: Static field →\nCollection → Leak"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D

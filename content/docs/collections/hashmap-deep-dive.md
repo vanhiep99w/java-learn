@@ -299,27 +299,24 @@ Resize là **O(n)**: cấp phát mảng mới + duyệt rehash mọi entry. Nế
 
 ### 8.1. `put(key, value)`
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant M as HashMap
-    C->>M: put(key, value)
-    M->>M: hash = hash(key)
-    M->>M: nếu table rỗng thì resize (lazy init)
-    M->>M: tính index i từ hash
-    alt bucket rỗng
-        M->>M: tạo Node mới đặt vào bucket
-    else có node
-        M->>M: duyệt chain/tree, so hash rồi equals
-        alt tìm thấy key trùng
-            M->>M: ghi đè value (trả về old value)
-        else không thấy
-            M->>M: thêm node vào cuối chain
-            M->>M: nếu chain đạt 8 thì treeifyBin
-        end
-    end
-    M->>M: tăng size, nếu vượt threshold thì resize
-    M-->>C: trả về previous value (hoặc null)
+```d2 title="8.1. put(key, value)"
+direction: right
+prepare: "put(key, value)\nhash(key), lazy-init table\ni = (n - 1) & hash"
+empty: "Bucket rỗng?" { shape: diamond }
+create: "Đặt Node mới\nthêm một entry"
+lookup: "Duyệt chain / tree\nso hash rồi equals"
+match: "Có key trùng?" { shape: diamond }
+update: "Ghi đè value\nreturn old value\nkhông tăng size"
+append: "Thêm node mới\nxét treeifyBin khi đủ điều kiện"
+finish: "Tăng size; resize nếu vượt threshold\nreturn null cho key mới"
+prepare -> empty
+empty -> create: Có
+empty -> lookup: Không
+lookup -> match
+match -> update: Có
+match -> append: Không
+create -> finish
+append -> finish
 ```
 
 ### 8.2. `get(key)` — `getNode()`

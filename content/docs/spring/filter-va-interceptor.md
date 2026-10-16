@@ -311,24 +311,27 @@ Nếu `TenantInterceptor.preHandle()` trả `false`, `AuditInterceptor` và cont
 Ví dụ ứng dụng có encoding filter, Spring Security, trace filter và hai MVC interceptor:
 
 ```d2 title="4. Luồng request end-to-end"
-direction: down
-n_A: "Client request"
-n_B: "CharacterEncodingFilter"
-n_C: "TraceIdFilter"
-n_D: "DelegatingFilterProxy"
-n_E: "FilterChainProxy: Spring Security\nfilters"
-n_F: "DispatcherServlet"
-n_G: "HandlerMapping chọn controller và\ninterceptors"
-n_H: "TraceInterceptor.preHandle"
-n_I: "TenantInterceptor.preHandle"
-n_J: "Controller method"
-n_K: "TenantInterceptor.postHandle"
-n_L: "TraceInterceptor.postHandle"
-n_M: "Render view hoặc HttpMessageConverter\nghi body"
-n_N: "TenantInterceptor.afterCompletion"
-n_O: "TraceInterceptor.afterCompletion"
-n_P: "TraceIdFilter finally"
-n_Q: "HTTP response"
+grid-rows: 9
+grid-columns: 2
+horizontal-gap: 48
+vertical-gap: 32
+n_A: "1. Client request"
+n_B: "2. CharacterEncodingFilter"
+n_D: "4. DelegatingFilterProxy"
+n_C: "3. TraceIdFilter"
+n_E: "5. FilterChainProxy: Spring Security\nfilters"
+n_F: "6. DispatcherServlet"
+n_H: "8. TraceInterceptor.preHandle"
+n_G: "7. HandlerMapping chọn controller và\ninterceptors"
+n_I: "9. TenantInterceptor.preHandle"
+n_J: "10. Controller method"
+n_L: "12. TraceInterceptor.postHandle"
+n_K: "11. TenantInterceptor.postHandle"
+n_M: "13. Render view hoặc HttpMessageConverter\nghi body"
+n_N: "14. TenantInterceptor.afterCompletion"
+n_P: "16. TraceIdFilter finally"
+n_O: "15. TraceInterceptor.afterCompletion"
+n_Q: "17. HTTP response"
 n_A -> n_B
 n_B -> n_C
 n_C -> n_D
@@ -890,33 +893,10 @@ Không lưu request context reactive vào `ThreadLocal`. Một reactive pipeline
 
 ```d2 title="15. Tóm tắt"
 direction: right
-t0: "Filter"
-t1: "= tầng Servlet container"
-t0 -> t1
-t2: "= bao quanh DispatcherServlet"
-t0 -> t2
-t3: "= phù hợp cho HTTP transport, CORS, tracing, wrapping request/response"
-t0 -> t3
-t4: "HandlerInterceptor"
-t0 -> t4
-t5: "= tầng Spring MVC"
-t4 -> t5
-t6: "= chạy sau khi đã chọn controller handler"
-t4 -> t6
-t7: "= phù hợp cho endpoint metadata, MVC audit, context theo route"
-t4 -> t7
-t8: "AOP MethodInterceptor"
-t0 -> t8
-t9: "= tầng Spring bean method"
-t8 -> t9
-t10: "= phù hợp cho transaction, cache, retry và business cross-cutting concern"
-t8 -> t10
-t11: "Spring Security"
-t0 -> t11
-t12: "= filter chain chuyên dụng"
-t11 -> t12
-t13: "= nơi mặc định cho authentication và authorization HTTP"
-t11 -> t13
+filter: "Filter\nTầng Servlet container\nBao quanh DispatcherServlet\nHTTP transport, CORS, tracing,\nwrapping request / response"
+interceptor: "HandlerInterceptor\nTầng Spring MVC\nSau khi đã chọn controller handler\nEndpoint metadata, MVC audit,\ncontext theo route"
+aop: "AOP MethodInterceptor\nTầng Spring bean method\nTransaction, cache, retry,\nbusiness cross-cutting concern"
+security: "Spring Security\nFilter chain chuyên dụng\nAuthentication và authorization HTTP"
 ```
 
 > [!TIP]

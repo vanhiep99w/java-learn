@@ -144,11 +144,14 @@ invokedynamic #0:accept:()Ljava/util/function/Consumer;
 **Flow tại runtime (chỉ lần đầu):**
 
 ```d2 title="4.2. invokedynamic — bootstrap tại runtime"
-direction: down
+grid-rows: 3
+grid-columns: 2
+horizontal-gap: 96
+vertical-gap: 48
 n_A: "invokedynamic lần đầu"
 n_B: "JVM gọi\nLambdaMetafactory.metafactory()"
-n_C: "Tạo class implement Consumer (dùng ASM\nbytecode gen)"
 n_D: "Tạo CallSite (link vào invokedynamic)"
+n_C: "Tạo class implement Consumer (dùng ASM\nbytecode gen)"
 n_E: "Lần gọi sau: dùng trực tiếp CallSite —\nKHÔNG bootstrap lại"
 n_A -> n_B
 n_B -> n_C
@@ -234,23 +237,21 @@ private static void lambda$main$0(String s) {
 
 ### 4.4. Memory layout: Non-capturing vs Capturing
 
+```d2 title="4.4. Memory layout: Non-capturing vs Capturing"
+grid-rows: 1
+grid-columns: 2
+horizontal-gap: 32
+noncapturing: "Non-capturing lambda" {
+  instance: "Thường tái sử dụng một instance\nkhông có field capture\naccept() → lambda body"
+  allocation: "Không cần heap allocation\nmỗi lần lấy lambda ở call site đó"
+}
+capturing: "Capturing lambda" {
+  instance: "Instance giữ arg\$1: String reference\nHeader 12B + ref 4B\nví dụ 16B trước tối ưu JIT"
+  allocation: "Có thể tạo instance mới\nđể giữ giá trị capture của lần gọi"
+}
 ```
-NON-CAPTURING (singleton — zero allocation):
-┌─────────────────────────────────────┐
-│ Lambda$$1 (SINGLETON in Metaspace)  │
-│  └─ accept() → lambda$main$0        │
-│     (no instance fields)            │
-└─────────────────────────────────────┘
-  Heap allocation: 0 bytes per call
 
-CAPTURING (new instance per call):
-┌─────────────────────────────────────┐
-│ Lambda$$2 instance (Heap)           │
-│  ├─ [Object Header]  12 bytes       │
-│  └─ arg$1: String ref  4 bytes      │
-│     Total: 16 bytes per call        │
-└─────────────────────────────────────┘
-```
+Instance lambda là object trên heap; Metaspace giữ metadata của class sinh ra. Việc tái sử dụng instance hoặc loại bỏ allocation là chi tiết triển khai/tối ưu của JVM, không phải bảo đảm cấp phát trong Java specification.
 
 ### 4.5. Tại sao invokedynamic tốt hơn anonymous class?
 

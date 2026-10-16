@@ -398,24 +398,20 @@ final boolean tryPushStack(Completion c) {
 
 ### 9.3. Flow chi tiết khi CF complete
 
-```mermaid
-sequenceDiagram
-    participant T1 as Thread hoàn thành task
-    participant CF1 as CompletableFuture-1
-    participant S as Completion Stack
-    participant CF2 as CompletableFuture-2
-
-    T1->>CF1: internalComplete(result)
-    CF1->>CF1: CAS set result (null → value)
-    CF1->>CF1: postComplete()
-    loop Pop stack
-        CF1->>S: pop Completion (CAS)
-        S-->>CF1: UniApply (fn, dep=CF-2)
-        CF1->>CF1: tryFire(NESTED)
-        Note over CF1: fn.apply(result) → newResult
-        CF1->>CF2: internalComplete(newResult)
-        CF2->>CF2: postComplete() → fire CF-2's stack
-    end
+```d2 title="9.3. Flow chi tiết khi CF complete"
+direction: right
+complete: "internalComplete(result)\nCAS set result: null → value"
+post: postComplete
+pop: "Pop Completion từ stack (CAS)\nUniApply: fn, dep = CF-2"
+empty: "Stack rỗng?" { shape: diamond }
+fire: "tryFire(NESTED)\nfn.apply(result) → newResult"
+dependent: "CF-2.internalComplete(newResult)\nCF-2.postComplete(): fire stack của CF-2"
+done: "Hoàn tất propagation"
+complete -> post -> empty
+empty -> done: Có
+empty -> pop: Không
+pop -> fire -> dependent
+dependent -> empty: "tiếp tục pop stack"
 ```
 
 ### 9.4. Thread execution: ai chạy completion?
