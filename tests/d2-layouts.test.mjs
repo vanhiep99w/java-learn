@@ -65,7 +65,7 @@ async function render({ engine = 'elk', meta = '', yaml, frontmatter } = {}) {
     path: resolve(projectRoot, '.cache/docs-kit/layout-priority-fixture.md'),
     data: frontmatter ? { frontmatter } : {},
   });
-  const component = tree.children.find((node) => node.name === 'D2Diagram');
+  const component = tree.children.find((node) => ['D2Diagram', 'D2InteractiveDiagram'].includes(node.name));
   return JSON.parse(component.attributes.find((attr) => attr.name === 'lightSvg').value.value);
 }
 
