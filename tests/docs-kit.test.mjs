@@ -38,11 +38,11 @@ test('all documentation text/visual candidates are reviewed; Mermaid and edited 
   await assert.rejects(checkInventory(legacy), /Mermaid:/);
 });
 
-test('docs-kit stays pinned to installed 0.9.0 and every learning fence has plugin, component and CSS', async () => {
+test('docs-kit stays pinned to installed 0.9.5 and every learning fence has plugin, component and CSS', async () => {
   const manifest = JSON.parse(await readFile(resolve(projectRoot, 'package.json'), 'utf8'));
   const installed = JSON.parse(await readFile(resolve(projectRoot, 'node_modules/@vanhiep99w/docs-kit/package.json'), 'utf8'));
-  assert.equal(manifest.dependencies['@vanhiep99w/docs-kit'], '0.9.0');
-  assert.equal(installed.version, '0.9.0');
+  assert.equal(manifest.dependencies['@vanhiep99w/docs-kit'], '0.9.5');
+  assert.equal(installed.version, '0.9.5');
   const registry = await readFile(resolve(projectRoot, 'src/app/[[...slug]]/page.tsx'), 'utf8');
   const css = await readFile(resolve(projectRoot, 'src/app/globals.css'), 'utf8');
   assert.equal(descriptors.size, 5);

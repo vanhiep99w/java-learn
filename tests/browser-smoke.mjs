@@ -71,13 +71,15 @@ try {
       }
       if (route === 'concurrency/completablefuture') {
         const interactive = page.locator('.d2-interactive');
-        await interactive.getByRole('button', { name: 'Explore diagram: allOf chờ cả hai future', exact: true }).click();
+        await expect(interactive.locator('.d2-viewer')).toBeVisible();
         await interactive.getByRole('button', { name: 'Next →', exact: true }).click();
         await expect(interactive.locator('.d2-step-count')).toHaveText('2 / 3');
         await interactive.getByRole('button', { name: 'Next →', exact: true }).click();
         await expect(interactive.locator('.d2-step-count')).toHaveText('3 / 3');
+        await interactive.locator('.d2-source-menu > summary').click();
         await expect(interactive.getByRole('button', { name: 'Motion off', exact: true })).toBeDisabled();
-        await interactive.getByRole('button', { name: 'Expand ↗', exact: true }).click();
+        await interactive.locator('.d2-source-menu > summary').click();
+        await interactive.getByRole('button', { name: 'Fullscreen', exact: true }).click();
         await expect(page.locator('dialog.d2-fullscreen')).toBeVisible();
         await page.keyboard.press('Escape');
         await expect(page.locator('dialog.d2-fullscreen')).toHaveCount(0);
@@ -88,11 +90,13 @@ try {
       }
       if (route === 'spring/dispatcher-servlet') {
         const visual = page.locator('.d2-interactive').filter({ has: page.locator('figcaption').filter({ hasText: 'DispatcherServlet: kết quả controller và nhánh exception' }) });
-        await visual.getByRole('button', { name: 'Explore diagram: DispatcherServlet: kết quả controller và nhánh exception', exact: true }).click();
+        await expect(visual.locator('.d2-viewer')).toBeVisible();
         await visual.getByRole('button', { name: 'Fit', exact: true }).click();
         await expect(visual.locator('.d2-viewport')).toBeVisible();
+        await visual.locator('.d2-source-menu > summary').click();
         await visual.getByRole('button', { name: 'Copy D2', exact: true }).click();
         assert.match(await page.evaluate(() => navigator.clipboard.readText()), /postHandle\(\) theo thứ tự ngược/);
+        await visual.locator('.d2-source-menu > summary').click();
         await page.locator('.source-ref').first().click();
         await expect(page.locator('#source-explorer .source-code .line').first()).toBeVisible();
         await page.getByRole('button', { name: 'Copy file', exact: true }).click();
