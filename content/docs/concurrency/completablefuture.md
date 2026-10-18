@@ -223,6 +223,69 @@ Result r2 = f2.join();
 > [!NOTE]
 > `allOf` trả `CompletableFuture<Void>` — không giữ kết quả. Bạn phải `.join()` từng future riêng. Nếu bất kỳ future fail → `allOf` future cũng fail (complete exceptionally).
 
+Để tách việc **hoàn thành từng future** khỏi việc **hoàn thành allOf**, mở sơ đồ rồi chuyển từng bước. Đây là một execution giả định, hai tác vụ được khởi chạy độc lập; step sau kế thừa step trước. `f1` hoàn thành không làm `allOf` hoàn thành khi `f2` vẫn đang chạy.
+
+```d2 mode=steps title="allOf chờ cả hai future"
+direction: down
+all: "Java CompletableFuture.allOf\nchưa hoàn thành" {
+  icon: ../../assets/d2/java.svg
+}
+f1: "f1: đang chạy"
+f2: "f2: đang chạy"
+f1 -> all: "phụ thuộc f1"
+f2 -> all: "phụ thuộc f2"
+steps: {
+  first: {
+    f1: "f1: đã hoàn thành"
+  }
+  both: {
+    f2: "f2: đã hoàn thành"
+    all: "allOf: đã hoàn thành\nkết quả Void"
+  }
+}
+```
+
+Nếu gắn thời gian vào ví dụ đó, hai tác vụ có thể chồng lấp như dưới đây. **Các số là minh họa, không phải trace đo được hoặc benchmark.** `allOf` chỉ là barrier chờ kết quả, không tự tạo tính song song; executor và thời điểm submit quyết định mức chồng lấp. Span cha ở đây bao trùm khoảng chờ và thu thập kết quả, không phải một thread chạy CPU liên tục.
+
+```span-waterfall
+title: Hai I/O độc lập và khoảng chờ allOf
+unit: ms
+provenance:
+  kind: illustrative
+  description: Timeline giả định để giải thích overlap; không đo JVM hoặc mạng thật.
+spans:
+  - id: aggregate
+    name: Chờ allOf và thu thập kết quả
+    service: orchestrator
+    start: 0
+    duration: 85
+    status: ok
+  - id: f1
+    parent: aggregate
+    name: f1 — đọc hồ sơ
+    service: profile
+    start: 0
+    duration: 40
+    status: ok
+    attributes: '{"future":"f1","example":true}'
+  - id: f2
+    parent: aggregate
+    name: f2 — đọc đơn hàng
+    service: orders
+    start: 0
+    duration: 80
+    status: ok
+  - id: collect
+    parent: aggregate
+    name: Thu thập kết quả đã hoàn thành
+    service: orchestrator
+    start: 80
+    duration: 5
+    status: ok
+```
+
+Không cộng `40 + 80` để suy ra thời gian chờ: hai khoảng này chồng nhau. Tổng 85 ms trong ví dụ gồm 80 ms chờ nhánh chậm hơn và 5 ms thu thập; hệ thống thật còn có overhead, queueing và lỗi. Nếu một future fail, `allOf` hoàn thành exceptionally sau khi các future đầu vào đều hoàn thành, không tự hủy tác vụ còn lại.
+
 ### 6.2. anyOf — dùng kết quả NHANH NHẤT
 
 ```java

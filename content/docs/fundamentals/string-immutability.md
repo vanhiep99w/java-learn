@@ -405,8 +405,19 @@ String result = builder.toString(); // tạo String kết quả đúng một l�
 
 Lúc này cùng một buffer được tái sử dụng:
 
-```text
-"" → append "A" → append "B" → append "C" → append "D" → toString()
+```d2 title="StringBuilder append trước toString"
+direction: down
+n0: "StringBuilder: \"\""
+n1: "append \"A\""
+n2: "append \"B\""
+n3: "append \"C\""
+n4: "append \"D\""
+n5: "toString()"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Mỗi phần mới chỉ được append một lần. Buffer của `StringBuilder` đôi khi vẫn phải resize và copy, nhưng capacity tăng theo cấp số nhân nên tổng chi phí resize là **amortized O(n)**. `toString()` chỉ copy toàn bộ kết quả một lần ở cuối, cũng là O(n).

@@ -259,13 +259,19 @@ private static final int MIN_TRANSFER_STRIDE = 16;
 // Thread claim stride bằng CAS trên transferIndex
 ```
 
-```
-oldTable.length = 64, stride = 16
-Thread A claims bins [48..63] ← transferIndex CAS 64 → 48
-Thread B claims bins [32..47] ← transferIndex CAS 48 → 32
-Thread C claims bins [16..31]
-Thread D claims bins [0..15]
-→ 4 thread transfer song song!
+Bốn thread transfer song song trên các dải bins đã claim riêng.
+
+```d2 title="Cooperative transfer chia bins cho bốn thread"
+direction: down
+table: "oldTable.length=64\nstride=16"
+a: "Thread A: bins [48..63]\nCAS transferIndex 64 → 48"
+b: "Thread B: bins [32..47]\nCAS transferIndex 48 → 32"
+c: "Thread C: bins [16..31]"
+d: "Thread D: bins [0..15]"
+table -> a: "claim"
+table -> b: "claim"
+table -> c: "claim"
+table -> d: "claim"
 ```
 
 ### 6.2. Transfer một bin

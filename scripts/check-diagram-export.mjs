@@ -20,13 +20,18 @@ for (const [path, diagrams] of pages) {
     continue;
   }
   for (const [i, figure] of figures.entries()) {
-    const svg = figure[1].match(/<svg\b[^>]*>/)?.[0] ?? '';
-    const width = Number(svg.match(/\bwidth="([\d.]+)"/)?.[1]);
-    const height = Number(svg.match(/\bheight="([\d.]+)"/)?.[1]);
     const expected = diagrams[i];
-    if (width !== expected.width || height !== expected.height) {
-      errors.push(`${path}: ${expected.caption} (${expected.layout}) audit=${expected.width}×${expected.height}, export=${width}×${height}`);
+    for (const theme of ['light', 'dark']) {
+      const svg = figure[1].match(new RegExp(`class="d2-diagram-${theme}"[^>]*>(<svg\\b[^>]*>)`))?.[1] ?? '';
+      const width = Number(svg.match(/\bwidth="([\d.]+)"/)?.[1]);
+      const height = Number(svg.match(/\bheight="([\d.]+)"/)?.[1]);
+      const expectedWidth = theme === 'dark' ? expected.darkWidth : expected.width;
+      const expectedHeight = theme === 'dark' ? expected.darkHeight : expected.height;
+      if (width !== expectedWidth || height !== expectedHeight) {
+        errors.push(`${path}: ${expected.caption} (${expected.layout}, ${theme}) audit=${expectedWidth}×${expectedHeight}, export=${width}×${height}`);
+      }
     }
+    if (/<image\b[^>]*(?:href|src)="https?:\/\//.test(figure[1])) errors.push(`${path}: icon not embedded`);
     checked++;
   }
 }

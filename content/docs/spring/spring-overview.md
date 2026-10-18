@@ -75,13 +75,19 @@ Container Spring có hai tầng:
 
 `ApplicationContext` là thứ bạn dùng 99% thời gian. Quá trình khởi động:
 
-```
-1. Đọc cấu hình (annotation/@Configuration/XML) → định nghĩa bean (BeanDefinition)
-2. BeanFactoryPostProcessor: sửa định nghĩa bean (vd thay ${placeholder})
-3. Tạo instance bean (theo thứ tự phụ thuộc)
-4. Tiêm dependency (DI)
-5. BeanPostProcessor: bọc proxy (AOP), xử lý @PostConstruct
-6. Container sẵn sàng
+```d2 title="Container đọc definition trước khi instantiate"
+direction: down
+n0: "Đọc annotation/@Configuration/XML\ntạo BeanDefinition"
+n1: "BeanFactoryPostProcessor sửa definition\nví dụ thay \${placeholder}"
+n2: "Tạo instance theo thứ tự dependency"
+n3: "Tiêm dependency (DI)"
+n4: "BeanPostProcessor: proxy (AOP), @PostConstruct"
+n5: "Container sẵn sàng"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 > [!NOTE]
@@ -193,11 +199,17 @@ Spring "thuần" cấu hình rườm rà. **Spring Boot** thêm hai thứ:
 
 ### 6.2. Auto-configuration — cấu hình theo "có gì trên classpath"
 
-```
-@SpringBootApplication → @EnableAutoConfiguration
-→ quét các AutoConfiguration class
-→ mỗi cái có @ConditionalOnClass / @ConditionalOnMissingBean ...
-→ "thấy H2 trên classpath mà chưa có DataSource → tự tạo DataSource H2"
+```d2 title="Auto-configuration chọn default theo điều kiện"
+direction: down
+n0: "@SpringBootApplication"
+n1: "@EnableAutoConfiguration"
+n2: "Quét AutoConfiguration classes"
+n3: "@ConditionalOnClass / @ConditionalOnMissingBean…"
+n4: "H2 trên classpath, chưa có DataSource\n→ tạo DataSource H2"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 > [!TIP]

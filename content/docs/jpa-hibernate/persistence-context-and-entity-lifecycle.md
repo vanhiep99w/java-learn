@@ -775,14 +775,23 @@ Khi cần thay một row cũ bằng row mới có cùng unique key trong một t
 
 `@Transactional` của Spring xác lập transaction boundary. Với JPA, `JpaTransactionManager` lấy hoặc tạo `EntityManager`, bind nó với execution context hiện tại, và flush/commit hoặc rollback khi method kết thúc.
 
-```text
-HTTP request
-  → Controller
-    → @Transactional Service method
-      → Spring mở transaction và gắn EntityManager
-      → Repository/EntityManager dùng cùng persistence context
-      → dirty checking + flush
-      → commit hoặc rollback
+```d2 title="Request dùng chung persistence context trong transaction"
+grid-rows: 4
+grid-columns: 2
+n0: "HTTP request"
+n1: "Controller"
+n3: "Spring mở transaction, gắn EntityManager"
+n2: "@Transactional Service method"
+n4: "Repository/EntityManager dùng cùng persistence context"
+n5: "Dirty checking + flush"
+n7: "" {style.opacity: 0}
+n6: "Commit hoặc rollback"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Hai repository được gọi trong cùng transaction thường nhìn thấy cùng managed instance của một entity. Khi rời transaction-scoped context, entity trở thành detached.

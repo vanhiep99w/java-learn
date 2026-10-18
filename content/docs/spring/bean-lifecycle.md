@@ -48,8 +48,17 @@ Các bước `BeanDefinition Loading` và `BeanFactoryPostProcessor` thuộc qu�
 
 Đây là câu trả lời nên dùng trong phỏng vấn hoặc khi cần một mental model ngắn gọn:
 
-```text
-Instantiate → Populate → Initialize → Use → Destroy
+```d2 title="Bean lifecycle tổng quát"
+direction: down
+n0: "Instantiate"
+n1: "Populate"
+n2: "Initialize"
+n3: "Use"
+n4: "Destroy"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 | Pha | Spring làm gì? | Hook/điểm mở rộng tiêu biểu |
@@ -319,8 +328,15 @@ public class CacheService implements InitializingBean {
 
 `BeanPostProcessor.postProcessAfterInitialization()` — step 10. Nếu bean có AOP advice (@Transactional, @Cacheable, @Async, custom @Around):
 
-```
-Bean gốc (target) → wrap bởi Proxy → container giữ Proxy, inject Proxy cho dependents
+```d2 title="Container inject proxy thay target"
+direction: down
+n0: "Bean gốc (target)"
+n1: "Wrap bởi Proxy"
+n2: "Container giữ Proxy"
+n3: "Inject Proxy cho dependents"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 ### 8.2. Hai loại proxy
@@ -334,12 +350,22 @@ Bean gốc (target) → wrap bởi Proxy → container giữ Proxy, inject Proxy
 | Default (Spring Boot) | Nếu có interface + config | **CGLIB** (default from SB 2.0+) |
 | Performance | Slightly slower | Slightly faster |
 
-```
-JDK Proxy:
-Caller → Proxy(implements Interface) → InvocationHandler → Target bean
-
-CGLIB Proxy:
-Caller → ProxySubclass(extends TargetClass) → MethodInterceptor → super.method()
+```d2 title="Hai cơ chế proxy và đường gọi"
+direction: right
+r0n0: "JDK: Caller"
+r0n1: "Proxy implements Interface"
+r0n2: "InvocationHandler"
+r0n3: "Target bean"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "CGLIB: Caller"
+r1n1: "ProxySubclass extends TargetClass"
+r1n2: "MethodInterceptor"
+r1n3: "super.method()"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 ### 8.3. Self-invocation problem
@@ -361,9 +387,15 @@ public class UserService {
   Xem UserService.java cùng các ví dụ khác
 </SourceRef>
 
-```
-Caller → Proxy.register() → Target.register() → Target.createUser() ← NO PROXY!
-                                                   ↑ direct call, AOP skipped
+```d2 title="Self-call không đi qua proxy"
+direction: down
+n0: "Caller"
+n1: "Proxy.register()"
+n2: "Target.register()"
+n3: "Target.createUser()\ndirect call: NO PROXY, AOP skipped"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 **Giải pháp:**
@@ -443,23 +475,19 @@ protected Object getEarlyBeanReference(String name, RootBeanDefinition mbd, Obje
 
 **Flow:**
 
-```
-1. Tạo A: instantiate A (constructor) → A chưa inject B
-   → đặt ObjectFactory(() → getEarlyBeanReference(A)) vào cache level 3
-   
-2. Inject B cho A: cần tạo B
-   → instantiate B (constructor) → B chưa inject A
-   → đặt ObjectFactory cho B vào cache level 3
-   
-3. Inject A cho B: tìm A
-   → cache level 1: không có (A chưa fully init)
-   → cache level 2: không có
-   → cache level 3: CÓ factory → gọi factory → lấy early reference A
-   → đặt early A vào cache level 2, xoá khỏi level 3
-   → inject early A vào B ✓
-   
-4. B fully initialized → vào cache level 1
-5. Quay lại A: inject B (đã sẵn sàng) → A fully initialized → vào cache level 1
+```d2 title="Circular dependency qua ba cache singleton"
+direction: down
+n0: "Instantiate A: chưa inject B\nL3: ObjectFactory(() → getEarlyBeanReference(A))"
+n1: "Inject B cho A: instantiate B, chưa inject A\nL3: ObjectFactory cho B"
+n2: "Inject A cho B: L1 không có, L2 không có\nL3 có factory → lấy early A"
+n3: "Đặt early A vào L2, xóa L3\ninject early A vào B"
+n4: "B fully initialized → L1"
+n5: "Quay lại A: inject B đã sẵn sàng\nA fully initialized → L1"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 ```d2 title="9.2. Three-level cache giải quyết (singleton only)"

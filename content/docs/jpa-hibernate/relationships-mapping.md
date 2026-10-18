@@ -1095,7 +1095,7 @@ Many-to-many thuần
 
 Join table có thêm dữ liệu
   đổi thành association entity
-  Post 1 -- * PostTag * -- 1 Tag
+  PostTag là association entity nối Post và Tag (cardinality ở hình dưới).
 
 Cascade
   truyền EntityManager operation qua relationship
@@ -1116,6 +1116,15 @@ Fetch
   ToOne mặc định EAGER; ToMany mặc định LAZY
   EAGER không bảo đảm JOIN; LAZY là hint theo JPA
   thiết kế fetch theo từng query và luôn kiểm tra SQL
+```
+
+```d2 title="Join table có dữ liệu riêng thành association entity"
+direction: right
+post: Post
+join: PostTag
+tag: Tag
+post -> join: "1 : nhiều"
+join -> tag: "nhiều : 1"
 ```
 
 ## 14. Tài liệu liên quan

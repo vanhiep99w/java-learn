@@ -125,21 +125,40 @@ Mỗi Sink có 3 method: `begin(size)`, `accept(element)`, `end()` — cho phép
 
 Terminal op **pull** element từ source qua từng stage:
 
-```
-Terminal.forEachRemaining():
-    for each element from source:
-        → filter stage: pass/skip
-        → map stage: transform
-        → collect stage: accumulate
+```d2 title="Stream fusion: xử lý từng element qua các stage"
+direction: down
+source: "Terminal.forEachRemaining()\nfor each element from source"
+filter: "filter stage: pass / skip" {shape: diamond}
+map: "map stage: transform"
+collect: "collect stage: accumulate"
+next: "element tiếp theo / kết thúc"
+source -> filter
+filter -> map: "pass"
+filter -> next: "skip"
+map -> collect -> next
 ```
 
 **Loop fusion**: JVM xử lý **từng element qua toàn bộ pipeline** trước khi lấy element tiếp. Không tạo collection trung gian giữa các stage:
 
-```
-Element 1: source → filter ✓ → map → collect
-Element 2: source → filter ✗ (skip)
-Element 3: source → filter ✓ → map → collect
-...
+```d2 title="Mỗi element đi trọn pipeline"
+direction: right
+r0n0: "Element 1: source"
+r0n1: "filter ✓"
+r0n2: "map"
+r0n3: "collect"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Element 2: source"
+r1n1: "filter ✗ (skip)"
+r1n0 -> r1n1
+r2n0: "Element 3: source"
+r2n1: "filter ✓"
+r2n2: "map"
+r2n3: "collect"
+r2n0 -> r2n1
+r2n1 -> r2n2
+r2n2 -> r2n3
 ```
 
 > [!TIP]
@@ -173,12 +192,20 @@ public interface Spliterator<T> {
 
 ### 4.2. Split quality ảnh hưởng parallel performance
 
-```
-ArrayList Spliterator: split bằng cách chia index /2
-→ 2 nửa bằng nhau → balanced work → parallel hiệu quả
-
-LinkedList Spliterator: split = duyệt tới giữa (O(n))
-→ split đắt + unbalanced → parallel kém
+```d2 title="Chi phí split ảnh hưởng parallel stream"
+direction: right
+r0n0: "ArrayList Spliterator: chia index /2"
+r0n1: "2 nửa bằng nhau"
+r0n2: "balanced work"
+r0n3: "parallel hiệu quả"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "LinkedList Spliterator: duyệt tới giữa O(n)"
+r1n1: "split đắt + unbalanced"
+r1n2: "parallel kém"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 | Data Source | Split quality | Parallel effectiveness |
@@ -270,11 +297,24 @@ Optional<String> found = hugeList.stream()   // 10M elements
 
 Short-circuit ops (`findFirst`, `findAny`, `anyMatch`, `limit`) signal upstream **"đủ rồi, dừng"**. Pipeline ngừng pull element từ source.
 
-```
-Source:     [a] [b] [c] [d] [e] [f] [g] ...
-filter:      ✗   ✗   ✓   ←── pass "c" downstream
-findFirst:   ←── nhận "c" → DONE. Cancel pipeline.
-             (d, e, f, g... KHÔNG BAO GIỜ được xử lý)
+```d2 title="findFirst cancel sau phần tử đầu qua filter"
+grid-rows: 4
+grid-columns: 2
+n0: "Source a"
+n1: "Filter a ✗"
+n3: "Filter b ✗"
+n2: "Source b"
+n4: "Source c"
+n5: "Filter c ✓ → pass downstream"
+n7: "d, e, f, g… KHÔNG được xử lý"
+n6: "findFirst nhận c → DONE\ncancel pipeline"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 **Parallel + short-circuit**: `findAny` hiệu quả hơn `findFirst` trong parallel vì không cần maintain ordering — thread nào tìm thấy đầu tiên thì dùng.
@@ -376,27 +416,30 @@ custom.submit(() ->
 
 ### 9.2. Fork-Join splitting
 
-```
-1. Spliterator.trySplit() chia data làm đôi
-2. Một nửa fork cho thread khác, nửa còn lại xử lý local
-3. Lặp lại đến khi chunk đủ nhỏ (threshold)
-4. Kết quả merge ngược lên (join)
-
-         [1, 2, 3, 4, 5, 6, 7, 8]
-              trySplit()
-        /                    \
-   [1,2,3,4]            [5,6,7,8]
-   trySplit()            trySplit()
-   /       \             /       \
-[1,2]    [3,4]       [5,6]    [7,8]
-  ↓        ↓           ↓        ↓
-process  process    process  process
-  ↓        ↓           ↓        ↓
-merge ←──merge     merge ←──merge
-       ↓                    ↓
-       merge ←─────────── merge
-              ↓
-           final result
+```d2 title="Parallel stream: split, process và merge"
+direction: down
+all: "[1,2,3,4,5,6,7,8]"
+splitLeft: "[1,2,3,4]"
+splitRight: "[5,6,7,8]"
+a: "[1,2]: process"
+b: "[3,4]: process"
+c: "[5,6]: process"
+d: "[7,8]: process"
+ml: "merge trái (join)"
+mr: "merge phải (join)"
+result: "final result"
+all -> splitLeft: "trySplit: nửa fork, nửa local"
+all -> splitRight: "trySplit"
+splitLeft -> a: "trySplit tới threshold"
+splitLeft -> b: "trySplit"
+splitRight -> c: "trySplit tới threshold"
+splitRight -> d: "trySplit"
+a -> ml
+b -> ml
+c -> mr
+d -> mr
+ml -> result: "merge (join)"
+mr -> result: "merge (join)"
 ```
 
 ### 9.3. N-Q model (khi nào parallel đáng)

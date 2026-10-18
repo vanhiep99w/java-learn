@@ -121,16 +121,22 @@ Annotation là "tấm biển chỉ dẫn"; proxy là "người thực thi". Tấ
 
 Có hai trường phái làm AOP, và Spring chọn **proxy-based** (khác với AspectJ dùng **weaving**):
 
-```text
-AspectJ (compile-time / load-time WEAVING):
-   Sửa thẳng bytecode của class → logic AOP nhúng VÀO chính method
-   → this.method() cũng bị chặn (vì code đã ở trong method rồi)
-   → KHÔNG bị self-invocation, nhưng cần weaver/agent riêng
-
-Spring AOP (runtime PROXY):
-   Không đụng bytecode của bạn → tạo một object BAO BÊN NGOÀI
-   → chỉ chặn được lời gọi ĐI QUA proxy
-   → this.method() KHÔNG đi qua proxy → bị bỏ qua  ← thủ phạm
+```d2 title="AspectJ weaving khác Spring AOP runtime proxy"
+direction: right
+r0n0: "AspectJ compile-time / load-time WEAVING"
+r0n1: "Sửa bytecode class, nhúng AOP vào method"
+r0n2: "this.method() cũng bị chặn"
+r0n3: "Không self-invocation pitfall, cần weaver/agent riêng"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Spring AOP runtime PROXY"
+r1n1: "Không đụng bytecode, tạo object bọc ngoài"
+r1n2: "Chỉ chặn lời gọi ĐI QUA proxy"
+r1n3: "this.method() không qua proxy → advice bị bỏ qua"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 Lúc context khởi động, một `BeanPostProcessor` (vd `InfrastructureAdvisorAutoProxyCreator`) phát hiện bean có `@Transactional`, và thay vì đăng ký object gốc, nó đăng ký một **proxy**:
@@ -207,15 +213,17 @@ Spring tạo proxy bằng một trong hai cơ chế — chi tiết này hay đư
 | Khi nào Spring dùng | Bean có interface (mặc định cũ) | Không có interface; Spring Boot **mặc định CGLIB** |
 | Hệ quả | Chỉ proxy được method khai báo trong interface | Proxy được method `public`/`protected` |
 
-```text
-JDK proxy:   interface OrderService
-                    ▲ implements
-             OrderServiceImpl (target)
-             OrderService$Proxy (implements interface, ủy quyền tới target)
-
-CGLIB proxy: OrderService (target, class thường)
-                    ▲ extends
-             OrderService$$EnhancerBySpringCGLIB (subclass, override method để chèn advice)
+```d2 title="JDK proxy implements, CGLIB proxy extends"
+direction: down
+interface: "OrderService\ninterface (JDK proxy)"
+target: "OrderServiceImpl\ntarget"
+jdk: "OrderService\$Proxy"
+target -> interface: "implements"
+jdk -> interface: "implements"
+jdk -> target: "ủy quyền"
+base: "OrderService\ntarget class (CGLIB)"
+cglib: "OrderService\$\$EnhancerBySpringCGLIB\noverride method để chèn advice"
+cglib -> base: "extends"
 ```
 
 Điểm chung quan trọng: **cả hai đều bị self-invocation.** Dù là JDK hay CGLIB, lời gọi `this.method()` từ bên trong target đều đi thẳng tới target, không qua lớp proxy.

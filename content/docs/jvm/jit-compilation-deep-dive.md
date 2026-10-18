@@ -298,13 +298,19 @@ animal.sound();
 
 **Deoptimization flow:**
 
-```
-1. Running compiled code → hit uncommon trap (guard fail)
-2. JVM pause thread tại safe point
-3. Reconstruct interpreter frame từ compiled frame (register → stack)
-4. Resume in interpreter (slow path)
-5. Re-profile with new type information
-6. Re-compile with updated profile (C2 lần 2: bao gồm cả Cat)
+```d2 title="Deoptimization quay về interpreter và compile lại"
+direction: down
+n0: "Compiled code hit uncommon trap (guard fail)"
+n1: "JVM pause thread tại safe point"
+n2: "Reconstruct interpreter frame\nregister → stack"
+n3: "Resume interpreter (slow path)"
+n4: "Re-profile với type information mới"
+n5: "Re-compile với profile cập nhật\nC2 lần 2 bao gồm cả Cat"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 **Khi nào deopt?**

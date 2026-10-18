@@ -33,13 +33,12 @@ Chi phí không chỉ đến từ cú pháp `synchronized`, mà chủ yếu từ
 
 Mỗi Java object trên heap bắt đầu bằng **Object Header**:
 
-```
-64-bit JVM (compressed oops):
-┌──────────────────────────────────────────────┬──────────┐
-│              Mark Word (64 bits)             │ Klass Ptr│
-│  (lock state, hashCode, GC age, ...)         │ (32 bits)│
-└──────────────────────────────────────────────┴──────────┘
-│←──────────── Object Header (96 bits) ───────────────────→│
+```d2 title="Object header với compressed oops"
+direction: right
+header: "Object Header: 96 bits\n64-bit JVM, compressed oops" {
+  mark: "Mark Word: 64 bits\nlock state, hashCode, GC age, …"
+  klass: "Klass Ptr: 32 bits"
+}
 ```
 
 **Mark Word layout** — thay đổi tuỳ lock state:
@@ -87,14 +86,15 @@ n_C -> n_D: "CAS fail nhiều lần\n(spin exhausted)" { style.stroke-dash: 3 }
 
 **Ý tưởng**: đa số lock trong thực tế chỉ được acquire bởi **1 thread** (VD: khởi tạo, single-threaded phase). Biased lock "nhớ" thread đầu tiên — lần acquire tiếp theo chỉ cần **check threadID trong mark word** (1 compare), không cần CAS.
 
-```
-Lần đầu acquire (bias):
-  Mark Word: [threadID = T1][epoch][age][1][01]
-  → Ghi threadID vào mark word (CAS 1 lần duy nhất)
-
-Lần sau T1 acquire lại:
-  → Check mark word threadID == T1? ✅ → Enter! (không CAS, không atomic op)
-  → Chi phí ≈ 1 memory read + 1 compare = ~1 ns
+```d2 title="Biased locking: acquire đầu và lần sau"
+direction: down
+n0: "Lần đầu acquire (bias)\nMark Word: threadID=T1, epoch, age, 1, 01"
+n1: "CAS ghi threadID một lần"
+n2: "T1 acquire lại: threadID == T1?"
+n3: "Đúng: enter\nkhông CAS, không atomic op\n≈ 1 memory read + 1 compare (~1 ns trong ví dụ cũ)"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 **Revoke biased lock** (khi thread khác muốn acquire):
@@ -194,28 +194,36 @@ mark -> monitor
 
 ### 6.1. Enter (acquire fat lock)
 
-```
-1. CAS _owner NULL → current_thread
-   → thành công: lock acquired!
-   → thất bại: contention
-
-2. Nếu _owner == current_thread → reentrant: _recursions++
-
-3. Spin (adaptive) — CAS thử thêm vài lần
-   → spin thành công: avoid park (vẫn ở user-space)
-
-4. Spin exhausted → enqueue vào _cxq → park thread (OS level)
-   → Thread chuyển RUNNABLE → BLOCKED
-   → Context switch (~5-15 µs)
+```d2 title="ObjectMonitor: acquire, reentrant, spin và park"
+direction: down
+n0: "CAS _owner NULL → current_thread"
+n1: "Lock acquired"
+n2: "Contention: _owner == current_thread?"
+n3: "Reentrant: _recursions++"
+n4: "Adaptive spin: CAS thêm vài lần"
+n5: "Spin thành công: tránh park (user-space)"
+n6: "Spin exhausted: enqueue _cxq, park (OS)\nRUNNABLE → BLOCKED\ncontext switch ~5–15 µs (ước lượng)"
+n0 -> n1: "thành công"
+n0 -> n2: "thất bại"
+n2 -> n3: "đúng"
+n2 -> n4: "khác owner"
+n4 -> n5: "thành công"
+n4 -> n6: "hết lượt"
 ```
 
 ### 6.2. Exit (release fat lock)
 
-```
-1. _recursions > 0? → _recursions-- (vẫn giữ lock)
-2. _recursions == 0: _owner = NULL
-3. Chọn successor từ _EntryList hoặc _cxq → unpark
-4. Successor wake up → thử acquire lại (CAS _owner)
+```d2 title="ObjectMonitor: release và đánh thức successor"
+direction: down
+n0: "_recursions > 0?"
+n1: "_recursions--\nvẫn giữ lock"
+n2: "_recursions == 0\n_owner = NULL"
+n3: "Chọn successor từ _EntryList hoặc _cxq\nunpark"
+n4: "Successor thức dậy\nthử CAS _owner để acquire lại"
+n0 -> n1: "đúng"
+n0 -> n2: "không"
+n2 -> n3
+n3 -> n4
 ```
 
 > [!IMPORTANT]
@@ -274,32 +282,53 @@ javap output:
 
 ### 8.1. wait()
 
-```
-Thread T1 đang giữ monitor:
-1. Tạo ObjectWaiter node, enqueue vào _WaitSet
-2. Release monitor (_owner = NULL, _recursions saved)
-3. Park thread → WAITING state
-4. Khi được notify: chuyển từ _WaitSet → _EntryList
-5. Re-acquire monitor (có thể phải đợi)
-6. Restore _recursions → tiếp tục từ sau wait()
+```d2 title="wait: nhả monitor, chờ và reacquire"
+grid-rows: 4
+grid-columns: 2
+n0: "T1 đang giữ monitor"
+n1: "Tạo ObjectWaiter → enqueue _WaitSet"
+n3: "Park → WAITING"
+n2: "Release monitor\n_owner=NULL, lưu _recursions"
+n4: "Được notify: _WaitSet → _EntryList"
+n5: "Re-acquire monitor (có thể phải đợi)"
+n7: "" {style.opacity: 0}
+n6: "Restore _recursions\ntiếp tục sau wait()"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 ### 8.2. notify()
 
-```
-Thread T2 gọi notify() (đang giữ monitor):
-1. Lấy 1 node từ _WaitSet (đầu hoặc cuối, JVM-dependent)
-2. Chuyển node sang _EntryList hoặc _cxq
-3. KHÔNG unpark ngay — thread chỉ eligible để compete lock
-4. Khi T2 exit monitor → successor (có thể là node vừa notify) được unpark
+```d2 title="notify không trao lock ngay"
+direction: down
+n0: "T2 giữ monitor, gọi notify()"
+n1: "Lấy một node _WaitSet\nđầu/cuối tùy JVM"
+n2: "Chuyển node sang _EntryList hoặc _cxq"
+n3: "Chưa unpark ngay\nchỉ eligible để compete lock"
+n4: "T2 exit monitor"
+n5: "Successor (có thể node vừa notify) được unpark"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 ### 8.3. notifyAll()
 
-```
-Chuyển TẤT CẢ node từ _WaitSet → _EntryList
-→ Tất cả sẽ compete lock khi monitor released
-→ Chỉ 1 thắng, còn lại block lại
+```d2 title="notifyAll chuyển toàn bộ waiter sang cạnh tranh lock"
+direction: down
+n0: "TẤT CẢ node _WaitSet → _EntryList"
+n1: "Monitor được release"
+n2: "Tất cả compete lock"
+n3: "Chỉ một thread thắng\ncác thread còn lại block lại"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 > [!WARNING]
@@ -390,9 +419,16 @@ CAS fail → spin loop:
 
 **Adaptive**: JVM theo dõi **history** — nếu spin thường thành công → tăng `spinCount`. Nếu spin thường fail → giảm `spinCount` (hoặc bỏ spin luôn):
 
-```
-Object A: spin thành công 80% lần → spinCount tăng lên 200
-Object B: spin fail 95% lần → spinCount giảm về 0 (park ngay, đừng đốt CPU)
+```d2 title="Adaptive spinning tùy lịch sử monitor"
+direction: right
+r0n0: "Object A: spin thành công 80%"
+r0n1: "spinCount tăng lên 200"
+r0n0 -> r0n1
+r1n0: "Object B: spin fail 95%"
+r1n1: "spinCount giảm về 0"
+r1n2: "park ngay, không đốt CPU"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 > [!NOTE]

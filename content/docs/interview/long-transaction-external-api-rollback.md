@@ -55,12 +55,17 @@ description: "Câu hỏi phỏng vấn backend/Spring về transaction kéo dài
 
 Ví dụ nghiệp vụ:
 
-```text
-1. UPDATE order → PROCESSING
-2. Payment API   → authorize tiền
-3. Inventory API → giữ hàng
-4. Shipping API  → tạo vận đơn
-5. UPDATE order → COMPLETED
+```d2 title="Workflow order kỳ vọng"
+direction: down
+n0: "1. UPDATE order → PROCESSING"
+n1: "2. Payment API: authorize tiền"
+n2: "3. Inventory API: giữ hàng"
+n3: "4. Shipping API: tạo vận đơn"
+n4: "5. UPDATE order → COMPLETED"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Yêu cầu mong muốn:
@@ -143,15 +148,21 @@ public void transfer(long fromId, long toId, BigDecimal amount) {
 
 Long transaction là transaction bị giữ mở quá lâu trước khi `COMMIT` hoặc `ROLLBACK`.
 
-```text
-BEGIN
-  ├─ UPDATE DB             20 ms
-  ├─ gọi Payment API     2000 ms
-  ├─ retry Payment API   4000 ms
-  ├─ gọi Inventory API   1500 ms
-  └─ COMMIT                10 ms
+Các số minh họa cho tổng thời gian transaction mở khoảng 7.5 giây (7.53 giây khi cộng các bước), không phải trace đo được.
 
-Tổng thời gian transaction mở: khoảng 7.5 giây
+```d2 title="Transaction giữ mở trong lúc gọi API"
+direction: down
+n0: "BEGIN"
+n1: "UPDATE DB: 20 ms"
+n2: "Payment API: 2000 ms"
+n3: "Retry Payment API: 4000 ms"
+n4: "Inventory API: 1500 ms"
+n5: "COMMIT: 10 ms"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Các SQL có thể rất nhanh, nhưng transaction vẫn dài vì application làm network I/O bên trong transaction.
@@ -244,28 +255,37 @@ Có hai khả năng.
 
 ### Trường hợp A: update nhưng chưa commit
 
-```text
-Order Service TX:
-  UPDATE order → PROCESSING
-  chưa COMMIT
-       │
-       └─ gọi API B
-             └─ API B dùng connection khác để đọc Order DB
+```d2 title="API B dùng connection khác không thấy update chưa commit"
+direction: down
+tx: "Order Service TX" {
+  update: "UPDATE order → PROCESSING\nchưa COMMIT"
+}
+b: "Gọi API B"
+connection: "Connection khác"
+db: "Order DB\nthường vẫn đọc trạng thái cũ"
+tx.update -> b
+b -> connection: "đọc DB"
+connection -> db
 ```
 
 Ở isolation level thông thường như `READ_COMMITTED`, API B **không nhìn thấy dữ liệu chưa commit** của transaction A.
 
-```text
-UPDATE trước nhưng chưa commit
-→ API khác thường vẫn đọc trạng thái cũ
+```d2 title="Update chưa commit chưa công bố trạng thái mới"
+direction: down
+n0: "UPDATE trước nhưng chưa commit"
+n1: "API khác thường vẫn đọc trạng thái cũ"
+n0 -> n1
 ```
 
 ### Trường hợp B: commit để API nhìn thấy
 
-```text
-UPDATE order → PROCESSING
-COMMIT
-CALL API B
+```d2 title="Commit trước khi gọi API B"
+direction: down
+n0: "UPDATE order → PROCESSING"
+n1: "COMMIT"
+n2: "CALL API B"
+n0 -> n1
+n1 -> n2
 ```
 
 API B nhìn thấy dữ liệu mới. Nhưng transaction đã commit nên không thể dùng `ROLLBACK` để quay lại.
@@ -305,12 +325,17 @@ Nhưng nó có nhiều failure mode.
 
 Nếu HikariCP có 20 connection và 20 request cùng chờ API trong 10 giây:
 
-```text
-20 request × 1 connection = hết pool
-Request thứ 21 không lấy được connection
-→ connection timeout
-→ request retry
-→ tải tăng thêm
+```d2 title="Pool exhaustion khuếch đại retry"
+direction: down
+n0: "20 request × 1 connection = hết pool"
+n1: "Request thứ 21 không lấy được connection"
+n2: "Connection timeout"
+n3: "Request retry"
+n4: "Tải tăng thêm"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ### Giữ lock lâu
@@ -382,10 +407,11 @@ Transaction chỉ bao phần ghi cuối cùng.
 
 Ví dụ gửi email không thể "thu hồi" sau khi người dùng đã đọc. Hãy gửi sau khi business transaction đã commit, thường qua outbox:
 
-```text
-COMMIT order COMPLETED + outbox ORDER_COMPLETED
-                    ↓
-worker gửi email
+```d2 title="Outbox gắn notification với commit"
+direction: down
+n0: "COMMIT order COMPLETED + outbox ORDER_COMPLETED"
+n1: "Worker gửi email"
+n0 -> n1
 ```
 
 Nếu gửi trùng, dùng idempotency hoặc deduplication ở consumer.
@@ -586,9 +612,11 @@ Khi nhận lại cùng key:
 
 Compensation cũng cần idempotent:
 
-```text
-release inventory lần 1 → success
-release inventory lần 2 → vẫn success/no-op
+```d2 title="Compensation idempotent"
+direction: down
+n0: "Release inventory lần 1: success"
+n1: "Release inventory lần 2: vẫn success / no-op"
+n0 -> n1
 ```
 
 ---
@@ -974,18 +1002,24 @@ messageBroker.publish(new OrderCreated(order.id()));
 
 Failure window:
 
-```text
-DB commit thành công
-application crash trước publish
-→ order tồn tại nhưng event bị mất
+```d2 title="Crash giữa commit và publish làm mất event"
+direction: down
+n0: "DB commit thành công"
+n1: "Application crash trước publish"
+n2: "Order tồn tại nhưng event bị mất"
+n0 -> n1
+n1 -> n2
 ```
 
 Nếu publish trước commit:
 
-```text
-event publish thành công
-DB rollback
-→ consumer nhận event cho order không tồn tại
+```d2 title="Publish trước commit có thể tạo event ma"
+direction: down
+n0: "Event publish thành công"
+n1: "DB rollback"
+n2: "Consumer nhận event cho order không tồn tại"
+n0 -> n1
+n1 -> n2
 ```
 
 Transactional Outbox ghi business data và event vào **cùng local transaction**:
@@ -1191,12 +1225,17 @@ Tại sao không dùng XA cho mọi thứ?
 
 Hai request có thể cùng xử lý một order:
 
-```text
-Request A: đọc order = NEW
-Request B: đọc order = NEW
-A bắt đầu payment
-B cũng bắt đầu payment
-→ duplicate side effect
+```d2 title="Hai request cùng đọc NEW gây duplicate side effect"
+direction: down
+n0: "Request A đọc order=NEW"
+n1: "Request B đọc order=NEW"
+n2: "A bắt đầu payment"
+n3: "B cũng bắt đầu payment"
+n4: "Duplicate side effect"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ### Conditional state transition
@@ -1303,19 +1342,29 @@ exponential backoff + jitter + max attempts + deadline
 
 Ví dụ:
 
-```text
-1s → 2s → 4s → 8s, cộng random jitter
+```d2 title="Backoff tăng dần có jitter"
+direction: down
+n0: "1s + random jitter"
+n1: "2s + random jitter"
+n2: "4s + random jitter"
+n3: "8s + random jitter"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 ### Circuit breaker
 
 Khi remote service lỗi diện rộng, circuit breaker ngăn hệ thống tiếp tục dồn request vào dependency đang hỏng.
 
-```text
-CLOSED → lỗi vượt ngưỡng → OPEN
-OPEN → fail fast
-sau cooldown → HALF_OPEN
-HALF_OPEN → probe success → CLOSED
+```d2 title="Circuit breaker: open, probe và closed"
+direction: right
+closed: CLOSED
+open: "OPEN\nfail fast"
+half: HALF_OPEN
+closed -> open: "lỗi vượt ngưỡng"
+open -> half: "sau cooldown"
+half -> closed: "probe success"
 ```
 
 ### Không retry mù
@@ -1343,9 +1392,11 @@ Không được đánh dấu order là `CANCELLED` nếu compensation quan trọ
 
 State hợp lý:
 
-```text
-COMPENSATING
-  └─ payment compensation = RETRY_PENDING
+```d2 title="Saga đang compensating còn payment pending"
+direction: down
+saga: COMPENSATING
+payment: "payment compensation = RETRY_PENDING"
+saga -> payment: "bước chưa hoàn tất"
 ```
 
 Recovery worker:
@@ -1378,11 +1429,17 @@ Happy-path test là chưa đủ. Cần fault-injection tại mọi boundary.
 
 Kiểm tra transition hợp lệ:
 
-```text
-NEW → PROCESSING                 hợp lệ
-PROCESSING → COMPLETED           hợp lệ
-COMPLETED → PROCESSING           không hợp lệ
-COMPENSATING → CANCELLED         chỉ khi mọi step đã compensated
+```d2 title="Trạng thái order: hợp lệ, cấm và có điều kiện"
+direction: right
+new: NEW
+processing: PROCESSING
+completed: COMPLETED
+compensating: COMPENSATING
+cancelled: CANCELLED
+new -> processing: "hợp lệ"
+processing -> completed: "hợp lệ"
+completed -> processing: "KHÔNG hợp lệ" {style.stroke-dash: 4}
+compensating -> cancelled: "chỉ khi mọi step đã compensated"
 ```
 
 ### Integration test transaction boundary
@@ -1684,71 +1741,71 @@ Nếu thất bại phải đưa hệ thống về trạng thái nghiệp vụ nh
 
 ### Thiết kế
 
-```text
-Local TX 1:
-  order NEW → PROCESSING
-  create saga + steps
-  create outbox PROCESS_ORDER
-COMMIT
-
-Worker:
-  Payment authorize(key=P)
-  persist payment SUCCEEDED
-
-  Inventory reserve(key=I)
-  persist inventory SUCCEEDED
-
-  Shipping reserve(key=S)
-  persist shipping SUCCEEDED
-
-Local TX cuối:
-  order PROCESSING → COMPLETED
-  saga → COMPLETED
-COMMIT
+```d2 title="Saga happy path với các local transaction ngắn"
+direction: down
+n0: "Local TX 1: order NEW → PROCESSING\ncreate saga + steps\ncreate outbox PROCESS_ORDER\nCOMMIT"
+n1: "Worker: Payment authorize(key=P)\npersist payment SUCCEEDED"
+n2: "Inventory reserve(key=I)\npersist inventory SUCCEEDED"
+n3: "Shipping reserve(key=S)\npersist shipping SUCCEEDED"
+n4: "Local TX cuối: order PROCESSING → COMPLETED\nsaga → COMPLETED\nCOMMIT"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Nếu Inventory thất bại vĩnh viễn:
 
-```text
-Payment đã SUCCEEDED
-Inventory FAILED
-
-Saga → COMPENSATING
-Payment void(key=PC)
-Payment step → COMPENSATED
-Order → CANCELLED
-Saga → CANCELLED
+```d2 title="Inventory fail sau payment: compensate"
+direction: down
+n0: "Payment SUCCEEDED\nInventory FAILED"
+n1: "Saga → COMPENSATING"
+n2: "Payment void(key=PC)"
+n3: "Payment step → COMPENSATED"
+n4: "Order → CANCELLED"
+n5: "Saga → CANCELLED"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Nếu Payment timeout:
 
-```text
-Không kết luận Payment thất bại.
-Saga step → RETRY_PENDING hoặc UNKNOWN.
-Worker retry cùng key P.
-Payment trả result cũ nếu request trước đã thành công.
+```d2 title="Payment timeout không đồng nghĩa thất bại"
+direction: down
+n0: "Không kết luận Payment thất bại"
+n1: "Saga step → RETRY_PENDING hoặc UNKNOWN"
+n2: "Worker retry cùng key P"
+n3: "Payment trả result cũ\nnếu request trước đã thành công"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Nếu application crash sau Inventory success:
 
-```text
-Inventory step local có thể vẫn STARTED.
-Worker restart, retry cùng key I.
-Inventory trả reservationRef cũ.
-Worker persist SUCCEEDED rồi tiếp tục Shipping.
+```d2 title="Restart sau inventory success chưa persist"
+direction: down
+n0: "Inventory step local có thể vẫn STARTED"
+n1: "Worker restart, retry cùng key I"
+n2: "Inventory trả reservationRef cũ"
+n3: "Worker persist SUCCEEDED\nrồi tiếp tục Shipping"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Nếu void Payment thất bại năm lần:
 
-```text
-Payment compensation → COMPENSATION_FAILED
-Saga → MANUAL_REVIEW
-Alert vận hành gồm:
-  operationId
-  orderId
-  paymentRef
-  idempotency key
-  error gần nhất
+```d2 title="Compensation fail cần manual review"
+direction: down
+n0: "Payment compensation → COMPENSATION_FAILED"
+n1: "Saga → MANUAL_REVIEW"
+n2: "Alert vận hành\noperationId, orderId, paymentRef\nidempotency key, error gần nhất"
+n0 -> n1
+n1 -> n2
 ```
 
 ### Consistency model

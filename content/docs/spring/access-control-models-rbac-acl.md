@@ -186,12 +186,17 @@ RBAC phù hợp khi quyền đi theo chức danh hoặc trách nhiệm ổn đ�
 
 Mỗi resource instance có danh sách **ACE — Access Control Entry**. Mỗi ACE nói subject nào được hoặc bị từ chối permission nào.
 
-```text
-Invoice INV-42 ACL
-├── USER:alice      → READ, WRITE
-├── USER:bob        → READ
-├── ROLE:AUDITOR    → READ
-└── USER:eve        → DENY READ
+```d2 title="ACL của Invoice INV-42"
+direction: down
+invoice: "Invoice INV-42 ACL"
+alice: "USER:alice"
+bob: "USER:bob"
+auditor: "ROLE:AUDITOR"
+eve: "USER:eve"
+invoice -> alice: "READ, WRITE"
+invoice -> bob: "READ"
+invoice -> auditor: "READ"
+invoice -> eve: "DENY READ"
 ```
 
 ACL cho phép object-level authorization chính xác. Chi phí đổi lại là số ACE có thể rất lớn, query phức tạp hơn và cache invalidation khó hơn RBAC.
@@ -343,8 +348,13 @@ Khi tổ chức đổi role nhưng capability không đổi, cách thứ nhất 
 
 Role hierarchy tiện lợi nhưng dễ vô tình cấp quá nhiều quyền:
 
-```text
-ADMIN > MANAGER > USER
+```d2 title="Role hierarchy"
+direction: down
+n0: "ADMIN"
+n1: "MANAGER"
+n2: "USER"
+n0 -> n1
+n1 -> n2
 ```
 
 Nếu `MANAGER` về sau nhận quyền đọc lương, mọi `ADMIN` cũng tự động nhận quyền đó. Vì vậy hierarchy chỉ nên diễn tả quan hệ bao hàm thật sự ổn định.
@@ -668,12 +678,17 @@ Khi grant/revoke quyền, phải xác định mức nào cần invalidation. Cac
 
 Một chiến lược phổ biến:
 
-```text
-Grant/revoke role
-    ├── commit database transaction
-    ├── publish AuthorizationChanged(userId)
-    ├── evict distributed cache
-    └── tăng authz_version để token/session cũ bị từ chối
+```d2 title="Grant/revoke và invalidation quyền"
+direction: down
+n0: "Grant/revoke role"
+n1: "Commit database transaction"
+n2: "Publish AuthorizationChanged(userId)"
+n3: "Evict distributed cache"
+n4: "Tăng authz_version\ntoken/session cũ bị từ chối"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ## 5. ACL chuyên sâu
@@ -700,11 +715,15 @@ Cần phân biệt ACL và ACE:
 
 Ví dụ ACL của invoice `42` có ba ACE:
 
-```text
-ACL của INVOICE:42
-├── ACE 1: USER:alice   được READ
-├── ACE 2: ROLE:AUDITOR được READ
-└── ACE 3: USER:eve     bị từ chối READ
+```d2 title="Các ACE trong ACL INVOICE:42"
+direction: down
+acl: "ACL của INVOICE:42"
+a: "ACE 1: USER:alice — READ"
+b: "ACE 2: ROLE:AUDITOR — READ"
+c: "ACE 3: USER:eve — từ chối READ"
+acl -> a
+acl -> b
+acl -> c
 ```
 
 Có thể biểu diễn mỗi ACE bằng sáu trường:
@@ -775,8 +794,13 @@ Chỉ cần kết hợp khi quyết định authorization có đồng thời hai
 
 Giả sử role `FINANCE_STAFF` có permission `invoice:read`:
 
-```text
-Alice → FINANCE_STAFF → invoice:read
+```d2 title="RBAC: user tới role tới permission"
+direction: down
+n0: "Alice"
+n1: "FINANCE_STAFF"
+n2: "invoice:read"
+n0 -> n1
+n1 -> n2
 ```
 
 Permission này cho biết Alice có khả năng đọc invoice, nhưng không chỉ ra Alice được đọc invoice nào. Nếu code chỉ gọi `hasAuthority("invoice:read")`, Alice có thể đọc cả invoice `42`, `43` và mọi invoice khác.
@@ -815,13 +839,17 @@ invoice:approve AND ACL APPROVE trên INV-42
 
 Ví dụ dữ liệu:
 
-```text
-RBAC của Alice
-└── FINANCE_STAFF → invoice:read, invoice:update
-
-ACL của Alice
-├── INVOICE:42 → READ, WRITE
-└── INVOICE:43 → READ
+```d2 title="RBAC capability khác ACL object scope"
+direction: down
+rbac: "RBAC của Alice"
+role: FINANCE_STAFF
+permissions: "invoice:read, invoice:update"
+acl: "ACL của Alice"
+invoice42: "INVOICE:42 — READ, WRITE"
+invoice43: "INVOICE:43 — READ"
+rbac -> role -> permissions
+acl -> invoice42
+acl -> invoice43
 ```
 
 Kết quả:
@@ -1168,11 +1196,13 @@ Tuy nhiên, bitmask chỉ tối ưu **cách lưu và thao tác tập permission*
 
 Bitmask không thay thế ACL. Nó chỉ thay cách biểu diễn tập permission bên trong một ACL entry:
 
-```text
-ACL entry
-├── resource: Document 42
-├── subject: alice
-└── permissions: READ + WRITE  → lưu thành một permission mask
+```d2 title="Một ACL entry và permission mask"
+direction: right
+entry: "ACL entry" {
+  resource: "resource: Document 42"
+  subject: "subject: alice"
+  permissions: "permissions: READ + WRITE\nlưu thành một permission mask"
+}
 ```
 
 **Bước 1 — gán mỗi permission vào một bit**
@@ -1479,16 +1509,17 @@ public class DocumentService {
 
 Luồng kiểm tra hoàn chỉnh:
 
-```text
-Alice gọi get(documentId=42)
-    ↓
-Tìm ACL của (DOCUMENT, 42, USER, alice)
-    ↓
-Đọc permission_mask = 3 (0011)
-    ↓
-Check READ: 0011 & 0001 = 0001
-    ↓
-ALLOW
+```d2 title="Kiểm tra READ trên permission mask"
+direction: down
+n0: "Alice gọi get(documentId=42)"
+n1: "Tìm ACL (DOCUMENT,42,USER,alice)"
+n2: "Đọc permission_mask=3 (0011)"
+n3: "Check READ: 0011 & 0001 = 0001"
+n4: "ALLOW"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Nếu không có row hoặc bit `READ` không bật, method bị từ chối.
@@ -1936,11 +1967,15 @@ Spring Security ACL không “tốt hơn” custom ACL trong mọi trường h�
 
 Không nên làm:
 
-```text
-SELECT * FROM invoice
-→ tạo 100.000 object
-→ @PostFilter từng object
-→ trả 20 object
+```d2 title="PostFilter lọc quá muộn"
+direction: down
+n0: "SELECT * FROM invoice"
+n1: "Tạo 100.000 object"
+n2: "@PostFilter từng object"
+n3: "Trả 20 object"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Đúng hơn là đưa RBAC scope và ACL vào query:
@@ -2004,10 +2039,16 @@ public ProjectDto getProject(UUID projectId) { ... }
 
 `projectPolicy` có thể query quan hệ:
 
-```text
-user --member_of--> team --owns--> project
-user --manager_of--> project.owner
-user --shared_with--> project
+```d2 title="Authorization theo relationships"
+direction: right
+user: user
+team: team
+project: project
+owner: "project.owner"
+user -> team: "member_of"
+team -> project: "owns"
+user -> owner: "manager_of"
+user -> project: "shared_with"
 ```
 
 Khi relation graph sâu hoặc nhiều service cùng cần policy, cân nhắc external PDP. Request flow khi đó là:

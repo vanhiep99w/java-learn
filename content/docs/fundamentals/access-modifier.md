@@ -39,11 +39,12 @@ Java có **4 mức** (theo thứ tự từ rộng → hẹp): `public` → `prot
 | *default* | ✅ | ✅ | ❌ | ❌ |
 | `private` | ✅ | ❌ | ❌ | ❌ |
 
-```
-public      ████████████████  toàn thế giới
-protected   ████████████      package + subclass
-default     ████████          chỉ package
-private     ████              chỉ class
+```d2 title="Phạm vi truy cập của access modifiers"
+direction: down
+n0: "public: toàn thế giới"
+n1: "protected: package + subclass"
+n2: "default: chỉ package"
+n3: "private: chỉ class"
 ```
 
 > [!NOTE]

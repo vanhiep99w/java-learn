@@ -291,9 +291,14 @@ final void runWorker(Worker w) {
 
 ### 7.1. SynchronousQueue — "direct handoff"
 
-```
-Producer: offer(task) → block cho đến khi có consumer take()
-Consumer: take()       → block cho đến khi có producer offer()
+```d2 title="SynchronousQueue: điểm hẹn producer và consumer"
+direction: right
+r0n0: "Producer offer(task)"
+r0n1: "chờ cho tới khi consumer take()"
+r0n0 -> r0n1
+r1n0: "Consumer take()"
+r1n1: "chờ cho tới khi producer offer()"
+r1n0 -> r1n1
 ```
 
 Không buffer. Mỗi task phải có thread nhận ngay. Nếu không → tạo thread mới (tới max) → reject. Đây là queue của `newCachedThreadPool`.

@@ -44,36 +44,54 @@ description: "Phân biệt Servlet Filter, Spring MVC HandlerInterceptor và AOP
 
 Trong ứng dụng Spring MVC chạy trên Tomcat, Jetty hoặc Undertow, HTTP request đi vào **Servlet container** trước. Container chạy Servlet `Filter` chain. Sau đó request đến `DispatcherServlet`, Spring MVC chọn controller handler phù hợp và chạy `HandlerInterceptor` chain.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant SC as Servlet Container
-    participant F as Servlet Filters
-    participant SS as Spring Security filters
-    participant DS as DispatcherServlet
-    participant HI as HandlerInterceptors
-    participant H as Controller / Handler
-    participant E as Exception Resolver
+```d2 interactive title="Filter và Security trước MVC"
+shape: sequence_diagram
+c: Client
+sc: "Servlet Container"
+f: "Servlet Filters"
+ss: "Spring Security filters"
+ds: DispatcherServlet
+c -> sc: "HTTP request"
+sc -> f: "doFilter()"
+f."Encoding, CORS, trace ID…\nSecurity bắt đầu tại đây"
+f -> ss: "DelegatingFilterProxy → FilterChainProxy"
+ss -> ds: "chain.doFilter()"
+```
 
-    C->>SC: HTTP request
-    SC->>F: doFilter()
-    Note over F: Encoding, CORS, trace ID...<br/>Security bắt đầu tại đây
-    F->>SS: DelegatingFilterProxy → FilterChainProxy
-    SS->>DS: chain.doFilter()
-    DS->>HI: preHandle()
-    HI->>H: invoke handler
-    alt Handler trả kết quả bình thường
-        H-->>DS: ModelAndView / response body
-        DS->>HI: postHandle()
-        DS->>HI: afterCompletion()
-    else Handler ném exception
-        H-->>E: exception
-        E-->>DS: error response / ModelAndView
-        DS->>HI: afterCompletion(exception)
-    end
-    DS-->>F: response quay ngược qua filter chain
-    F-->>SC: HTTP response
-    SC-->>C: HTTP response
+Sau khi Security cho phép request tới MVC, hai nhánh dưới đây phân biệt handler trả kết quả với handler ném exception. Đường response sau MVC quay ngược filter chain; interceptor không thay thế filter.
+
+```d2 interactive title="MVC: callback thành công hoặc exception"
+shape: sequence_diagram
+ds: DispatcherServlet
+hi: HandlerInterceptors
+h: "Controller / Handler"
+e: "Exception Resolver"
+ds -> hi: "preHandle()"
+ds -> h: "invoke handler qua HandlerAdapter"
+ok: "Handler trả kết quả bình thường" {
+  h -> ds: "ModelAndView / response body"
+  ds -> hi: "postHandle()"
+  ds -> hi: "afterCompletion() sau render"
+}
+fail: "Handler ném exception (nhánh thay thế)" {
+  h -> ds: "exception"
+  ds -> e: "resolveException()"
+  e -> ds: "error response / ModelAndView nếu resolve được"
+  ds -> hi: "afterCompletion(exception nếu chưa resolve)"
+}
+```
+
+`preHandle=false` dừng trước handler; chỉ interceptor đã hoàn tất preHandle thành công được gọi afterCompletion. Với exception đã resolve, afterCompletion thường nhận `null`; lỗi chưa resolve propagate ra container.
+
+```d2 title="HTTP response quay ngược filter chain"
+shape: sequence_diagram
+ds: DispatcherServlet
+f: "Servlet Filters (gồm Spring Security filters)"
+sc: "Servlet Container"
+c: Client
+ds -> f: "response quay ngược filter chain"
+f -> sc: "HTTP response"
+sc -> c: "HTTP response"
 ```
 
 Một filter nằm **ngoài** Spring MVC. Vì vậy nó thấy mọi request đi qua servlet mapping: static resource, request bị Spring Security chặn, request không match controller và cả một số error dispatch tuỳ cấu hình.
@@ -105,12 +123,21 @@ Nó được Servlet container gọi. Vì là chuẩn Servlet, cùng một filte
 
 Mỗi filter nhận `FilterChain`. Gọi `chain.doFilter(request, response)` để chuyển request tới filter tiếp theo. Khi filter cuối hoàn thành, container gọi servlet đích — trong Spring MVC thường là `DispatcherServlet`.
 
-```text
-Request đi xuống:
-Client → Filter A → Filter B → DispatcherServlet → Controller
-
-Response quay ngược:
-Client ← Filter A ← Filter B ← DispatcherServlet ← Controller
+```d2 title="Request đi xuống, response quay ngược"
+shape: sequence_diagram
+client: Client
+a: "Filter A"
+b: "Filter B"
+ds: DispatcherServlet
+controller: Controller
+client -> a: "Request đi xuống"
+a -> b
+b -> ds
+ds -> controller
+controller -> ds: "Response quay ngược"
+ds -> b
+b -> a
+a -> client
 ```
 
 Cấu trúc này giải thích vì sao một filter có thể thực hiện logic trước và sau controller:
@@ -298,10 +325,29 @@ chain -> ds
 
 Khi handler hoàn thành, callback đi ngược:
 
-```text
-preHandle:        Trace → Tenant → Audit → Controller
-postHandle:       Controller → Audit → Tenant → Trace
-afterCompletion:  Controller → Audit → Tenant → Trace
+```d2 title="Thứ tự Trace, Tenant, Audit"
+direction: right
+r0n0: "preHandle: Trace"
+r0n1: "Tenant"
+r0n2: "Audit"
+r0n3: "Controller"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "postHandle: Controller"
+r1n1: "Audit"
+r1n2: "Tenant"
+r1n3: "Trace"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
+r2n0: "afterCompletion: Controller"
+r2n1: "Audit"
+r2n2: "Tenant"
+r2n3: "Trace"
+r2n0 -> r2n1
+r2n1 -> r2n2
+r2n2 -> r2n3
 ```
 
 Nếu `TenantInterceptor.preHandle()` trả `false`, `AuditInterceptor` và controller không chạy. `afterCompletion()` chỉ chạy cho các interceptor đã pre-handle thành công trước đó, tức `TraceInterceptor`.
@@ -681,14 +727,23 @@ SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
 `HandlerInterceptor.preHandle()` **đúng là chạy trước controller method**. Vì vậy, về mặt kỹ thuật, interceptor có thể đọc JWT và đặt `Authentication` vào `SecurityContextHolder` để controller/service phía sau dùng được.
 
-```text
-HTTP request
-  → Servlet Filter chain
-  → Spring Security FilterChain
-  → DispatcherServlet bắt đầu xử lý
-  → HandlerMapping tìm handler
-  → HandlerInterceptor.preHandle()
-  → Controller method
+```d2 title="Security filters chạy trước MVC"
+grid-rows: 4
+grid-columns: 2
+n0: "HTTP request"
+n1: "Servlet Filter chain"
+n3: "DispatcherServlet bắt đầu xử lý"
+n2: "Spring Security FilterChain"
+n4: "HandlerMapping tìm handler"
+n5: "HandlerInterceptor.preHandle()"
+n7: "" {style.opacity: 0}
+n6: "Controller method"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Khác biệt không phải là “interceptor chạy sau controller”; nó chạy trước controller. Khác biệt là Spring Security cần chạy **trước toàn bộ Spring MVC pipeline**, còn interceptor chỉ chạy sau khi `DispatcherServlet` đã bắt đầu xử lý và tìm được một `HandlerExecutionChain`.
@@ -703,11 +758,15 @@ Khác biệt không phải là “interceptor chạy sau controller”; nó ch�
 
 Ví dụ một request không authenticated có thể bị dừng ngay ở filter:
 
-```text
-GET /admin/users
-  → AuthorizationFilter: chưa xác thực
-  → ExceptionTranslationFilter: trả 401 hoặc redirect login
-  → DispatcherServlet, HandlerInterceptor và Controller không chạy
+```d2 title="Security từ chối trước DispatcherServlet"
+direction: down
+n0: "GET /admin/users"
+n1: "AuthorizationFilter: chưa xác thực"
+n2: "ExceptionTranslationFilter: 401 hoặc redirect login"
+n3: "DispatcherServlet, HandlerInterceptor\nvà Controller KHÔNG chạy"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Tự authenticate trong `HandlerInterceptor` không luôn sai. Nó có thể phù hợp với một kiểm tra **MVC-specific** sau khi identity đã được Spring Security thiết lập, chẳng hạn kiểm tra annotation endpoint hoặc dựng tenant context dựa trên route. Tuy nhiên, không nên dùng nó thay cho authentication, URL authorization, CSRF hoặc CORS của Spring Security.

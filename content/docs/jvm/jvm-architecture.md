@@ -100,12 +100,17 @@ platform -> bootstrap: "delegate up"
 
 Khi cần load class `com.example.Foo`:
 
-```
-1. AppClassLoader → hỏi PlatformClassLoader: "bạn có Foo?"
-2. PlatformClassLoader → hỏi BootstrapClassLoader: "bạn có Foo?"
-3. Bootstrap: "Không" → trả về Platform
-4. Platform: "Không" → trả về App
-5. AppClassLoader: tự load từ classpath
+```d2 title="Parent delegation hỏi trước, App load khi parent không có"
+direction: down
+n0: "AppClassLoader hỏi Platform: có Foo?"
+n1: "Platform hỏi Bootstrap: có Foo?"
+n2: "Bootstrap: không → trả về Platform"
+n3: "Platform: không → trả về App"
+n4: "AppClassLoader tự load từ classpath"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 **Tại sao?** Security + consistency. Ngăn user code định nghĩa `java.lang.String` giả.
@@ -348,12 +353,17 @@ ireturn       // trả kết quả
 
 Interpreter thông dịch **JVM bytecode**, không thông dịch Java source. Khi thread gọi một Java method chưa có native code JIT phù hợp, nó thường vào interpreter trước. Interpreter đọc bytecode theo program counter (PC), thực hiện semantics của instruction, rồi chuyển PC sang instruction tiếp theo.
 
-```text
-Lần đầu gọi OrderService.calculateTotal()
-  → JVM có bytecode của method
-  → chưa có JIT native code trong Code Cache
-  → interpreter chạy bytecode instruction-by-instruction
-  → đồng thời cập nhật profile/counter cho call site, branch và type thực tế
+```d2 title="Cold call đi qua interpreter và cập nhật profile"
+direction: down
+n0: "Lần đầu gọi OrderService.calculateTotal()"
+n1: "JVM có bytecode của method"
+n2: "Chưa có JIT native code trong Code Cache"
+n3: "Interpreter chạy từng bytecode instruction"
+n4: "Cập nhật profile/counter\ncall site, branch, type thực tế"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Interpreter chậm hơn native code vì mỗi bytecode instruction phải qua một lớp dispatch/runtime work của JVM. Đổi lại, nó có các lợi ích quan trọng:
@@ -368,12 +378,17 @@ Một cold method có thể **luôn** được thông dịch trong cả vòng đ
 
 JIT không biên dịch lại `.java` source. Nó lấy bytecode của một **method nóng** hoặc một **loop nóng** đã được interpreter/C1 profile rồi biên dịch thành native machine code cho CPU đang chạy process, ví dụ x86-64 hoặc AArch64. Native code được giữ trong **Code Cache**.
 
-```text
-Method/loop đủ hot
-  → JVM xếp compilation task cho compiler thread
-  → application thread vẫn tiếp tục chạy bản interpreter hoặc bản C1 hiện có
-  → C1/C2 compile xong và JVM cài native code vào Code Cache
-  → lần gọi/back-edge kế tiếp phù hợp sẽ thực thi native code
+```d2 title="Hot method được compile ngoài application thread"
+direction: down
+n0: "Method/loop đủ hot"
+n1: "Xếp compilation task cho compiler thread"
+n2: "Application thread vẫn chạy interpreter hoặc C1 hiện có"
+n3: "C1/C2 compile xong\ncài native code vào Code Cache"
+n4: "Lần gọi/back-edge phù hợp kế tiếp thực thi native code"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Điểm cuối rất quan trọng: JIT compilation thường chạy trên **compiler thread nền**. Request/thread gọi method không đứng yên chờ C2 compile xong; nó tiếp tục chạy phiên bản hiện tại. Khi bản native được cài xong, JVM chuyển execution sang bản mới ở điểm vào an toàn.
@@ -438,9 +453,16 @@ void importRows(List<Row> rows) {
 
 **Native method** là trường hợp khác với JIT. Method khai báo `native`, ví dụ một phần của `System.arraycopy` hoặc JNI library, đã là mã native do JVM/JDK/library cung cấp (C/C++/assembly hoặc tương đương). JVM không thông dịch bytecode của thân method đó vì không có thân bytecode Java để thông dịch. JIT có thể tối ưu *call site* quanh native method trong một số trường hợp, nhưng không JIT-compile implementation native bên ngoài như một Java method.
 
-```text
-Java method bình thường: bytecode → interpreter hoặc JIT → native code
-native method / JNI:     Java call boundary → native library/JVM runtime code
+```d2 title="Java method và JNI đi hai đường"
+direction: right
+r0n0: "Java method bình thường: bytecode"
+r0n1: "Interpreter hoặc JIT"
+r0n2: "Native code"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "Native method / JNI: Java call boundary"
+r1n1: "Native library / JVM runtime code"
+r1n0 -> r1n1
 ```
 
 ### 7.6. Tại sao JIT có thể nhanh hơn AOT?
@@ -519,16 +541,16 @@ a.speak();  // invokevirtual — runtime dispatch dựa trên actual object type
 
 JVM dùng **vtable** (virtual method table):
 
-```
-Dog.class metadata:
-┌───────────────────────────────────┐
-│         vtable                    │
-├───────────────────────────────────┤
-│ [0] Object.hashCode → addr        │
-│ [1] Object.equals → addr          │
-│ [2] Animal.speak → Dog.speak addr │  ← override
-│ [3] Dog.fetch → addr              │
-└───────────────────────────────────┘
+```d2 title="Dog vtable trong class metadata"
+direction: right
+metadata: "Dog.class metadata" {
+  vtable: vtable {
+    zero: "[0] Object.hashCode → addr"
+    one: "[1] Object.equals → addr"
+    two: "[2] Animal.speak → Dog.speak addr\noverride"
+    three: "[3] Dog.fetch → addr"
+  }
+}
 ```
 
 Dispatch: `receiver.getClass().vtable[method_index]` → **O(1)** lookup.
@@ -618,11 +640,17 @@ JIT compiler đưa ra **speculative assumptions**:
 
 Nếu assumption bị **invalidate** (load class mới implement Animal, branch taken khác) → **deoptimize**:
 
-```
-1. Native code bị discard
-2. Stack frame chuyển lại về interpreted state (uncommon trap)
-3. Execution tiếp tục ở interpreter
-4. Profiling lại → re-compile với knowledge mới
+```d2 title="Uncommon trap phục hồi interpreted execution"
+direction: down
+n0: "Native code bị discard"
+n1: "Stack frame → interpreted state (uncommon trap)"
+n2: "Execution tiếp tục ở interpreter"
+n3: "Profiling lại"
+n4: "Re-compile với knowledge mới"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ### 11.2. Ví dụ thực tế

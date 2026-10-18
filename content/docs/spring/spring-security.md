@@ -651,12 +651,11 @@ executor.execute(() -> {
 
 ### 9.2. BCrypt internals
 
-```
+```text
 $2a$12$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
- │  │  └─────────────────── 22 char salt + 31 char hash (Base64)
- │  └───── cost factor (2^12 = 4096 rounds)
- └──── version (2a, 2b, 2y)
 ```
+
+Chuỗi BCrypt demo giữ nguyên định dạng: `$2a$` là version (`2a`, `2b`, `2y`); `12` là cost factor (`2^12 = 4096` rounds); phần sau gồm salt 22 ký tự và hash 31 ký tự (Base64).
 
 - **Salt**: random 128-bit, **mỗi password khác nhau** → hai user cùng password → hash khác nhau → rainbow table vô dụng
 - **Cost factor**: mỗi +1 = **gấp đôi** thời gian hash. `10` = ~100ms, `12` = ~400ms, `14` = ~1.6s
@@ -830,13 +829,15 @@ Spring Security tạo `MethodSecurityExpressionRoot` làm SpEL root object:
 ```
 
 Evaluation flow:
-```
-"#userId == authentication.principal.id or hasRole('ADMIN')"
-      │                    │                        │
-      ▼                    ▼                        ▼
-  method param         root.getAuthentication()   root.hasRole("ADMIN")
-  resolver               .getPrincipal()          → check authorities
-                           .getId()               → contains "ROLE_ADMIN"?
+```d2 title="SpEL: tham số method và security expression root"
+direction: down
+expression: "#userId == authentication.principal.id or hasRole('ADMIN')"
+param: "#userId\nmethod param resolver"
+principal: "authentication.principal.id\nroot.getAuthentication()\n.getPrincipal().getId()"
+role: "hasRole('ADMIN')\nroot.hasRole(ADMIN)\ncheck authorities chứa ROLE_ADMIN?"
+expression -> param
+expression -> principal
+expression -> role
 ```
 
 ### 10.5. @PreAuthorize vs @Secured vs @RolesAllowed
@@ -1034,10 +1035,14 @@ http.oauth2ResourceServer(oauth2 -> oauth2
 );
 ```
 
-```
-Resource Server → POST https://auth-server/introspect
-                  token=abc123&token_type_hint=access_token
-                ← { "active": true, "sub": "user1", "scope": "read write", "exp": 1234567890 }
+HTTP minh họa: response body là `{"active":true,"sub":"user1","scope":"read write","exp":1234567890}`; `abc123` chỉ là token demo.
+
+```d2 title="Opaque token introspection"
+shape: sequence_diagram
+resource: "Resource Server"
+auth: "https://auth-server/introspect"
+resource -> auth: "POST\ntoken=abc123&token_type_hint=access_token"
+auth -> resource: "active=true, sub=user1\nscope=read write, exp=1234567890"
 ```
 
 | | JWT | Opaque Token |
@@ -1379,15 +1384,20 @@ public class SecurityConfig {
 
 ### 18.2. FilterChainProxy chọn chain
 
-```
-Request: GET /api/users
-  → Chain #1 (@Order 1): securityMatcher("/api/**") → MATCH ✓
-  → Dùng chain #1 (JWT, stateless, no CSRF)
-
-Request: GET /dashboard
-  → Chain #1: securityMatcher("/api/**") → NO MATCH
-  → Chain #2 (@Order 2): securityMatcher("/**") → MATCH ✓
-  → Dùng chain #2 (form login, session, CSRF)
+```d2 title="First-match SecurityFilterChain"
+direction: right
+r0n0: "GET /api/users"
+r0n1: "Chain #1 @Order 1: /api/** → MATCH"
+r0n2: "Dùng #1: JWT, stateless, no CSRF"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "GET /dashboard"
+r1n1: "Chain #1: /api/** → NO MATCH"
+r1n2: "Chain #2 @Order 2: /** → MATCH"
+r1n3: "Dùng #2: form login, session, CSRF"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 > [!IMPORTANT]

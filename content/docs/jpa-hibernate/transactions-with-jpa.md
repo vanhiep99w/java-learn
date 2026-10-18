@@ -333,41 +333,53 @@ Thứ tự SQL cụ thể phụ thuộc mapping, chiến lược sinh ID, batchi
 
 Luồng dưới đây mô tả lời gọi qua proxy Spring với Hibernate làm JPA provider:
 
-```mermaid
-sequenceDiagram
-    participant C as Controller
-    participant P as Spring transaction proxy
-    participant S as OrderService
-    participant EM as EntityManager
-    participant H as Hibernate
-    participant DB as Database
-
-    C->>P: placeOrder(productId, quantity)
-    P->>EM: mở hoặc tham gia transaction
-    P->>S: gọi method thật
-    S->>EM: find(Product)
-    EM->>DB: SELECT product
-    DB-->>EM: row và version
-    S->>S: product.reserve(quantity)
-    Note over EM,H: managed entity trở thành dirty
-    S->>EM: persist(Order)
-    S-->>P: return orderId
-    P->>EM: commit
-    EM->>H: flush persistence context
-    H->>DB: INSERT order
-    H->>DB: UPDATE product WHERE version = oldVersion
-    alt mọi SQL thành công
-        EM->>DB: COMMIT
-        DB-->>EM: commit thành công
-        EM-->>P: success
-        P-->>C: orderId
-    else constraint hoặc version conflict
-        DB-->>EM: lỗi
-        EM->>DB: ROLLBACK
-        EM-->>P: exception
-        P-->>C: exception
-    end
+```d2 interactive title="JPA: từ proxy tới dirty managed entity"
+shape: sequence_diagram
+c: Controller
+p: "Spring transaction proxy"
+s: OrderService
+em: EntityManager
+db: Database
+c -> p: "placeOrder(productId, quantity)"
+p -> em: "mở hoặc tham gia transaction"
+p -> s: "gọi method thật"
+s -> em: "find(Product)"
+em -> db: "SELECT product"
+db -> em: "row và version"
+s -> s: "product.reserve(quantity)"
+em."Managed entity trở thành dirty (Hibernate theo dõi)"
+s -> em: "persist(Order)"
+s -> p: "return orderId (chưa commit)"
 ```
+
+Method trả về chưa đồng nghĩa transaction đã commit. Ở pha sau, EntityManager yêu cầu Hibernate flush; lỗi constraint hoặc version conflict vẫn có thể khiến caller nhận exception thay vì orderId.
+
+```d2 interactive title="JPA: flush, commit hoặc rollback"
+shape: sequence_diagram
+p: "Spring transaction proxy"
+em: EntityManager
+h: Hibernate
+db: Database
+c: Controller
+p -> em: "commit"
+em -> h: "flush persistence context"
+h -> db: "INSERT order"
+h -> db: "UPDATE product WHERE version = oldVersion"
+ok: "Mọi SQL thành công" {
+  em -> db: "COMMIT"
+  db -> em: "commit thành công"
+  em -> p: "success"
+  p -> c: "orderId"
+}
+fail: "Constraint hoặc version conflict (nhánh thay thế)" {
+  db -> em: "lỗi"
+  em -> db: "ROLLBACK"
+  em -> p: "exception"
+  p -> c: "exception"
+}
+```
+
+Hai nhóm cuối là nhánh thay thế, không chạy nối tiếp trong một request.
 
 Các mốc cần nhớ:
 

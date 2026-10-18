@@ -488,11 +488,15 @@ Identity map bảo đảm một transaction không có hai bản managed mâu th
 
 Khi entity được hydrate, Hibernate giữ thông tin trạng thái ban đầu. Trước khi commit hoặc tại một điểm cần đồng bộ, **dirty checking** so sánh trạng thái hiện tại với trạng thái ban đầu để tìm field đã đổi. Hibernate sau đó xếp `INSERT`, `UPDATE` và `DELETE` vào hàng đợi hành động.
 
-```text
-find Product → managed snapshot
-rename       → Java field thay đổi, chưa chắc đã có SQL
-flush        → dirty checking → tạo và chạy UPDATE
-commit       → database xác nhận transaction
+```d2 title="Managed entity: sửa field, flush rồi commit"
+direction: down
+n0: "find Product → managed snapshot"
+n1: "rename → Java field đổi, chưa chắc có SQL"
+n2: "flush → dirty checking → tạo và chạy UPDATE"
+n3: "commit → database xác nhận transaction"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 **Flush** là đồng bộ thay đổi trong persistence context xuống database bằng SQL. Flush có thể xảy ra:

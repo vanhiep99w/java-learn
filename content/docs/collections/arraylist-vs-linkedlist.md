@@ -43,11 +43,14 @@ public class ArrayList<E> {
 - `add(e)` ở cuối = `elementData[size++] = e` → **O(1) amortized** (trừ lúc phải grow).
 - `add(i, e)` / `remove(i)` ở giữa = dịch chuyển phần đuôi bằng `System.arraycopy` → **O(n)**.
 
-```
-ArrayList size=4, capacity=10:
-  elementData: [A][B][C][D][ ][ ][ ][ ][ ][ ]
-                              └──── slot trống (capacity dư) ────┘
-  get(2) = elementData[2] = C   (tức thì)
+```d2 title="ArrayList: size và capacity"
+direction: right
+array: "elementData: Object[10] — capacity=10" {
+  used: "index 0..3: A, B, C, D\nsize=4"
+  free: "index 4..9: 6 slot trống\ncapacity dư"
+}
+get: "get(2) = elementData[2] = C\ntruy cập tức thì O(1)"
+get -> array.used: "index 2"
 ```
 
 > [!NOTE]
@@ -74,8 +77,21 @@ private Object[] grow(int minCapacity) {
 
 Vì sao `add` cuối là **O(1) amortized**: mỗi lần grow tốn O(n) copy nhưng xảy ra hiếm dần (sau mỗi 1.5x), nên chi phí trung bình mỗi `add` vẫn là hằng số.
 
-```
-add liên tục:  cap 10 → 15 → 22 → 33 → 49 → ...   (mỗi lần copy toàn bộ phần tử cũ)
+Mỗi lần grow đều copy toàn bộ phần tử cũ sang mảng mới.
+
+```d2 title="ArrayList tăng capacity và copy phần tử"
+direction: down
+n0: "capacity 10"
+n1: "capacity 15"
+n2: "capacity 22"
+n3: "capacity 33"
+n4: "capacity 49"
+n5: "…"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 > [!TIP]

@@ -106,6 +106,36 @@ n_F -> n_M: "map(getName): trả String"
 n_F -> n_FM: "flatMap(findMgr): trả Optional"
 ```
 
+Đọc pipeline sau theo ba quyết định: tạo container, loại chuỗi trắng, rồi chuẩn hóa. `input` có thể null; ví dụ dùng Java 11+ vì có `isBlank()`. Khi filter trả false, map không chạy và kết quả là empty — không có lời gọi `trim()` trên null.
+
+```code-walkthrough
+title: Theo dõi giá trị qua Optional
+language: java
+snapshots:
+  - id: pipeline
+    title: Chuẩn hóa tên nhập vào
+    code: |-
+      Optional<String> name = Optional.ofNullable(input)
+          .filter(value -> !value.isBlank())
+          .map(String::trim);
+steps:
+  - id: nullable
+    snapshot: pipeline
+    title: Chấp nhận absence ở biên
+    description: input null tạo empty; các callback phía sau không nhận null từ container này.
+    ranges: [[1, 1]]
+  - id: blank
+    snapshot: pipeline
+    title: Chuỗi trắng cũng là absence
+    description: Với input chỉ có khoảng trắng, predicate false làm pipeline thành empty.
+    ranges: [[2, 2]]
+  - id: trim
+    snapshot: pipeline
+    title: Chỉ trim giá trị còn lại
+    description: Với input có tên, map bỏ khoảng trắng hai đầu và giữ kết quả trong Optional.
+    ranges: [[3, 3]]
+```
+
 > [!NOTE]
 > Quy tắc nhớ: nếu hàm bạn truyền vào **đã** trả `Optional`, dùng `flatMap` (để "làm phẳng"). Nếu trả giá trị thường, dùng `map`. Giống `Stream.map` vs `Stream.flatMap`.
 
@@ -123,13 +153,50 @@ n_F -> n_FM: "flatMap(findMgr): trả Optional"
 
 Bẫy kinh điển — `orElse` đánh giá **eager**:
 
-```java
-// orElse: createDefaultUser() LUÔN chạy, kể cả khi opt có giá trị!
-User u = opt.orElse(createDefaultUser());     // 😱 lãng phí / side-effect ngoài ý
+Ở đây `opt` đã được tạo và `createDefaultUser()` trả về `User`. Thay đổi nhỏ dưới đây trì hoãn việc tạo default, không thay đổi giá trị trả về khi `opt` có giá trị.
 
-// orElseGet: chỉ chạy khi opt rỗng
-User u = opt.orElseGet(() -> createDefaultUser());   // ✅ lazy
+```code-diff
+title: Chỉ tạo default khi Optional rỗng
+language: java
+wordDiff: true
+before:
+  label: Eager — gọi cả khi present
+  code: |-
+    User u = opt.orElse(createDefaultUser());
+after:
+  label: Lazy — gọi khi empty
+  code: |-
+    User u = opt.orElseGet(() -> createDefaultUser());
 ```
+
+Bạn có thể tự phân biệt hai cách bằng side-effect thay vì đo thời gian. Phiên dưới chạy trên máy local có **JDK 17+**, không cần project Spring. Output là transcript minh họa (bỏ prompt/banner của JShell); website không thực thi lệnh. Dòng `fallback invoked` chỉ xuất hiện ở lần gọi `orElse`, dù cả hai đều trả `alice`.
+
+```terminal-session
+title: Kiểm chứng eager và lazy bằng JShell
+context:
+  kind: local
+  label: JDK 17+ / shell POSIX
+steps:
+  - id: compare
+    title: Optional đã có alice
+    command: |-
+      jshell --feedback silent <<'EOF'
+      import java.util.Optional;
+      String fallback() { System.out.println("fallback invoked"); return "guest"; }
+      System.out.println(Optional.of("alice").orElse(fallback()));
+      System.out.println(Optional.of("alice").orElseGet(() -> fallback()));
+      /exit
+      EOF
+    outputs:
+      - stream: stdout
+        text: |-
+          fallback invoked
+          alice
+          alice
+    expected: Fallback được gọi một lần, bởi orElse; orElseGet không gọi supplier khi present.
+    exitCode: 0
+```
+
 
 > [!WARNING]
 > `orElse(expensiveCall())` — biểu thức trong ngoặc được tính **trước khi** `orElse` chạy (Java đánh giá argument eager). Nếu default tốn kém hoặc có side-effect (query DB, tạo object), **luôn** dùng `orElseGet(() -> ...)`. Chỉ dùng `orElse` cho hằng số/giá trị có sẵn rẻ.

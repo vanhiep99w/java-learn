@@ -94,13 +94,17 @@ public class ForkJoinPool extends AbstractExecutorService {
   Xem ForkJoinPool.java cùng các ví dụ khác
 </SourceRef>
 
-```
-workQueues array:
-index: 0     1      2     3      4     5     ...
-      [sub] [W0]  [sub] [W1]  [sub] [W2]
-       ↑     ↑            ↑            ↑
-   external  worker 0's   worker 1's   worker 2's
-   submissions  deque       deque        deque
+```d2 title="ForkJoinPool: workQueues xen kẽ"
+direction: down
+queues: "workQueues[]" {
+  zero: "index 0: sub\nexternal submissions"
+  one: "index 1: W0\nworker 0 deque"
+  two: "index 2: sub\nexternal submissions"
+  three: "index 3: W1\nworker 1 deque"
+  four: "index 4: sub\nexternal submissions"
+  five: "index 5: W2\nworker 2 deque"
+  more: "…"
+}
 ```
 
 **Deque operations:**

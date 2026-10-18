@@ -661,10 +661,13 @@ Java object identity dùng toán tử `==`: hai reference có trỏ tới cùng 
 
 Generated id còn tạo ra một chuyển đổi:
 
-```text
-new Product(...)       id = null
-persist(product)       id = 101
-detach / load lại      object khác, id vẫn = 101
+```d2 title="Persistent identity qua lifecycle của entity"
+direction: down
+n0: "new Product(…): id=null"
+n1: "persist(product): id=101"
+n2: "detach / load lại: object khác\nid vẫn 101"
+n0 -> n1
+n1 -> n2
 ```
 
 Nếu `hashCode()` dựa trực tiếp vào generated id, hash đổi từ `0` sang hash của `101` sau `persist`. Một object đã nằm trong `HashSet` sẽ “mất dấu” vì collection tìm nó ở bucket mới trong khi entry còn ở bucket cũ.

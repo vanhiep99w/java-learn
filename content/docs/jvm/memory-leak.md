@@ -38,10 +38,17 @@ Chẩn đoán cần dựa trên xu hướng heap sau full GC, heap dump, dominat
 
 Định nghĩa trong Java: **Memory leak = object mà ứng dụng không còn cần nhưng GC không thu hồi được vì vẫn có reference chain tới GC Root.**
 
-```
-GC Root → ... → Container (HashMap) → Entry → Event object
-                                              ↑
-                                    Ứng dụng không cần nữa, nhưng reference vẫn còn
+```d2 title="Memory leak: reference sống tới object không còn cần"
+direction: down
+n0: "GC Root"
+n1: "…"
+n2: "Container (HashMap)"
+n3: "Entry"
+n4: "Event object\nứng dụng không cần nữa nhưng reference vẫn còn"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ### 2.1. Phân biệt Leak vs High Memory Usage
@@ -52,17 +59,22 @@ GC Root → ... → Container (HashMap) → Entry → Event object
 | GC hiệu quả | **Giảm dần** (thu hồi ít đi) | Ổn định (thu hồi đều) |
 | Fix | Tìm + remove reference chain | Tăng heap hoặc tối ưu object creation |
 
-```
-Heap usage over time:
-
-Normal:                      Leak:
-  ▲                            ▲
-  │   /\/\/\/\                 │        ╱
-  │  /        \                │      ╱
-  │ /          \               │    ╱
-  │/            \/\/\          │  ╱         ← baseline tăng dần
-  └─────────────────→ time     └─────────────────→ time
-       baseline ổn định              heading to OOM
+```d2 title="Heap baseline phân biệt bình thường và leak"
+direction: right
+r0n0: "Normal: allocate làm heap tăng"
+r0n1: "GC thu hồi"
+r0n2: "Baseline ổn định"
+r0n3: "Tiếp tục chu kỳ allocate/GC"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Leak: reference giữ object không cần"
+r1n1: "GC không thu hồi được"
+r1n2: "Baseline tăng dần"
+r1n3: "Heading to OOM"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 ---
@@ -287,12 +299,17 @@ public class NativeResource implements AutoCloseable {
 
 **Flow nội bộ Cleaner:**
 
-```
-Object trở thành phantom reachable (chỉ PhantomReference trỏ tới)
-    → GC enqueue PhantomReference vào ReferenceQueue
-    → Cleaner daemon thread poll queue
-    → Chạy cleanup action (freeNative)
-    → Object memory được thu hồi ở lần GC tiếp
+```d2 title="PhantomReference và Cleaner"
+direction: down
+n0: "Object phantom reachable\nchỉ PhantomReference trỏ tới"
+n1: "GC enqueue PhantomReference vào ReferenceQueue"
+n2: "Cleaner daemon thread poll queue"
+n3: "Chạy cleanup action (freeNative)"
+n4: "Object memory được thu hồi ở lần GC tiếp"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ---
@@ -533,13 +550,17 @@ n_E -> n_G: "Không"
 
 Nếu **bất kỳ** tham chiếu nào còn sống (ThreadLocal, static field, timer, listener...) → cả ClassLoader + tất cả class + tất cả static → **sống mãi**.
 
-```
-Metaspace:
-  Redeploy 1: ClassLoader₁ + 500 classes (10 MB)    ← không thể GC
-  Redeploy 2: ClassLoader₂ + 500 classes (10 MB)    ← không thể GC
-  Redeploy 3: ClassLoader₃ + 500 classes (10 MB)
-  ...
-  → Metaspace OOM: java.lang.OutOfMemoryError: Metaspace
+```d2 title="ClassLoader leak qua redeploy"
+direction: down
+n0: "Metaspace: Redeploy 1\nClassLoader₁ + 500 classes (10 MB), không thể GC"
+n1: "Redeploy 2\nClassLoader₂ + 500 classes (10 MB), không thể GC"
+n2: "Redeploy 3\nClassLoader₃ + 500 classes (10 MB)"
+n3: "…"
+n4: "java.lang.OutOfMemoryError: Metaspace"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 ### 9.2. Nguyên nhân thường gặp

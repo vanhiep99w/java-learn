@@ -173,15 +173,20 @@ Hoặc self-injection (`@Autowired ReportService self;` rồi gọi `self.genera
 public class Application { ... }
 ```
 
-```text
-Không có @EnableAsync:
-   Spring KHÔNG đăng ký AsyncAnnotationBeanPostProcessor
-   → KHÔNG tạo proxy async cho bean có @Async
-   → @Async bị coi như không tồn tại → method chạy đồng bộ, IM LẶNG
-
-Không có @EnableCaching:
-   Spring KHÔNG đăng ký cache interceptor
-   → @Cacheable bị bỏ qua → method chạy mỗi lần
+```d2 title="Thiếu enable: interceptor không được đăng ký"
+direction: right
+r0n0: "Không @EnableAsync"
+r0n1: "Không AsyncAnnotationBeanPostProcessor"
+r0n2: "Không proxy async cho bean @Async"
+r0n3: "@Async không có tác dụng\nmethod chạy đồng bộ, im lặng"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Không @EnableCaching"
+r1n1: "Không cache interceptor"
+r1n2: "@Cacheable bị bỏ qua\nmethod chạy mỗi lần"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 > [!WARNING]

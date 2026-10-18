@@ -3,6 +3,7 @@ import { visit } from 'unist-util-visit';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
 import { docsPageSchema } from './src/lib/docs-schema.mjs';
 import { d2Options } from './scripts/d2-options.mjs';
+import { learningPlugins } from './scripts/learning-plugins.mjs';
 import { remarkSourceReferences } from './scripts/source-references.mjs';
 
 const admonitionTypeMap: Record<string, string> = {
@@ -49,26 +50,6 @@ function remarkGithubCallouts() {
   };
 }
 
-function remarkMermaid() {
-  return (tree: import('mdast').Root) => {
-    visit(tree, 'code', (node, index, parent) => {
-      if (node.lang !== 'mermaid' || index === undefined || !parent) return;
-      (parent.children as unknown[])[index] = {
-        type: 'mdxJsxFlowElement',
-        name: 'MermaidDiagram',
-        attributes: [
-          {
-            type: 'mdxJsxAttribute',
-            name: 'chart',
-            value: node.value,
-          },
-        ],
-        children: [],
-      };
-    });
-  };
-}
-
 export const docs = defineDocs({
   dir: 'content/docs',
   docs: {
@@ -81,7 +62,7 @@ export default defineConfig({
     remarkPlugins: [
       remarkGithubCallouts,
       remarkSourceReferences,
-      remarkMermaid,
+      ...learningPlugins,
       [remarkD2, d2Options],
     ],
   },

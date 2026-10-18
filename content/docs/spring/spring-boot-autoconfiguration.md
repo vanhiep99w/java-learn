@@ -401,12 +401,14 @@ protected ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTy
 
 Spring Boot evaluate condition theo **hai phase**:
 
-```
-Phase 1 (PARSE_CONFIGURATION): @Conditional trên CLASS
-    → Nếu fail → TOÀN BỘ class bị skip, không parse @Bean methods bên trong
-
-Phase 2 (REGISTER_BEAN): @Conditional trên @Bean METHOD
-    → Class đã pass → evaluate từng @Bean method riêng
+```d2 title="Hai phase evaluate condition"
+direction: right
+r0n0: "PARSE_CONFIGURATION: @Conditional trên CLASS"
+r0n1: "Fail → skip toàn bộ class, không parse @Bean methods"
+r0n0 -> r0n1
+r1n0: "REGISTER_BEAN: class đã pass"
+r1n1: "Evaluate @Conditional trên từng @Bean METHOD riêng"
+r1n0 -> r1n1
 ```
 
 ```java source="spring-boot-autoconfiguration/06/DataSourceAutoConfiguration.java"
@@ -1023,18 +1025,17 @@ public class DataSourceAutoConfiguration__BeanDefinitions {
 
 ### 14.1. Debug checklist khi "bean không xuất hiện"
 
-```
-1. debug=true → xem CONDITIONS EVALUATION REPORT
-2. Bean có trong "Negative matches"?
-   → Xem condition nào fail:
-     - OnClassCondition: thiếu dependency/JAR
-     - OnPropertyCondition: property chưa set hoặc sai giá trị
-     - OnBeanCondition (OnMissingBean): ai đó đã define bean đó
-     - OnWebApplicationCondition: app type sai (servlet vs reactive vs none)
-3. Bean không ở cả Positive lẫn Negative?
-   → Class không trong .imports file → chưa đăng ký auto-config
-4. Auto-config class bị exclude?
-   → Xem @EnableAutoConfiguration(exclude=...) hoặc spring.autoconfigure.exclude
+```d2 title="Chẩn đoán auto-configuration không tạo bean"
+direction: down
+n0: "debug=true → CONDITIONS EVALUATION REPORT"
+n1: "Bean trong Negative matches?"
+n2: "Xem condition fail\nOnClassCondition: thiếu dependency/JAR\nOnPropertyCondition: thiếu/sai property\nOnMissingBean: đã có bean\nOnWebApplicationCondition: sai app type"
+n3: "Không ở Positive lẫn Negative?\nKiểm tra class có trong .imports (đã đăng ký) chưa"
+n4: "Bị exclude?\n@EnableAutoConfiguration(exclude=…)\nhoặc spring.autoconfigure.exclude"
+n0 -> n1
+n1 -> n2: "có"
+n1 -> n3: "không"
+n3 -> n4: "kiểm tra tiếp"
 ```
 
 ---

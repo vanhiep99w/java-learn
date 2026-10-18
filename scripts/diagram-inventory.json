@@ -1,0 +1,3581 @@
+{
+  "version": 1,
+  "scope": "All content/docs .md and .mdx fences, plus box/bar notation outside fences. Retained text reviewed manually; hashes fail closed when edited.",
+  "converted": [
+    {
+      "id": 1,
+      "path": "collections/arraylist-vs-linkedlist.md",
+      "originalLine": 46,
+      "language": "plain",
+      "sha256": "738c0165dd7e4040060b179839d1474badad695940b25cfb8443b7f304ba3c3d"
+    },
+    {
+      "id": 2,
+      "path": "collections/arraylist-vs-linkedlist.md",
+      "originalLine": 77,
+      "language": "plain",
+      "sha256": "8be92f700453251f03866a1b94b155745baef901e6b48494d45774ffd6143ed9"
+    },
+    {
+      "id": 6,
+      "path": "collections/concurrenthashmap-deep-dive.md",
+      "originalLine": 262,
+      "language": "plain",
+      "sha256": "7725b7c69415fb87c690d43c4abc9100269f719244c5503fd640a715effcde39"
+    },
+    {
+      "id": 9,
+      "path": "collections/hashmap-deep-dive.md",
+      "originalLine": 116,
+      "language": "plain",
+      "sha256": "e418b7a0248808dd8d28cae87cfbc78cf95e0291728019ede6310fd2ee54cc15"
+    },
+    {
+      "id": 12,
+      "path": "collections/hashmap-deep-dive.md",
+      "originalLine": 176,
+      "language": "plain",
+      "sha256": "da63f9f112c3f8ce70847a8d7556f9b2125c46e72508cac969d41535d74a910d"
+    },
+    {
+      "id": 13,
+      "path": "collections/hashmap-deep-dive.md",
+      "originalLine": 258,
+      "language": "plain",
+      "sha256": "17eda88f1933ad39d195d358d7daa063aefa6d0aab30f0c18924a4a51b0cafb1"
+    },
+    {
+      "id": 14,
+      "path": "collections/hashmap-deep-dive.md",
+      "originalLine": 360,
+      "language": "plain",
+      "sha256": "f2c8651c8f9b99d0198ecdd57967d0c64d639f6f1b4d76fc713cdb3ae9b4a8c7"
+    },
+    {
+      "id": 16,
+      "path": "collections/hashmap-deep-dive.md",
+      "originalLine": 411,
+      "language": "plain",
+      "sha256": "071da62b51694c2712de33b460e6be02b1bd8df6d169ec112a1ba28b77875f86"
+    },
+    {
+      "id": 22,
+      "path": "concurrency/aqs-deep-dive.md",
+      "originalLine": 346,
+      "language": "plain",
+      "sha256": "35bc9787f58288188769e0329ebdc1e7a41eb9cf4bf78cc7d4f55ed1fb8e2fc2"
+    },
+    {
+      "id": 23,
+      "path": "concurrency/aqs-deep-dive.md",
+      "originalLine": 411,
+      "language": "plain",
+      "sha256": "5673cd05cac0ca1c9b23036742197979c60eb2d04e7d15a0113a808d98d743b6"
+    },
+    {
+      "id": 31,
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "originalLine": 97,
+      "language": "plain",
+      "sha256": "ad7bd1e88cfee40cfcc204645d0c91dcff1a035dc1c10b5646bbd03c9efeb817"
+    },
+    {
+      "id": 39,
+      "path": "concurrency/locks-optimistic-vs-pessimistic.md",
+      "originalLine": 137,
+      "language": "plain",
+      "sha256": "0855e870b2e5be3567e7e922eaf78c88e7710e287a0d35a508146bfee534bb86"
+    },
+    {
+      "id": 41,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 36,
+      "language": "plain",
+      "sha256": "1e33bb23f28c17f14df9151f3ed3b45e73ad4eac4b13ab590c4d6433407d821f"
+    },
+    {
+      "id": 42,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 90,
+      "language": "plain",
+      "sha256": "69cef401f0b65c3dfdc0afafa818c993e0cc1439408f383ccd0bb02516bf04bc"
+    },
+    {
+      "id": 43,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 197,
+      "language": "plain",
+      "sha256": "bfd0cd7c4ec2f2b32300b550137e2d44163543658a3d97ba1afd778a12b0bb76"
+    },
+    {
+      "id": 44,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 214,
+      "language": "plain",
+      "sha256": "9888903e003a08b58d57da55de017bcb02069665815a40850def298d410cbac0"
+    },
+    {
+      "id": 46,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 277,
+      "language": "plain",
+      "sha256": "1bde8510ed8e12d00d7bb30ebc82d290eabf35b08119728654d6e09e127b8f4e"
+    },
+    {
+      "id": 47,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 289,
+      "language": "plain",
+      "sha256": "b75bb0875961d8dbd8f0ea086f6c52ba672b2f626700faf807feaba27f9223b1"
+    },
+    {
+      "id": 48,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 299,
+      "language": "plain",
+      "sha256": "56869b7478b8561d6f355ffef30b9321156bea11d0579bc3ab4248188774a408"
+    },
+    {
+      "id": 50,
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "originalLine": 393,
+      "language": "plain",
+      "sha256": "c2cae35a0b9bb8a78137cddd771a14d4591a916f34e455fb02f9aa3a777290b5"
+    },
+    {
+      "id": 52,
+      "path": "concurrency/thread-vs-runnable.md",
+      "originalLine": 294,
+      "language": "plain",
+      "sha256": "555fae3f871c3ff6ed77667c173db1aee9df0894efe76c6f06673682d72afacd"
+    },
+    {
+      "id": 63,
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "originalLine": 143,
+      "language": "plain",
+      "sha256": "5fc1c2d9e278862576ed3bfe65e63b7b60108b2926c16531888b6b2f4801872f"
+    },
+    {
+      "id": 64,
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "originalLine": 241,
+      "language": "plain",
+      "sha256": "c3f88d31435b901910bb51f7db0e2dd99ff541af0acac8d7988b15405ef5297f"
+    },
+    {
+      "id": 65,
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "originalLine": 264,
+      "language": "plain",
+      "sha256": "421d4a5cbabfecccddd30047ab1dd87e7df71f8463c191fd769c17e18ee2272b"
+    },
+    {
+      "id": 69,
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "originalLine": 493,
+      "language": "plain",
+      "sha256": "b76b1933a1d28b1a77d3544c69ceb2e8a29f54f69784d5004d9411f897456790"
+    },
+    {
+      "id": 75,
+      "path": "fundamentals/access-modifier.md",
+      "originalLine": 42,
+      "language": "plain",
+      "sha256": "6986e61efc7e89f5d9cefa166c2a4aaeebe021308b8cf28ffdb27bb77250aa1c"
+    },
+    {
+      "id": 78,
+      "path": "fundamentals/annotation.md",
+      "originalLine": 185,
+      "language": "java",
+      "sha256": "eab76457cc49682c48e840e3c8ae36f7bbb0b18016157d9b94a7f6b4adffde6d"
+    },
+    {
+      "id": 82,
+      "path": "fundamentals/autoboxing-unboxing.md",
+      "originalLine": 108,
+      "language": "plain",
+      "sha256": "976c429ec058cba6856d1f9c09a78b02978325955f16321c9cbf9ba1656dce86"
+    },
+    {
+      "id": 83,
+      "path": "fundamentals/autoboxing-unboxing.md",
+      "originalLine": 168,
+      "language": "plain",
+      "sha256": "4ab4d765645b555e6d08560c7450df8ce48bb80420c084cfdf3c116e9b7f2213"
+    },
+    {
+      "id": 86,
+      "path": "fundamentals/comparable-vs-comparator.md",
+      "originalLine": 149,
+      "language": "plain",
+      "sha256": "f999a6a42d5b20fd011015d0236b24002229473d18b4640d02d466d942945de3"
+    },
+    {
+      "id": 88,
+      "path": "fundamentals/equals-hashcode.md",
+      "originalLine": 335,
+      "language": "plain",
+      "sha256": "b0965b513cce1609c130d3abe0620d325cf2977131cb0fa9801487f1902a73ea"
+    },
+    {
+      "id": 91,
+      "path": "fundamentals/exception-handling.md",
+      "originalLine": 171,
+      "language": "plain",
+      "sha256": "7dc4a3e560eb9672a2300e4033027aebb13e448214cfc910ff417ea39b835469"
+    },
+    {
+      "id": 95,
+      "path": "fundamentals/final-keyword.md",
+      "originalLine": 136,
+      "language": "plain",
+      "sha256": "384c5b335dbda80b7f5b47771d5280f9eff92c4a57a90ed3975ba83cb92a0d00"
+    },
+    {
+      "id": 109,
+      "path": "fundamentals/heap-vs-stack.md",
+      "originalLine": 325,
+      "language": "plain",
+      "sha256": "901a77425d3f9ceb8353c7f5c4f6c2c6211339f3d27c1ce1fb42fd3c19f534b4"
+    },
+    {
+      "id": 119,
+      "path": "fundamentals/string-immutability.md",
+      "originalLine": 408,
+      "language": "text",
+      "sha256": "90c6b5a50d3adecc4b3708aca2beacbc62c26940b97da32520702c0926a99204"
+    },
+    {
+      "id": 126,
+      "path": "interview/async-cacheable-not-working.md",
+      "originalLine": 176,
+      "language": "text",
+      "sha256": "765fb3fdc5686ddc3c2b2fd39ebde2b21bf5e296dc7eec500c575fecb55f5356"
+    },
+    {
+      "id": 127,
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "originalLine": 65,
+      "language": "text",
+      "sha256": "46a826051a4f7624768efa97c632fe12041aa21df8b359b540f42fda48b02788"
+    },
+    {
+      "id": 128,
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "originalLine": 79,
+      "language": "text",
+      "sha256": "94c7d09d2b89e9665cc76b8341e40f3bf67965feecbc071a427df6e193d6adfd"
+    },
+    {
+      "id": 129,
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "originalLine": 104,
+      "language": "text",
+      "sha256": "61a0ab748049362e490a2a5b435ce93be6b41b74544c7bc554a9adcce7003f10"
+    },
+    {
+      "id": 135,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 58,
+      "language": "text",
+      "sha256": "6cf3222f2e8ff813a6b1266c4c03c9794d3a3dbd72ec9c87e4472e95bbe4eaa4"
+    },
+    {
+      "id": 137,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 146,
+      "language": "text",
+      "sha256": "b07ab57f9425bdb505f3eb9a24a2a51e1e0c63873ceebe21c644db801f0b043c"
+    },
+    {
+      "id": 140,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 247,
+      "language": "text",
+      "sha256": "11bea06bff986477e4df570836163648e77d99193ac3223dfe261df1717cb13c"
+    },
+    {
+      "id": 141,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 258,
+      "language": "text",
+      "sha256": "2ccb01375016d105607dc6a2304de64aaa785280b4dcd72b238fd2ed62f4d3e2"
+    },
+    {
+      "id": 142,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 265,
+      "language": "text",
+      "sha256": "1fb1ad5de5a117645eb48611743c2ea42fedb41ce65a56f75296815c13fa356c"
+    },
+    {
+      "id": 144,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 308,
+      "language": "text",
+      "sha256": "61b6f524fe0a12c70d2b9e40910595c949bb944e4d730464428de175cb0602b6"
+    },
+    {
+      "id": 145,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 385,
+      "language": "text",
+      "sha256": "b9eccd93fce35d3b69fe31bbea167e65418dcee92f8158d2d04d4583bad9d5ec"
+    },
+    {
+      "id": 147,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 589,
+      "language": "text",
+      "sha256": "0acaeff0e783aaecf67bf90ba2ec97676b0c66f7fde534ddf3b4e2b47320c5ff"
+    },
+    {
+      "id": 150,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 977,
+      "language": "text",
+      "sha256": "95fb8eef8fbf5f78945335735eaa50b6e034b323972cc4d2a983dfb0280814b1"
+    },
+    {
+      "id": 151,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 985,
+      "language": "text",
+      "sha256": "5ca88fe20e839b3bc7c2340980d7e418e8973c7c25297aa466793ffb78f09ae9"
+    },
+    {
+      "id": 156,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1194,
+      "language": "text",
+      "sha256": "2ddf9b0fe40cd7e4dd206bbea8c40a27fbfea82983742043a105800bd7ea0af1"
+    },
+    {
+      "id": 158,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1306,
+      "language": "text",
+      "sha256": "e143dcacbf35f0960e86764d239393a4b59670316d953d7774d111b159661f61"
+    },
+    {
+      "id": 159,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1314,
+      "language": "text",
+      "sha256": "0e31c23aba8e0484cc3d971d3df423cb2740c9a82f9b1549135b9b5ceda66713"
+    },
+    {
+      "id": 161,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1346,
+      "language": "text",
+      "sha256": "682db20e80e7cec5901c47eca14b73294f6a2362ba28ac4026141dc50c26909e"
+    },
+    {
+      "id": 162,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1381,
+      "language": "text",
+      "sha256": "692e3f27c49cd4662752e612a6ca00929e0f32a1bc759241a056a50d58d78c8a"
+    },
+    {
+      "id": 165,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1687,
+      "language": "text",
+      "sha256": "6cacd8bc68e410b1d1592b7964d9bf68d73f886f6c30290b8f53346bb5327c05"
+    },
+    {
+      "id": 166,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1712,
+      "language": "text",
+      "sha256": "35e439db0ae4398ad96eae57d021a515423590a7bcb7321a0485625ebc531900"
+    },
+    {
+      "id": 167,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1725,
+      "language": "text",
+      "sha256": "c9d9bf5fc0b5cb6d39c4b04e1fd0f544a111d80bb1da33f8f33ec9c17cbe908f"
+    },
+    {
+      "id": 168,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1734,
+      "language": "text",
+      "sha256": "8c18f52c430623eb1c10a6c12e829990d7585d828ba5a6fb50c6d14489d1dc68"
+    },
+    {
+      "id": 169,
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "originalLine": 1743,
+      "language": "text",
+      "sha256": "d7a88833903c19474c5caed71cab4a792b48f377a096ff66ea3d0ce29d45d965"
+    },
+    {
+      "id": 171,
+      "path": "interview/more-threads-not-faster.md",
+      "originalLine": 50,
+      "language": "text",
+      "sha256": "7cf6031abcd5bcacf8a1e59a1d40dbc42971d1d5ebc3a4fe95b27abe2f7596ff"
+    },
+    {
+      "id": 172,
+      "path": "interview/more-threads-not-faster.md",
+      "originalLine": 60,
+      "language": "text",
+      "sha256": "9b60acb57df7ca0b79d103b9dbb291b992738e1ea4347012c43fa95024554003"
+    },
+    {
+      "id": 174,
+      "path": "interview/more-threads-not-faster.md",
+      "originalLine": 109,
+      "language": "text",
+      "sha256": "3fc0c4855675a869c14538811c0fea4714e961ac838cfff1e9d2a97ee1adafcf"
+    },
+    {
+      "id": 178,
+      "path": "interview/more-threads-not-faster.md",
+      "originalLine": 212,
+      "language": "text",
+      "sha256": "0dfcc1f49321d7adb11f99ed0cd89dede23d98ac3239a1173fe82e55e515259b"
+    },
+    {
+      "id": 179,
+      "path": "interview/more-threads-not-faster.md",
+      "originalLine": 237,
+      "language": "text",
+      "sha256": "64991fd80a549cad85b8d218b7f92b6dcdbb386984a4a05f1158e285f475a449"
+    },
+    {
+      "id": 182,
+      "path": "interview/transactional-self-invocation.md",
+      "originalLine": 124,
+      "language": "text",
+      "sha256": "3e20be48c4c9d1741110f0d86aa0f4de8da93a76b3c02d02805c81df349e3d2f"
+    },
+    {
+      "id": 183,
+      "path": "interview/transactional-self-invocation.md",
+      "originalLine": 210,
+      "language": "text",
+      "sha256": "f1fb53126cbb41efc6ac6e310632c4be3f4161e9739dbc69307cc3f72cf3ea45"
+    },
+    {
+      "id": 186,
+      "path": "interview/volatile-loop-never-stops.md",
+      "originalLine": 198,
+      "language": "text",
+      "sha256": "2c6bbfe00d3f3d054c037002c3ee69f806c0b379d3f82b53ecf8f2fdbf0f7c7e"
+    },
+    {
+      "id": 189,
+      "path": "io-network/download-large-file.md",
+      "originalLine": 126,
+      "language": "plain",
+      "sha256": "a8e737ec4239c0153862c194fb0f090978aa747096401a29c0c9c72f37c1c563"
+    },
+    {
+      "id": 196,
+      "path": "io-network/streaming-data.md",
+      "originalLine": 169,
+      "language": "plain",
+      "sha256": "32afd773fe12b1c31d52ace17088ee845c4d9596a5b5759a0f1ddde3c462211e"
+    },
+    {
+      "id": 198,
+      "path": "jpa-hibernate/entity-mapping-and-identity.md",
+      "originalLine": 664,
+      "language": "text",
+      "sha256": "cb4a82d223337ca9bec9a1fc8e8b9dde1fa84fba32270999a43382b6e69caac2"
+    },
+    {
+      "id": 200,
+      "path": "jpa-hibernate/fetching-strategies-and-proxies.md",
+      "originalLine": 1065,
+      "language": "text",
+      "sha256": "730530a02c27fc292cd232e729371d9c63f5cfd1a63074993fdceb68dd925005"
+    },
+    {
+      "id": 201,
+      "path": "jpa-hibernate/jpa-hibernate-overview.md",
+      "originalLine": 491,
+      "language": "text",
+      "sha256": "5ba1d2aa154387310015df897af09ac3af224a1b34d304048f57ba645c873253"
+    },
+    {
+      "id": 202,
+      "path": "jpa-hibernate/persistence-context-and-entity-lifecycle.md",
+      "originalLine": 778,
+      "language": "text",
+      "sha256": "6e4ca0607803e0e4236b598e9029aa902a264710d64537a61f6f1911a036425e"
+    },
+    {
+      "id": 203,
+      "path": "jpa-hibernate/relationships-mapping.md",
+      "originalLine": 1082,
+      "language": "text",
+      "sha256": "b6b581f4f68292e45611ee373959c24ca59c72b7dd759bc13f5d5b915b864f0a"
+    },
+    {
+      "id": 204,
+      "path": "jpa-hibernate/transactions-with-jpa.md",
+      "originalLine": 336,
+      "language": "mermaid",
+      "sha256": "08eb0d746e35f81a24d940dfbc51bded33d554c6cf13fce14b6d48e934e69869"
+    },
+    {
+      "id": 205,
+      "path": "jvm/classloader-deep-dive.md",
+      "originalLine": 148,
+      "language": "plain",
+      "sha256": "dfdade3f3fbcf3b4b27ae34b5fd442c4600afe3db610b70f762641dc6eedcbc9"
+    },
+    {
+      "id": 207,
+      "path": "jvm/classloader-deep-dive.md",
+      "originalLine": 362,
+      "language": "plain",
+      "sha256": "ad723c013c40ca627b4fb20b9c81af740cdeabf28e76391f298fad7c0c66e317"
+    },
+    {
+      "id": 210,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 106,
+      "language": "text",
+      "sha256": "8eee278c516d6cd3adebdce6b24711fbe3a115094394dbc3c43c4e62305ebe51"
+    },
+    {
+      "id": 211,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 189,
+      "language": "text",
+      "sha256": "fa22be28d09c222b70b646b60c8754310febcbe9aec94da52a23d340e3d25bfb"
+    },
+    {
+      "id": 212,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 287,
+      "language": "text",
+      "sha256": "43a8d0edf3e97249511b8228559b8aeb04e9b55ce837c5feacc519924ddc2c7c"
+    },
+    {
+      "id": 213,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 308,
+      "language": "text",
+      "sha256": "6c31795a7cfcb217d5e289b988ef1dba5cb0fc618d73ccb4813af62d7f9877d8"
+    },
+    {
+      "id": 214,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 317,
+      "language": "text",
+      "sha256": "123e6ac317af633ca89f37ad422f0a3d2f5af45cc5448586b84fe3f552017488"
+    },
+    {
+      "id": 215,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 428,
+      "language": "text",
+      "sha256": "a4e8f1d958bfb58f75ead9141037ba6803d65164437648b938c47ee0e1b6410f"
+    },
+    {
+      "id": 216,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 434,
+      "language": "text",
+      "sha256": "5fd5fcc188a5ad524b4d14179356666fceaec95a5d0079747579a34cbd4c3735"
+    },
+    {
+      "id": 217,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 442,
+      "language": "text",
+      "sha256": "1a5817c5eb6d3366d1718fc14c2f6f0b7d4fc6046688d327cf78884739a1923c"
+    },
+    {
+      "id": 218,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 451,
+      "language": "text",
+      "sha256": "f4ea0cd37a787e00a268a116005a5e06296a1dba70634d334c993cfb39822310"
+    },
+    {
+      "id": 219,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 470,
+      "language": "text",
+      "sha256": "44ba9d9a860fdfcf75ebbfd925ef29d14fad78f12e4cd4c16be9598fe8caf4b0"
+    },
+    {
+      "id": 220,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 497,
+      "language": "text",
+      "sha256": "ec4b5a385b8e42ea11da423cf2629e8b226d6d4ab79f9414df3d18b6000a198b"
+    },
+    {
+      "id": 221,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 533,
+      "language": "text",
+      "sha256": "e63d892576191dea1875b6dd4661123007899a8edacb5d4fd8eb1659427a48c0"
+    },
+    {
+      "id": 223,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 628,
+      "language": "text",
+      "sha256": "cf5dcdd337ce73148538be8bd627d8852085c281ee9698e1e2727af1909fb115"
+    },
+    {
+      "id": 224,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 685,
+      "language": "plain",
+      "sha256": "2419729cd6ef763e34166c73c80fffebd501350bc33bf6f8440de2f93941face"
+    },
+    {
+      "id": 226,
+      "path": "jvm/garbage-collection.md",
+      "originalLine": 805,
+      "language": "plain",
+      "sha256": "2569e305c1dcb6eb2b8edba30263fb92f39307509017eb0f0575865f41402190"
+    },
+    {
+      "id": 232,
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "originalLine": 301,
+      "language": "plain",
+      "sha256": "66dcf80a4cf17003c1d4102395301a10063c9d84bfa1c9e34422753ad3676c02"
+    },
+    {
+      "id": 238,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 103,
+      "language": "plain",
+      "sha256": "0aac11ca4b282b8252a537f82c1f161cc6a3cd241c0d831a2583f31bed07c3b5"
+    },
+    {
+      "id": 243,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 351,
+      "language": "text",
+      "sha256": "be5349a9987f405b8674a7a81326729224e673d41002946223c84bef175c36f3"
+    },
+    {
+      "id": 244,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 371,
+      "language": "text",
+      "sha256": "f70bfe40a8ca486bf6244f31fd28ee20cc53ccf920e8733148f257b8c04abbad"
+    },
+    {
+      "id": 245,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 441,
+      "language": "text",
+      "sha256": "f63f5a42268328c1ff485ee00d9c6ae2951adcdb6715f464a17c464b61c7d91b"
+    },
+    {
+      "id": 246,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 522,
+      "language": "plain",
+      "sha256": "c3474368b951713961ab5043b03028539669043a420eba4553c80b96e8c9acb7"
+    },
+    {
+      "id": 249,
+      "path": "jvm/jvm-architecture.md",
+      "originalLine": 621,
+      "language": "plain",
+      "sha256": "c75c8275650a306960c814ee947cf7334b243969a2237c9685d19900bea0eb22"
+    },
+    {
+      "id": 256,
+      "path": "jvm/memory-leak.md",
+      "originalLine": 41,
+      "language": "plain",
+      "sha256": "1ed5499945abe571843ff3de9e839840bfc5206a91234c320cd12acf5fd5ec3d"
+    },
+    {
+      "id": 257,
+      "path": "jvm/memory-leak.md",
+      "originalLine": 55,
+      "language": "plain",
+      "sha256": "6632a57579ce71013e1889436b24ace9353b71178a43befa3eb7623b13427a74"
+    },
+    {
+      "id": 259,
+      "path": "jvm/memory-leak.md",
+      "originalLine": 290,
+      "language": "plain",
+      "sha256": "4a77ed3a14e7eb5e5353215b471a3554af0142636e2f4e71414ea465c821dbf5"
+    },
+    {
+      "id": 261,
+      "path": "jvm/memory-leak.md",
+      "originalLine": 536,
+      "language": "plain",
+      "sha256": "24ee8d7f7e50081722e9820ca12339b55904809f0c8806df7e5f4d57baab6169"
+    },
+    {
+      "id": 268,
+      "path": "jvm/reference-types-deep-dive.md",
+      "originalLine": 328,
+      "language": "plain",
+      "sha256": "d289f7a0a354e62ed61c1d94895068f162cfe2748637947488a72c6897d462b6"
+    },
+    {
+      "id": 279,
+      "path": "modern-java/stream-api.md",
+      "originalLine": 128,
+      "language": "plain",
+      "sha256": "e205c2dc86cae7a621955483aeea53b81d29a75d52befd45c88692a376c4a4f1"
+    },
+    {
+      "id": 280,
+      "path": "modern-java/stream-api.md",
+      "originalLine": 138,
+      "language": "plain",
+      "sha256": "f131a3e1e28f52e6e55440c727ee0407b1fb8fab3734b8fec1322c1864999c88"
+    },
+    {
+      "id": 281,
+      "path": "modern-java/stream-api.md",
+      "originalLine": 176,
+      "language": "plain",
+      "sha256": "980a911a4597cf59118cb7515017d1d43e33fbb0072efa7a8363c771f87f8e59"
+    },
+    {
+      "id": 282,
+      "path": "modern-java/stream-api.md",
+      "originalLine": 273,
+      "language": "plain",
+      "sha256": "b991ac26411cadbdb48aa97d6f5d296ea3e238ae068e849808ba075182bcc6c9"
+    },
+    {
+      "id": 283,
+      "path": "modern-java/stream-api.md",
+      "originalLine": 379,
+      "language": "plain",
+      "sha256": "540e1d282b32eb36939782b592af758ea87343ec6b82b5397ce812610742a741"
+    },
+    {
+      "id": 286,
+      "path": "modern-java/virtual-threads.md",
+      "originalLine": 72,
+      "language": "text",
+      "sha256": "f683697ff9e45032eac583e4dfe41f649a256d793d2f635ec2076c5026fd027b"
+    },
+    {
+      "id": 287,
+      "path": "modern-java/virtual-threads.md",
+      "originalLine": 120,
+      "language": "text",
+      "sha256": "58b1f645bf54d1e05784da193b4fa96f987a0506f7688c14bfaacb53581397fc"
+    },
+    {
+      "id": 288,
+      "path": "modern-java/virtual-threads.md",
+      "originalLine": 129,
+      "language": "text",
+      "sha256": "e888f05adb7d9a350dba49a7a010ab13d4dffe3f9ab6cd6cfe417767685c9aec"
+    },
+    {
+      "id": 289,
+      "path": "modern-java/virtual-threads.md",
+      "originalLine": 144,
+      "language": "text",
+      "sha256": "6faccc0bb1f1397401b7668a3f84d0b643ceaf6bbddf02195554bfef6b9ee200"
+    },
+    {
+      "id": 292,
+      "path": "serialization/java-serialization.md",
+      "originalLine": 169,
+      "language": "plain",
+      "sha256": "47143072046f01e3c785bd75ada7a0aa6dcdb2e778f3dbcbd52bf037512a9777"
+    },
+    {
+      "id": 298,
+      "path": "serialization/protobuf-avro.md",
+      "originalLine": 188,
+      "language": "plain",
+      "sha256": "1b983d914887a30b72025b61f182449b0eda2ed4db0e1e887ba677d446314dfe"
+    },
+    {
+      "id": 301,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 189,
+      "language": "text",
+      "sha256": "55b21ab9336e2da4058dd7c6d36899aec206d4ef8ac770bd254c0813eb1f7fb4"
+    },
+    {
+      "id": 304,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 346,
+      "language": "text",
+      "sha256": "62ee6b5c9cbda5e99b0fcddbe9126803ba27aea68e914db5dcfec3c4508be96f"
+    },
+    {
+      "id": 307,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 671,
+      "language": "text",
+      "sha256": "134c1f1732360e88a4e0fe6e6d6d72a5618b7e0b74f0925bf9e954d36dfdb1ae"
+    },
+    {
+      "id": 308,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 703,
+      "language": "text",
+      "sha256": "f3bc458a61a74edca68c137560efe0fbee191180709cd2e1aed15e5c55306f11"
+    },
+    {
+      "id": 312,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 778,
+      "language": "text",
+      "sha256": "7d6f9f10983261af7a731dae8ba0529ea7d20e2f70ce35ea5eeed2f534375b71"
+    },
+    {
+      "id": 315,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 818,
+      "language": "text",
+      "sha256": "61080fc528453fc4e16bb59f66683c8f054330b6a6129610e44eb571b210810d"
+    },
+    {
+      "id": 319,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 1171,
+      "language": "text",
+      "sha256": "69b71f9f3a0cb82c15df4c203bc5478232c23fac738e156902ab5cfc9fa893c2"
+    },
+    {
+      "id": 325,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 1482,
+      "language": "text",
+      "sha256": "fec5964ffe52fd52d0b3784985ca00d5a2fbde229eb1e00adf9daa8b25bb3086"
+    },
+    {
+      "id": 331,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 1939,
+      "language": "text",
+      "sha256": "9cf27f2262c8d5976b8e90e3a8f5795efd32ad09e4c4db71392192c36de4aabe"
+    },
+    {
+      "id": 332,
+      "path": "spring/access-control-models-rbac-acl.md",
+      "originalLine": 2007,
+      "language": "text",
+      "sha256": "240c9c52ca80bc8c1827a2272f2a752cc5722a99e638854e7e775ad36d1a4fc8"
+    },
+    {
+      "id": 333,
+      "path": "spring/bean-lifecycle.md",
+      "originalLine": 51,
+      "language": "text",
+      "sha256": "e73d0dc40575ffe41efbdc7ed7e1db7a82df2e01ad80892fd00a582d86d48d3f"
+    },
+    {
+      "id": 334,
+      "path": "spring/bean-lifecycle.md",
+      "originalLine": 322,
+      "language": "plain",
+      "sha256": "ebe3866567a93a5295db51ee12d3f8a16e490224d75b0948b29c4ae99790a25c"
+    },
+    {
+      "id": 335,
+      "path": "spring/bean-lifecycle.md",
+      "originalLine": 337,
+      "language": "plain",
+      "sha256": "ea29c04c8aac69414f34c6b3cbc7a75f5e617bf27876476f73ad961a407435a1"
+    },
+    {
+      "id": 336,
+      "path": "spring/bean-lifecycle.md",
+      "originalLine": 364,
+      "language": "plain",
+      "sha256": "89ed5879e02ef81650786a7abed10f2ffd8bd5cc76b246a2a929bb5ad69493af"
+    },
+    {
+      "id": 337,
+      "path": "spring/bean-lifecycle.md",
+      "originalLine": 446,
+      "language": "plain",
+      "sha256": "206dd68dcaa66a28f1243f20a9aed0425247dcd626a5ff60ac7b4de23a9423b9"
+    },
+    {
+      "id": 347,
+      "path": "spring/dispatcher-servlet.md",
+      "originalLine": 81,
+      "language": "text",
+      "sha256": "a8aeb30b7d49b518ce549b83a7fdb0f14bc90f82509db50705a0c9adafad17e1"
+    },
+    {
+      "id": 348,
+      "path": "spring/dispatcher-servlet.md",
+      "originalLine": 114,
+      "language": "text",
+      "sha256": "ab35db371710d2b8c56f71d1db27b8d07214b2a598f0ea87d14ea04a16729c1f"
+    },
+    {
+      "id": 349,
+      "path": "spring/dispatcher-servlet.md",
+      "originalLine": 341,
+      "language": "mermaid",
+      "sha256": "af0e991c3b45aadf9d5d3cd26536cc31e04880a1fdc597381d095d266fa357f5"
+    },
+    {
+      "id": 350,
+      "path": "spring/dispatcher-servlet.md",
+      "originalLine": 521,
+      "language": "text",
+      "sha256": "d18ab12d5de08e8772d98f96aba7e6f081c0c04468677d53290d43b5ec1c8899"
+    },
+    {
+      "id": 353,
+      "path": "spring/filter-va-interceptor.md",
+      "originalLine": 47,
+      "language": "mermaid",
+      "sha256": "b9179cf107ee95d2a7e3e1e424893f2f274bbe448a8fd3e77403bfd741bc1d8a"
+    },
+    {
+      "id": 354,
+      "path": "spring/filter-va-interceptor.md",
+      "originalLine": 108,
+      "language": "text",
+      "sha256": "1cec5095992a4b19123b35c883cf72731959a79841077b1cc40f66e0705bbf01"
+    },
+    {
+      "id": 355,
+      "path": "spring/filter-va-interceptor.md",
+      "originalLine": 301,
+      "language": "text",
+      "sha256": "326b5de999961c42beccfb2ef24a985a46371e5d54c722f1326b8eed1b8eac10"
+    },
+    {
+      "id": 356,
+      "path": "spring/filter-va-interceptor.md",
+      "originalLine": 684,
+      "language": "text",
+      "sha256": "25ba268ff4ced20e6787673c6c6497766c4702de2f1fef454dbb69e079e58f77"
+    },
+    {
+      "id": 357,
+      "path": "spring/filter-va-interceptor.md",
+      "originalLine": 706,
+      "language": "text",
+      "sha256": "ee1f4ae322316926d39ff5e47eedc45211dc9f6a9f94d1b77e0c7e648e285904"
+    },
+    {
+      "id": 358,
+      "path": "spring/kafka-spring-boot.md",
+      "originalLine": 61,
+      "language": "plain",
+      "sha256": "23616aef2f4bb6990f5bd5a3c2be4b83bbe46dae1a6a34bf381eaf71b069fb4b"
+    },
+    {
+      "id": 359,
+      "path": "spring/kafka-spring-boot.md",
+      "originalLine": 184,
+      "language": "plain",
+      "sha256": "76d7ce6ecdef8949b9a9b57b2907c6fa9f913b0ce5bfdd6ba4c77a195da7b824"
+    },
+    {
+      "id": 361,
+      "path": "spring/kafka-spring-boot.md",
+      "originalLine": 217,
+      "language": "plain",
+      "sha256": "8e3fdaff0cf19f783dcb6cb4953e6d6fdbc487c2f2d6a00ad33760003709d1db"
+    },
+    {
+      "id": 367,
+      "path": "spring/mdc-logging.md",
+      "originalLine": 469,
+      "language": "text",
+      "sha256": "3001783d1331f7375ee741defc1029f06515f99222c014e2099bc545b12edda5"
+    },
+    {
+      "id": 369,
+      "path": "spring/mdc-logging.md",
+      "originalLine": 683,
+      "language": "text",
+      "sha256": "a310b54f0adb1e9b1908240d2e0380e280dcfc78695ec6bbe872cbea2bc36905"
+    },
+    {
+      "id": 372,
+      "path": "spring/spring-aop.md",
+      "originalLine": 412,
+      "language": "text",
+      "sha256": "207c2b1030d66908ef952631842675fe7b3fb2843ea48d230a9c5507a9e9fadc"
+    },
+    {
+      "id": 373,
+      "path": "spring/spring-aop.md",
+      "originalLine": 602,
+      "language": "text",
+      "sha256": "e2232d79bc5ddcda60eea4f4fc18526bcdc1d18c18eefa20d9c38a6267bc73ee"
+    },
+    {
+      "id": 376,
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "originalLine": 404,
+      "language": "plain",
+      "sha256": "6b52660edc59ee0e6aed8243e41b807be78f31a31181e2f0299ce5df65d85912"
+    },
+    {
+      "id": 382,
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "originalLine": 1026,
+      "language": "plain",
+      "sha256": "550dd591ccb646ab68e4afe272de96c01b3291795225c93330e7e0aa070f3d48"
+    },
+    {
+      "id": 387,
+      "path": "spring/spring-overview.md",
+      "originalLine": 78,
+      "language": "plain",
+      "sha256": "18251a74ef63146259b9bc6b0b6773edb2a06afc1a746234e508d81faaa962e2"
+    },
+    {
+      "id": 389,
+      "path": "spring/spring-overview.md",
+      "originalLine": 196,
+      "language": "plain",
+      "sha256": "3d0c5a3c4252913d9b4752607415f58546dae310b29dcb87e4540ec76583c1f0"
+    },
+    {
+      "id": 393,
+      "path": "spring/spring-proxy.md",
+      "originalLine": 706,
+      "language": "plain",
+      "sha256": "83a06bd311df22bac7b9bede121f323f4033a09dc8a4e0c61fff9f2b2887a21b"
+    },
+    {
+      "id": 397,
+      "path": "spring/spring-security.md",
+      "originalLine": 833,
+      "language": "plain",
+      "sha256": "17da17dbe3b3e1c3aeb067414c2e6807029df1118e70e5cee08dc40ab3a42e47"
+    },
+    {
+      "id": 398,
+      "path": "spring/spring-security.md",
+      "originalLine": 1037,
+      "language": "plain",
+      "sha256": "33d57b8ad32ee6ecdb16c733f1ad67b2b9a5085776e44e00e07fef0bed085eeb"
+    },
+    {
+      "id": 401,
+      "path": "spring/spring-security.md",
+      "originalLine": 1382,
+      "language": "plain",
+      "sha256": "6ce55ded71109f543561ea727c6f2c049d7a6fdcb21d31ccb19d3d1da40a1dc3"
+    },
+    {
+      "id": 403,
+      "path": "spring/spring-transaction.md",
+      "originalLine": 476,
+      "language": "mermaid",
+      "sha256": "33ab87e46ecbcc3d4e1a6263fd5904389517d976f436f14cb0f0e502cbff97fd"
+    }
+  ],
+  "retained": [
+    {
+      "path": "collections/arraylist-vs-linkedlist.md",
+      "line": 286,
+      "language": "plain",
+      "sha256": "b322a8d6dea5831bfe3b2b1454cb4be674e44478d4b3d6f609ac8f0d87e45428",
+      "preview": "1. ArrayList  = Object[] động, get O(1), add cuối O(1) amortized, grow ×1.5",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/collection-framework-overview.md",
+      "line": 234,
+      "language": "plain",
+      "sha256": "c653dd1fff7d12cb346a931cbfec418b7bfd00e344c3b86676e4569e48498ced",
+      "preview": "1. Iterable → Collection → {List, Set, Queue→Deque};  Map là cây RIÊNG",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/concurrent-collections.md",
+      "line": 541,
+      "language": "plain",
+      "sha256": "3a9e1e3180a1777452c3fd8f91d47951f9358b9deedd27e71b698272377d619d",
+      "preview": "1. Cấu trúc: Node<K,V>[] giống HashMap, nhưng val/next đều volatile",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/concurrenthashmap-deep-dive.md",
+      "line": 314,
+      "language": "java",
+      "sha256": "d3c49052959c82e41d3b4b96688e331f5392626c2edf9c0712a458d5e30092c0",
+      "preview": "private transient volatile long baseCount;                    // base counter",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "collections/concurrenthashmap-deep-dive.md",
+      "line": 419,
+      "language": "java",
+      "sha256": "766f65d4984e531ebc689842997c25e63dc82786e5d67794506d4b13e22fa7bd",
+      "preview": "// Thread A:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "collections/concurrenthashmap-deep-dive.md",
+      "line": 483,
+      "language": "text",
+      "sha256": "8ad29cb2f27d774f11c418e224c2eee1a5d5f623e857dc0a811dd3448cae00f3",
+      "preview": "Threads   Hashtable     synchronizedMap   ConcurrentHashMap",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "collections/concurrenthashmap-deep-dive.md",
+      "line": 560,
+      "language": "plain",
+      "sha256": "786ae36a300487886a30c5613d688bb59ce8c01d353698fb45556d7db83ba534",
+      "preview": "1. get(): volatile read — KHÔNG lock, KHÔNG block, scale vô hạn",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/hashmap-deep-dive.md",
+      "line": 144,
+      "language": "plain",
+      "sha256": "db552a350060c23e239ae2a8aa75fbff9588ab70e23604753587fba82fd5af00",
+      "preview": "hashCode A = 0x7FFF0000 → bit thấp 0000 → bucket 0",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/hashmap-deep-dive.md",
+      "line": 162,
+      "language": "plain",
+      "sha256": "6aa781d761458c1663ce6ee472d5be5598e30e93f31752018f3af24f59be0399",
+      "preview": "h            = 0xABCD1234",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "collections/hashmap-deep-dive.md",
+      "line": 409,
+      "language": "text",
+      "sha256": "a339b357c92ef68a3dab6fdb761567a4c495dd10f26e9643021e9b83700e213d",
+      "preview": "# 1.000.000 phần tử, đo trên JDK 17",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "collections/hashmap-deep-dive.md",
+      "line": 475,
+      "language": "java",
+      "sha256": "13e81d081b95b44b4da5e9118f58c9beeb63f09734b0c06a6dd003ed9a3f22d6",
+      "preview": "// Sai: bắt đầu 16, resize nhiều lần để chứa 1000 phần tử (16→32→…→2048)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "collections/hashmap-deep-dive.md",
+      "line": 546,
+      "language": "plain",
+      "sha256": "a6787b8e820f697356bf57b2d136d38a60f4f9fde16bb3055ed9a67f1a2ce82d",
+      "preview": "1. index   = (n-1) & (h ^ (h>>>16))      // hash perturbation + mask bit thấp",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/list-vs-map-vs-set.md",
+      "line": 154,
+      "language": "plain",
+      "sha256": "3a48d893691b9950d94b4437b75f92a3e663fa9a3d466780d483d621ed4439f6",
+      "preview": "HashMap/HashSet       → KHÔNG xác định (theo bucket, có thể đổi giữa các phiên bản JVM)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/list-vs-map-vs-set.md",
+      "line": 215,
+      "language": "plain",
+      "sha256": "a246135c51ed4177dfdf6c72cd0eba0b06bd1eafe76a89b74d8fce6ab75df610",
+      "preview": "List  → dãy có index, cho trùng, giữ thứ tự        → \"phần tử thứ i\"",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/set-implementations.md",
+      "line": 86,
+      "language": "plain",
+      "sha256": "6669daed2311ca13da9925b749143d912abf972f3257506ce7f62b2e8101e50c",
+      "preview": "HashSet {\"a\", \"b\"}  thực chất là  HashMap { \"a\"→PRESENT, \"b\"→PRESENT }",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "collections/set-implementations.md",
+      "line": 282,
+      "language": "plain",
+      "sha256": "d8475ebc25169b328d7636a9528b1d256e80dc3acab9309849a8e121ba6c4ecf",
+      "preview": "1. Set = Map đội lốt: phần tử là KEY, value là PRESENT giả dùng chung",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/aqs-deep-dive.md",
+      "line": 459,
+      "language": "java",
+      "sha256": "f0c9003a42eacab9ca99e26e0341a84b2f80c9ea71ad6ee6984e0c3ec952a834",
+      "preview": "public final void await() throws InterruptedException {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/aqs-deep-dive.md",
+      "line": 573,
+      "language": "plain",
+      "sha256": "ce5b228e55434d1f4bd3b909d7915b48bcfae343b4943deb298f2ec6fa810fbf",
+      "preview": "1. state (volatile int): ý nghĩa do subclass quy định (lock count, permits, countdown)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/completablefuture.md",
+      "line": 568,
+      "language": "plain",
+      "sha256": "fdd336860868d7eb2939e742056fcdb826f7eaa6a9e0610bc134733a663112db",
+      "preview": "1. supplyAsync → chạy task trên pool thread, trả CF<T>",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/data-race-vs-race-condition.md",
+      "line": 39,
+      "language": "plain",
+      "sha256": "12082486cf46f8f258c8c9a18d6fc8fb192f4fef9dbcbb60a92cea2e90eaab64",
+      "preview": "1. cùng địa chỉ bộ nhớ (biến chia sẻ)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/data-race-vs-race-condition.md",
+      "line": 105,
+      "language": "java",
+      "sha256": "5d915483b7900a2e2b88bc80b3124aaa4d870c038299c40e5e5c7374a4c63179",
+      "preview": "value++;   // tách thành: t1=read(value); t2=t1+1; write(value)=t2",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/data-race-vs-race-condition.md",
+      "line": 245,
+      "language": "plain",
+      "sha256": "6cbbecce14c9e1dcbcc75fda519bfe94345c921158e5694d0896ab991f5656ce",
+      "preview": "Data race      = vi phạm JMM: ≥1 write + cùng biến + không happens-before",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/deadlock.md",
+      "line": 195,
+      "language": "text",
+      "sha256": "0c55b05b0466350c9495869adfbe1e38a791e567e89a43d8e88ed26896cb844d",
+      "preview": "\"transfer-A-to-B\" #21 prio=5 os_prio=0 tid=0x... nid=0x... waiting for monitor entry",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "concurrency/deadlock.md",
+      "line": 218,
+      "language": "text",
+      "sha256": "1d3780895aa7c5f6df94030a9c3e23362898001afd16e7122f8264928bfbf1b8",
+      "preview": "Found one Java-level deadlock:",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "concurrency/deadlock.md",
+      "line": 530,
+      "language": "text",
+      "sha256": "992303801f587a9755674e3745e3ea592d9f3ce5e1bada43c815591f541a80c3",
+      "preview": "Deadlock = các owner giữ tài nguyên và chờ nhau theo một vòng.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 121,
+      "language": "java",
+      "sha256": "b8a58c8dba4c09fa4745b6b736d8b117a27be5c6121593d1f696bdecd836fb28",
+      "preview": "// ForkJoinWorkerThread.run() (simplified):",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 337,
+      "language": "java",
+      "sha256": "fc1c5d62d7bf0b7b268c4870fdaace91f8314a2c632d9c297396cc3c1c9ef9a0",
+      "preview": "// Task A: CPU-intensive parallel stream (dùng hết 7 worker)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 438,
+      "language": "java",
+      "sha256": "a14096df7fa9cbd3a8038d5ce2c2745a056e0768c562c7cd13f6c4bb014b367b",
+      "preview": "// Nếu PHẢI block trong ForkJoinTask:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 457,
+      "language": "plain",
+      "sha256": "36aa8db2bf8ea50ace0c09a27e24d329fe8ff1186040cff37d660b7d63afe5f1",
+      "preview": "-Djava.util.concurrent.ForkJoinPool.common.parallelism=N",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 467,
+      "language": "java",
+      "sha256": "660e44eaa37f3ab326a94212338513f1a82395567a405a38e70b90277a41b4eb",
+      "preview": "// Quá lớn: ít task → ít work stealing → load imbalance",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/forkjoin-deep-dive.md",
+      "line": 494,
+      "language": "plain",
+      "sha256": "c726092f8e5673b81bed3544d4fd66ef1c60f4f828a9f6780ed957cc529dc457",
+      "preview": "1. ForkJoinPool: per-worker deque (WorkQueue[]) — owner push/pop LIFO, stealer poll FIFO",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/jmm.md",
+      "line": 201,
+      "language": "plain",
+      "sha256": "f8810e85800c7ce45feeab70f93dd324146adcd16474f7db8b5b606c29a2644c",
+      "preview": "volatile write trên x86:",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "concurrency/jmm.md",
+      "line": 296,
+      "language": "plain",
+      "sha256": "17d44c67401ad3491f08b95e58ca84b7b0b1f5b97bb47201b59e1568fa23ac6f",
+      "preview": "// HotSpot JIT output cho volatile write trên x86:",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "concurrency/jmm.md",
+      "line": 407,
+      "language": "plain",
+      "sha256": "33a2efe93680dfdd4a5ec47e73208b618df7cef157d30871fad743ab9869c625",
+      "preview": "// Pseudo-barrier:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/jmm.md",
+      "line": 585,
+      "language": "plain",
+      "sha256": "f5f9ee517757f093d9fa43736b23053dd59003af3c458b273e11587e98d9107f",
+      "preview": "JMM = Hợp đồng giữa lập trình viên và JVM:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/locks-optimistic-vs-pessimistic.md",
+      "line": 94,
+      "language": "plain",
+      "sha256": "4b76a267ac48260b66786008b81c4c00d04c9be91a5b1c649eeb7e42b8ed3158",
+      "preview": "CAS(địa_chỉ, expected, newValue):",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/locks-optimistic-vs-pessimistic.md",
+      "line": 313,
+      "language": "plain",
+      "sha256": "096abcf21e6df369fc34fbd07e8102b2139472ee9d1c16dd52228c40488535b2",
+      "preview": "1. Pessimistic = khóa trước, người khác CHỜ (synchronized, ReentrantLock)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "line": 132,
+      "language": "java",
+      "sha256": "d92aaed8fa4cc252debfc315876a316342d8feccd0d4431e5c262f3a35e8ead7",
+      "preview": "// Pseudo-code:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "line": 257,
+      "language": "plain",
+      "sha256": "abc8428d55efdcd900d656afb515a626f1be61a4e741c15ecaf60b663602940f",
+      "preview": "javap output:",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "line": 381,
+      "language": "java",
+      "sha256": "3101ad470ca556039d3099d520820f1127684fe8579e65734c4f9c2af604bcb0",
+      "preview": "public String concat(String a, String b) {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "line": 411,
+      "language": "plain",
+      "sha256": "6cd8064e56c74425e91bdc6a837d529c3a04d366a2a10f87b58b522bcf2fe16a",
+      "preview": "CAS fail → spin loop:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/synchronized-internals-deep-dive.md",
+      "line": 473,
+      "language": "plain",
+      "sha256": "46e834655f8ea04214164723371de8bdd1643607eac32619062e53e17c95974d",
+      "preview": "1. Lock state nằm trong Object Header Mark Word (2 bit tag: 01/00/10)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/thread-vs-runnable.md",
+      "line": 333,
+      "language": "java",
+      "sha256": "41dae0624d130fbb0abce9ec3cf55f88fab2dba5b34304d0e22b4aae4cc3dfb7",
+      "preview": "// Khi pool + queue đầy:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/thread-vs-runnable.md",
+      "line": 471,
+      "language": "plain",
+      "sha256": "b0daaec982962e7c25552e754c6550ada454360d9bdc8f93d5d0857ad04e24dc",
+      "preview": "N = 8 × (1 + 200/20) = 8 × 11 = 88 threads",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/thread-vs-runnable.md",
+      "line": 496,
+      "language": "plain",
+      "sha256": "3964e0adb655cafa880ad683a0fddcc2fda07e53ff6a3cb3285567438c8452e9",
+      "preview": "ThreadPoolExecutor = core threads + bounded queue + max threads + rejection handler",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/threadlocal-deep-dive.md",
+      "line": 262,
+      "language": "plain",
+      "sha256": "cd3f1ac1935b8ca1a4adc847af0b967b8256ffe7b14ad8b22880b0041e4dcd57",
+      "preview": "ThreadLocal #0: hash = 0x00000000 → 0x...0 & 15 = 0",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadlocal-deep-dive.md",
+      "line": 694,
+      "language": "java",
+      "sha256": "9b42250b92360b15a6742229620ee227ada077ac36201c2f6636e8119bc0d1f7",
+      "preview": "// SAI — không clear:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/threadlocal-deep-dive.md",
+      "line": 705,
+      "language": "java",
+      "sha256": "4e2754cff06950ae41ed82c180459cb506b538266828cf71c55a3c5fa3a62ede",
+      "preview": "// SAI — field instance:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/threadlocal-deep-dive.md",
+      "line": 738,
+      "language": "plain",
+      "sha256": "ccc155192b709e6ecd0c3e0598b57bbe12f9c8eb34fbcf0b5d65bbc073d1dbf9",
+      "preview": "1. Map nằm trong Thread (t.threadLocals), KHÔNG nằm trong ThreadLocal → không cần lock",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 488,
+      "language": "plain",
+      "sha256": "1bd00f8b6cdedd25fb8513c88c22fe777784de7f7e5120097a4b33303a9e9a1c",
+      "preview": "optimalThreads = numberOfCPUs + 1",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 496,
+      "language": "plain",
+      "sha256": "658f52f2813916fb06419ed22bdea58df2cf91ae2373f0cac6bf71cf39f4882f",
+      "preview": "optimalThreads = numberOfCPUs × (1 + waitTime / computeTime)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 501,
+      "language": "plain",
+      "sha256": "ac4f048997ee1d26ee74867795724fece5e3f6fa5baadf3c539a23b4cdf65034",
+      "preview": "8 × (1 + 800/200) = 8 × 5 = 40 threads",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 507,
+      "language": "plain",
+      "sha256": "40e00c45e174a7f7be5fa645daf7cfdb7346673a8e1589e938d33336752b6878",
+      "preview": "L = λ × W",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 513,
+      "language": "plain",
+      "sha256": "174a81c2bbe827719edeecc8f9a0dbd818ff42783e38f0555d641256f5b4ef99",
+      "preview": "threads = 1000 × 0.1 = 100 threads",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "concurrency/threadpool-executor-deep-dive.md",
+      "line": 573,
+      "language": "plain",
+      "sha256": "8774ca4d57bb486a4ea6c44ee4a1ff7013e059803dda1f4cb1f384f48f0bc995",
+      "preview": "1. execute(task): core chưa đủ → tạo thread; đủ rồi → offer vào queue",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "line": 297,
+      "language": "plain",
+      "sha256": "a62051e50c1a0da6d3bec1a364b5f47712be03bcfb232974ace710c655422173",
+      "preview": "CAS(address, expectedValue, newValue):",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "line": 360,
+      "language": "plain",
+      "sha256": "c5a00d305b32e741c796cc0de8a99792fca8485e443726e69621c250bd3f8173",
+      "preview": "retry:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "line": 428,
+      "language": "java",
+      "sha256": "2f2f9043ff135908bd85f1d6850a24554c848c362716049ae7c0822d052becaa",
+      "preview": "AtomicStampedReference<Node> top = new AtomicStampedReference<>(null, 0);",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "line": 453,
+      "language": "text",
+      "sha256": "cc9d2e76b3ed8a305ea6fa8a42f867aed8b4417520bd3df9df90978d4a1201d4",
+      "preview": "AtomicLong:   1 cache line, 64 threads CAS → 95% retry",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "concurrency/volatile-synchronized-atomic.md",
+      "line": 657,
+      "language": "plain",
+      "sha256": "a77af9bfc039e1597d2312989f3b64190cfc76c9267eeeac56c949911f13fbab",
+      "preview": "1. volatile: visibility + ordering barrier, KHÔNG atomic compound (++, +=)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "design-patterns/behavioral-patterns.md",
+      "line": 204,
+      "language": "java",
+      "sha256": "6af316c538d6dc0d4fb982a8fe7dfbed9c86510b4e953fd0216a235c32f35c94",
+      "preview": "interface OrderState { void next(Order o); void cancel(Order o); }",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "design-patterns/behavioral-patterns.md",
+      "line": 250,
+      "language": "plain",
+      "sha256": "d5912cf35f00fb530dc19cafcb456fc372601fffe3876f239ffa4a1bedf0de4a",
+      "preview": "Strategy   → hoán đổi thuật toán (lambda/Comparator)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "design-patterns/creational-patterns.md",
+      "line": 286,
+      "language": "plain",
+      "sha256": "e95cc624b9f70c3ba171b8000889c6f1454d65a66463a37988a010f8b38fe8a4",
+      "preview": "Singleton        → 1 instance: enum (an toàn) / holder (lazy) / DCL+volatile",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "design-patterns/solid-principles.md",
+      "line": 60,
+      "language": "java",
+      "sha256": "a687b82154e84d2112912543911543de3e914a2a331ddfe4e7834723e1fdeb78",
+      "preview": "// VI PHẠM — thêm loại hình mới phải SỬA hàm này (và mọi hàm tương tự)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "design-patterns/solid-principles.md",
+      "line": 244,
+      "language": "plain",
+      "sha256": "579cedef9d1584e6dccb0e60b1b3de65c501e8e6a2ea1921efda3e2d7523150a",
+      "preview": "S  Single Responsibility — 1 lý do để thay đổi",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "design-patterns/structural-patterns.md",
+      "line": 279,
+      "language": "plain",
+      "sha256": "9fbf2bbad993b9a6ea1a55ec70db14594706787e988f210307b346e4364d9e42",
+      "preview": "Adapter    → đổi interface cho khớp (interface vào ≠ ra)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/access-modifier.md",
+      "line": 72,
+      "language": "plain",
+      "sha256": "2f6692a3db187971ae4e5faf4711c2de1797ee2586b0d7e44ce0a63290d40d74",
+      "preview": "// Bytecode trước Java 11 (giản lược)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/access-modifier.md",
+      "line": 236,
+      "language": "plain",
+      "sha256": "0fa394d4693a65f1b309d9280b07ca68f975a3865ab3dcbe94b61bf73e24aa69",
+      "preview": "public     → mọi nơi (nhưng JPMS cần exports)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/annotation.md",
+      "line": 271,
+      "language": "plain",
+      "sha256": "20d62423270dc954af184b57f85b5c44c6b2bf59ff85ebe96c3d0deca7bda26d",
+      "preview": "// javap -v MyClass.class",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/annotation.md",
+      "line": 465,
+      "language": "plain",
+      "sha256": "7dac66d6554592263bbea05bdc1f40b78f19675bf8bf3db563a28a776157de86",
+      "preview": "Annotation = metadata, KHÔNG phải code. Logic ở processor.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/autoboxing-unboxing.md",
+      "line": 59,
+      "language": "text",
+      "sha256": "988c95b2795faea06d0c9df3da3fb4f6830d3ce8d8167d02c57b544a3595c74a",
+      "preview": "0: bipush        42",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/autoboxing-unboxing.md",
+      "line": 303,
+      "language": "plain",
+      "sha256": "858400cce787a9a8cb72eaa35381153b803be5e0f2e23f66ebf8694fb5b40c43",
+      "preview": "1. autobox  = compiler chèn Integer.valueOf()  (CÓ cache [-128,127])",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/comparable-vs-comparator.md",
+      "line": 56,
+      "language": "plain",
+      "sha256": "f93b63cedeba9522ab423f1cd6842276e7050171b44a9d4739a7dc67604961f4",
+      "preview": "compare(a, b) < 0   →  a đứng TRƯỚC b  (a \"nhỏ hơn\")",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/comparable-vs-comparator.md",
+      "line": 116,
+      "language": "java",
+      "sha256": "69f0469cc15a32a0dba30fea43292d64331bc7470fcdac435901ceaa2211b1d4",
+      "preview": "int a = Integer.MAX_VALUE;   // 2147483647",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/comparable-vs-comparator.md",
+      "line": 265,
+      "language": "plain",
+      "sha256": "1e30968e8f437c75b31d28b41b79219707bce62811bc5f7047860db359400932",
+      "preview": "1. Comparable.compareTo  = natural order (TRONG class, 1 thứ tự)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/equals-hashcode.md",
+      "line": 407,
+      "language": "plain",
+      "sha256": "a542d2235b3f2d9b76e77dd967c9ad04da1add150c95eba95068a92b476857ed",
+      "preview": "1. equals → so GIÁ TRỊ; hashCode → chọn BUCKET (lọc thô O(1))",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/exception-handling.md",
+      "line": 139,
+      "language": "plain",
+      "sha256": "2a0525ea410a82c9cd7f2c2778ca140a47b180651c1cfed0e883d59e44311c53",
+      "preview": "Exception table:",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/exception-handling.md",
+      "line": 155,
+      "language": "java",
+      "sha256": "bced4060ac118df455b262e4aee6abeec9a3ee56ed9fccb42a62a396d6f10189",
+      "preview": "try {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/exception-handling.md",
+      "line": 290,
+      "language": "plain",
+      "sha256": "132e62574872aed0bb054c00110efcc415635bf1eeb68f38c434b50090753d58",
+      "preview": "Benchmark                    Mode  Cnt    Score    Error  Units",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "fundamentals/exception-handling.md",
+      "line": 358,
+      "language": "java",
+      "sha256": "e338a29d8fb46d3c23f634c8ec67564578d7bfacaf90b702c1dd853efe96b061",
+      "preview": "try {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/exception-handling.md",
+      "line": 503,
+      "language": "plain",
+      "sha256": "c67c6c42cf7ac2e1fa5b4d5774f9571f7b99c4a8f579b20513ed7eefff133278",
+      "preview": "Exception = tình huống bất thường, KHÔNG phải control flow",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/final-keyword.md",
+      "line": 284,
+      "language": "plain",
+      "sha256": "86da516ec5b7a068a1b8f42b9b2421d8689c7b011e85ad668f19b9a46e393e09",
+      "preview": "1. final variable → gán đúng 1 lần (KHÓA reference, KHÔNG khóa nội dung)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 91,
+      "language": "java",
+      "sha256": "faa71bae1c342db80385bd679bffa03d06adf7ca67948a2731d2e2d5fdede469",
+      "preview": "// Function: andThen, compose",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 134,
+      "language": "plain",
+      "sha256": "5c8876dd237da103bb673cb6e79286939d08b5d74a0e3ae89496f34810131f5b",
+      "preview": "invokedynamic #0:accept:()Ljava/util/function/Consumer;",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 189,
+      "language": "plain",
+      "sha256": "3d062f73a0dc96060ffc7a147abfe53901186d2a05f3f4815301b82c3aa82f6f",
+      "preview": "// Non-capturing lambda: s -> System.out.println(s)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 205,
+      "language": "plain",
+      "sha256": "646d756c20f9d469f7f86449c4b0e3686d813e8ce0fc3c69cc05c7b7f3590da4",
+      "preview": "// Capturing lambda: captured variable `prefix`",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 325,
+      "language": "plain",
+      "sha256": "a9dbadac3c7e9655534e692a9210400711cc5542f6e1d866b9d963bc8a7491df",
+      "preview": "ALOAD 1                    // load prefix từ local var",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 383,
+      "language": "java",
+      "sha256": "05b9c86620eefe8d6ee6b7bada6f56526b4578323801ebbad952027ecceaaf93",
+      "preview": "// Compiler suy luận type từ target type:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/functional-interface.md",
+      "line": 521,
+      "language": "plain",
+      "sha256": "158256c24dd556caa027131edb96611ba49bd943f516ac29d85abb283d1fd4ee",
+      "preview": "Functional Interface = 1 abstract method → có thể dùng lambda/method reference",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 67,
+      "language": "plain",
+      "sha256": "d4500c9a4f442442704a506e56caa00e7d4635a5b6aa6e771087571635474bb4",
+      "preview": "public java.lang.Object get(java.lang.String);",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 78,
+      "language": "plain",
+      "sha256": "b7ad7ea520fcf976d226042afd59190e23676c55eb3bf304038303f8916a29ce",
+      "preview": "invokevirtual #5    // Cache.get(String)Object",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 90,
+      "language": "plain",
+      "sha256": "a8fc21f611e0eee89de93509d824d33df6e661e615b3d3a6de6ead31e5a4edb8",
+      "preview": "// javap -v Cache.class → Signature of get():",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 101,
+      "language": "java",
+      "sha256": "54fb1a1472f4768a8bec326481fa3732969c0bb4e253bf0f0b5f101a4327e7e5",
+      "preview": "// Spring ví dụ: lấy generic type từ Signature attribute",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 159,
+      "language": "plain",
+      "sha256": "bbecb9ecf7014ebf4a6899934d736399297492bbcb011f9f4783637aef93be3c",
+      "preview": "public int compareTo(java.lang.Object);",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/generics.md",
+      "line": 557,
+      "language": "plain",
+      "sha256": "96c3d3e06b1e72a4114a0035a02e740859d6fa5eee462c945613833786d87573",
+      "preview": "1. Type Erasure: compiler check → erase → insert cast ở caller site",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/heap-vs-stack.md",
+      "line": 83,
+      "language": "text",
+      "sha256": "d656996e03a5067d7e7aefcf74d7a67b4c44df6d4b05e31e881c5e1f625a4a15",
+      "preview": "0: iload_1     // push a (slot 1) lên operand stack",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/heap-vs-stack.md",
+      "line": 226,
+      "language": "text",
+      "sha256": "c67633a46dd36be271dace5a399efb75fc8c067b35974197a879c790300e5fb9",
+      "preview": "a ban đầu:          @6646153",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "fundamentals/heap-vs-stack.md",
+      "line": 357,
+      "language": "text",
+      "sha256": "9a7c928c64f67a248fd14851074e3876273b36f88e95e3b53edf402e3cc106f9",
+      "preview": "OutOfMemoryError: Java heap space          → heap đầy (leak, -Xmx nhỏ)",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "fundamentals/heap-vs-stack.md",
+      "line": 414,
+      "language": "plain",
+      "sha256": "a8ed88af86f51c654a1bc80c4d7e2544c5b34a636f7119657a4126dc02bf12b3",
+      "preview": "1. STACK: per-thread, LIFO frame, cấp phát = dời con trỏ, tự dọn khi return",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/oop-4-tinh-chat.md",
+      "line": 140,
+      "language": "text",
+      "sha256": "82651e66aea84f56c208433f7a186c3e7e5887731ebff182624519f535f55a82",
+      "preview": "new Dog",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/oop-4-tinh-chat.md",
+      "line": 148,
+      "language": "text",
+      "sha256": "58221f9757967da350967423c4d3d0181771a9912ddc71432fb1b5fef9678ca9",
+      "preview": "aload_0",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/oop-4-tinh-chat.md",
+      "line": 232,
+      "language": "text",
+      "sha256": "acb70c66d58818812d8ad070b8434f898ea852935d9cecbabc76e70348bc329b",
+      "preview": "aload_1",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 96,
+      "language": "plain",
+      "sha256": "e8a402a4cdd10b5d7fc766d202677e1753d6caddc0f764603757f59a34cd3c4c",
+      "preview": "Giả sử String MUTABLE:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 326,
+      "language": "plain",
+      "sha256": "36a47587978109e1d37a29b23f18d40c89a3cd433ab5fdf57b5d1005cd5527a0",
+      "preview": "NEW java/lang/StringBuilder",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 375,
+      "language": "text",
+      "sha256": "ee5b04ce29cb851559fb2f02ba9df01b661c9c7818fcbb252cf8d3c993b64d79",
+      "preview": "0 + 1 + 2 + 3 + ... + (n - 1)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 384,
+      "language": "text",
+      "sha256": "3950670423cef9b7ff7f38fe6df72b18b08c4a70f98bc91d4fca327c96934811",
+      "preview": "Iteration 1: \"\"      + \"A\" → \"A\"       String cũ: \"\"      → bỏ",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 700,
+      "language": "plain",
+      "sha256": "a3f89ecc2836ff62e643a6fddd810756182b0b54b2b79b6f0b8f1a79437debe7",
+      "preview": "[stringdedup] Deduplicated: 1,234,567 strings",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 738,
+      "language": "java",
+      "sha256": "f44891ab3d31a8aeab26d7c96df653f33261bdaeaf85b9793b0acfe6fa871995",
+      "preview": "// Compiler thấy \"hel\" + \"lo\" = 2 compile-time constants",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "fundamentals/string-immutability.md",
+      "line": 798,
+      "language": "plain",
+      "sha256": "723faca47e01ccb38d79743b6bba46be3a0a81fc7a24a3e7bcd308d9663b6ff2",
+      "preview": "String = final class, immutable, backing byte[] (JDK 9+)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "fundamentals/string-internals-deep-dive.md",
+      "line": 56,
+      "language": "plain",
+      "sha256": "e18cad9ff693082e3bc683d46a28354c92d8428e894a2283837f2e5a5e517b48",
+      "preview": "JDK 8:  String object (header 12B + char[] ref 4B + hash 4B + padding) = 24B",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "fundamentals/string-internals-deep-dive.md",
+      "line": 133,
+      "language": "plain",
+      "sha256": "a896797a8a91913d6235557703c6fb6aff644dfb4e51c479d203d2ba91587e95",
+      "preview": "JDK 7+: Pool là HashTable native (C++ level), bucket = linked list",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "fundamentals/string-internals-deep-dive.md",
+      "line": 398,
+      "language": "text",
+      "sha256": "2bfc1c0089c2670e9f0c3559304eac09f42cc83e11ab164bd510f7dc6b13c112",
+      "preview": "Method                          ns/op    Allocations",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "fundamentals/string-internals-deep-dive.md",
+      "line": 412,
+      "language": "plain",
+      "sha256": "5792f9cccf988fc64fca5ed804dfa78d170177d00a91071f7127d10f23e1c17e",
+      "preview": "1. String = final class, byte[] value (immutable), byte coder (LATIN1=0 / UTF16=1)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "line": 186,
+      "language": "text",
+      "sha256": "7bdf95c48fda3949d7ce59a23260849e2de8443ebc0c3a2765537bf41324aa22",
+      "preview": "11",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "line": 253,
+      "language": "text",
+      "sha256": "a0ae662d94336dc14c3ae1f184b1b0cd933085b9c7cbef769a4f67301317681c",
+      "preview": "Bình",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "line": 275,
+      "language": "text",
+      "sha256": "9f98b7c7f071714517d9a5e67c135b41fa3e91f20bac108158b33b073396f6e5",
+      "preview": "An",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "line": 333,
+      "language": "text",
+      "sha256": "23f70165bdcd44549ba38dd43add0f47f105e86a3f6aac1b426244e9060be904",
+      "preview": "A, B",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "interview/java-pass-by-value-vs-pass-by-reference.md",
+      "line": 534,
+      "language": "text",
+      "sha256": "65e831bf7e6d8ef6a94af4e8285c2cff70d922259f1de82d8d579dc424efbc18",
+      "preview": "Java luôn pass-by-value.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 73,
+      "language": "text",
+      "sha256": "bf9466870697a7ff73852b3ce9e6f731fca062ba372c393822cfd5b9a1c360e7",
+      "preview": "Nếu bất kỳ bước nào lỗi:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 174,
+      "language": "text",
+      "sha256": "d17a58e632ca331b9db449e520ca31c0dc389683dc9fc3650ab8c8bf7a0b4f66",
+      "preview": "Order DB + Payment Service + Inventory Service + Shipping Service",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 237,
+      "language": "text",
+      "sha256": "c1e100c4f5bde2b8e7a00944e9bda5c6883f762140a05c09c940f6f5e95d6de3",
+      "preview": "Order DB:       rollback về NEW",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 295,
+      "language": "text",
+      "sha256": "132859ca29032224e7ba3b56d428ca71c1b597df8019ed3380f902f5b34c10e7",
+      "preview": "Không commit → service khác không thấy dữ liệu mới.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 573,
+      "language": "text",
+      "sha256": "648869c462279e048a0b4c3da7942ed194876bcfdf62bebda3521bc87bfebaed",
+      "preview": "{operationId}:PAYMENT_AUTHORIZE",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 628,
+      "language": "text",
+      "sha256": "cc812f33fc29de401cc332f7f39001bdd821fd93adab89026aa1fad383985b08",
+      "preview": "1. Payment API thành công.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 705,
+      "language": "text",
+      "sha256": "082bd7af66d31b281729b209d77f13561b31f79d4e4791d3a313ae2954b4a918",
+      "preview": "PENDING",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 931,
+      "language": "java",
+      "sha256": "7f7e9b64d672d441d39f9252b89a83a705b8b8d0fb5dd9cd69a75bd4ccbd842a",
+      "preview": "@Service",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1100,
+      "language": "text",
+      "sha256": "5bff51aaf9ebee7b018af01d435fe6d6f7ed500d5410b775b735b3ce9df7b3cd",
+      "preview": "Payment: authorize tiền, chưa capture",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1110,
+      "language": "text",
+      "sha256": "4e2b2c4db3d6fc49f58756275df220b3b28e0bd6917f81b677a4690729bdcff9",
+      "preview": "Payment: capture",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1120,
+      "language": "text",
+      "sha256": "f5bea55a6239cbf66a9e7d1b8c64419f810c1c4bf1ed9eec77056f5097580918",
+      "preview": "Payment: void authorization",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1170,
+      "language": "text",
+      "sha256": "cf215fe9e7d1db36f29ce6ec755663e0933d5635709947edb94febb36997e9bb",
+      "preview": "\"Bạn có đảm bảo sẽ commit được không?\"",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1339,
+      "language": "text",
+      "sha256": "1138a850af1fd43004ee4ed23ea729b2c9f201fddbb6b18393f01afb9a462e98",
+      "preview": "exponential backoff + jitter + max attempts + deadline",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1383,
+      "language": "text",
+      "sha256": "a711c33dcbedaf8ec248b572efbff32bb1f233017bf2fe868877ab785a1e5fbd",
+      "preview": "Inventory đã reserve",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1494,
+      "language": "text",
+      "sha256": "bcb2b61ba1ed84f48b61268b334f860d6099e19c03de3ad8206e0e9b9bc1c5c5",
+      "preview": "saga_started_total",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1584,
+      "language": "text",
+      "sha256": "3fa17daee96a54918437eb485f465b826480266f84aab99d5982a122ce19c0a9",
+      "preview": "order.status = FAILED",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/long-transaction-external-api-rollback.md",
+      "line": 1815,
+      "language": "text",
+      "sha256": "96a499859a45e4881f17df194b6f806a982477c998fbf3dc33698709601b3945",
+      "preview": "Order = PROCESSING",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 90,
+      "language": "text",
+      "sha256": "a5c69560e53c03780d1bf1ba629d3914998ae74db4fcec6c999dcdb61fbc623e",
+      "preview": "              1",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 135,
+      "language": "text",
+      "sha256": "e72f7f58cb4fd5a06008446d4d2f01a70a3000836cdecaa28b6da614fd83ee68",
+      "preview": "CPU-BOUND (tính toán nặng: nén, mã hóa, xử lý ảnh, tính toán số):",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 163,
+      "language": "text",
+      "sha256": "08c72791ec3c996a4f2989185c7d7436af890121838d31ca4e8574d4c1a05e52",
+      "preview": "Một lần context switch phải:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 183,
+      "language": "java",
+      "sha256": "cbcd70af98b6a4ef2bfcddad24c5af8c0049e04e3d79bbfa8a848dd6be0edf99",
+      "preview": "// ❌ Bottleneck ẩn: mọi thread tranh nhau MỘT lock",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 194,
+      "language": "text",
+      "sha256": "4553a7656d3f6e34ed0e4916bc95b819b9e027bc4dcdea5ad99d96872b0ad90e",
+      "preview": "Hiệu ứng lên Amdahl: vùng synchronized = phần TUẦN TỰ.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 307,
+      "language": "text",
+      "sha256": "5c66a1668f568d155dbeba41d0dd3180f68d875f3aa1fea80ab3af5feebb463c",
+      "preview": "N_threads = N_core × U × (1 + W/C)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "interview/more-threads-not-faster.md",
+      "line": 315,
+      "language": "text",
+      "sha256": "c67c77ff497f25540f21235ecfff1d188ebb4afe86ec8e3498868c05a0dad8c2",
+      "preview": "CPU-BOUND (W/C ≈ 0):",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "interview/transactional-self-invocation.md",
+      "line": 369,
+      "language": "text",
+      "sha256": "f1f7a762c279c807717eeaa10332db962e2a40254cbe70ecad9805b23f890261",
+      "preview": "B1. Gọi method trực tiếp từ ngoài (controller/test) → xem log có \"Getting transaction\" không.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/volatile-loop-never-stops.md",
+      "line": 167,
+      "language": "text",
+      "sha256": "1e543ab33de0cceb900e4d4b0e51442ae920a7bd9b011ef694c2c27269a6da64",
+      "preview": "Vì sao JIT được phép làm vậy?",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/volatile-loop-never-stops.md",
+      "line": 220,
+      "language": "text",
+      "sha256": "9fb98a69efa01fad92e6026b43099c3897b12f554f46216ca4f3cd2a57c451d7",
+      "preview": "volatile boolean stop:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "interview/volatile-loop-never-stops.md",
+      "line": 257,
+      "language": "text",
+      "sha256": "7aedb309e871b142fcaefe1251c9ea7df8b77afcf09147b91106ec9205db4c9b",
+      "preview": "Trên laptop dev:                    Trên server production:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "io-network/download-large-file.md",
+      "line": 277,
+      "language": "plain",
+      "sha256": "530b06bd083e0e9ac490f2524039b9356189d051bb00544aae254602e04b2ba8",
+      "preview": "1. STREAM   → ofFile/ofInputStream + transferTo (đừng readAllBytes)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 35,
+      "language": "xml",
+      "sha256": "f6b8055afb858f059abf0b31af99eaab3e6d78b4e0912203df83cb80f2604ddd",
+      "preview": "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 73,
+      "language": "plain",
+      "sha256": "ac4d34195b04a81bf2a31bdc56426e92012517b8b9d47f150fb7d78834e5cbfa",
+      "preview": "/users           GET (danh sách), POST (tạo)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 98,
+      "language": "plain",
+      "sha256": "8cad4f32c91747c6de2f8244ea8626d96b5915dc82ec4ffafaefd9cc93896700",
+      "preview": "2xx thành công   200 OK, 201 Created, 204 No Content",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 176,
+      "language": "plain",
+      "sha256": "11911ef7d7f694eb37204884ef9a2d791ed9adbbe03571959ad875fd18bb24ea",
+      "preview": "Level 0: một endpoint, POST mọi thứ (= SOAP-ish, \"RPC qua HTTP\")",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 211,
+      "language": "plain",
+      "sha256": "0925f707a1424bae50445e66e0b350d39fab996958ad0f73e6221a16aa8ac503",
+      "preview": "URL path:     /v2/users          ← rõ ràng, phổ biến nhất",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "io-network/rest-vs-soap.md",
+      "line": 253,
+      "language": "plain",
+      "sha256": "f8d7245018f5f5394540faa5e5eb118e1d333458d41b89643bb95e529037d4d8",
+      "preview": "SOAP = GIAO THỨC: XML envelope + WSDL + WS-*  (nghiêm ngặt, doanh nghiệp)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "io-network/streaming-data.md",
+      "line": 228,
+      "language": "plain",
+      "sha256": "580a8b1129f2694417ce00e3991a17ce4846eb295d5897336cc6a988cff2ae79",
+      "preview": "IO       → InputStream/OutputStream theo buffer, transferTo, Files.lines (lazy)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jpa-hibernate/entity-mapping-and-identity.md",
+      "line": 1000,
+      "language": "text",
+      "sha256": "91f149f8611c31d29a4b61fcca7bedebe106768ff336d9c5a98551662c4542c0",
+      "preview": "@Entity + @Id                 → một entity có persistent identity",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jpa-hibernate/relationships-mapping.md",
+      "line": 1082,
+      "language": "text",
+      "sha256": "062337154682088abc645e56e5200318d2b8a8729b301987c5a5bde4c7af23af",
+      "preview": "Foreign key ở child",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/classloader-deep-dive.md",
+      "line": 167,
+      "language": "plain",
+      "sha256": "35f09d76343f50412abfd79c93b53fa6688bb10c831de3ee390ef5373bc004c9",
+      "preview": "class Foo {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/classloader-deep-dive.md",
+      "line": 181,
+      "language": "java",
+      "sha256": "05898f36d08cfe4a5daf64831a61fd87a8157365825f27a2b9a3da50e2ef83c0",
+      "preview": "class Foo {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/classloader-deep-dive.md",
+      "line": 212,
+      "language": "java",
+      "sha256": "f22bbd8b331487b8d714eeb66b7b5fcfa60c8b636bc9e7db34f0d337717a7b2e",
+      "preview": "// JDBC driver registration — vì sao dùng Class.forName?",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/classloader-deep-dive.md",
+      "line": 407,
+      "language": "plain",
+      "sha256": "c484aecd9cc5bc0a2bd35441c5005438cc3c09e88d6da4ad73ccec132db60f22",
+      "preview": "META-INF/services/java.sql.Driver",
+      "category": "literal-file-listing"
+    },
+    {
+      "path": "jvm/classloader-deep-dive.md",
+      "line": 441,
+      "language": "plain",
+      "sha256": "1e86352b794289d37fb2219a8c9da4fb009cf79ef4949ee469bf63f3b1bd0ac8",
+      "preview": "1. Class identity = (fully-qualified name, ClassLoader) — khác loader = khác class",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/garbage-collection.md",
+      "line": 588,
+      "language": "text",
+      "sha256": "070cfa974fcb0d94b169ced6d5b9097c1a011b3825206ec6a2cd51f49121ce0c",
+      "preview": "Mark-Sweep   = đánh dấu object sống → thu hồi chỗ của object rác",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/garbage-collection.md",
+      "line": 833,
+      "language": "text",
+      "sha256": "50e8d8e4da93026b1d73ab464eae23ac15774a90cfca804eb2e22a72c5739537",
+      "preview": "Collector      Max pause (typical)    Heap limit",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/garbage-collection.md",
+      "line": 934,
+      "language": "text",
+      "sha256": "4d416ece03b18bf763e018eeeceab225e9cd1d5d645f167ecd2d6056ed2d1322",
+      "preview": "[0.523s][info][gc] GC(3) Pause Young (Normal) (G1 Evacuation Pause)",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/garbage-collection.md",
+      "line": 1041,
+      "language": "plain",
+      "sha256": "fd203716178b2d8c0ba754f1992bf5a6f69cf0b18413571b3fd96fe5edbe344c",
+      "preview": "1. GC xác định sống/chết bằng reachability từ GC Roots (không phải ref counting)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 95,
+      "language": "plain",
+      "sha256": "a49c71456f38278b106779ffbbc9c9b1c28efde8b125b8ddbaedb44683131bcd",
+      "preview": "Method counter: tăng mỗi lần method được gọi",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 192,
+      "language": "plain",
+      "sha256": "ddd65168aca4e4901234a35edb1c1e5181df095901ce8304779f534459820f78",
+      "preview": "-XX:MaxInlineSize=35        (bytecode < 35 bytes → inline luôn, không cần \"hot\")",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 201,
+      "language": "java",
+      "sha256": "cbd953d61e3aa2670732d144a2270d0f2515b460f6cea4efc30f7399b982a60d",
+      "preview": "interface Animal { void sound(); }",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 243,
+      "language": "java",
+      "sha256": "23dba674a51c3522bc98778d06950611a3373e9aded03af79de8ec0efa49921f",
+      "preview": "public String concat(String a, String b) {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 278,
+      "language": "text",
+      "sha256": "01c12ced5e0a9ccb65062ac22df5b8b8d89414670df5986f1f54eecc4d8e7b71",
+      "preview": "Without OSR: loop 1M iterations all in interpreter = 5s",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 292,
+      "language": "java",
+      "sha256": "d6038cbe2814b5e4b3e5627d277572db8faa55a411c95206b51a1e5665149052",
+      "preview": "// Profile: animal luôn là Dog → JIT inline Dog.sound()",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 332,
+      "language": "plain",
+      "sha256": "c542582ce34405ba4ecb4cfa5ced94d11f0d6f382288db25d54b5883b1dd1dfa",
+      "preview": "-XX:InitialCodeCacheSize=2496k    (initial)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 344,
+      "language": "plain",
+      "sha256": "a833c09a61ac1d932807b260cd66cb24ce9d5935a922d06938873908d9559dc7",
+      "preview": "CodeCache: size=245760Kb used=245000Kb max_used=245500Kb free=760Kb",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 368,
+      "language": "plain",
+      "sha256": "fc54613407d6da6914a000ee5d4cc120f250bec80c9a51527c8d393ed90ff15f",
+      "preview": "-XX:+UnlockExperimentalVMOptions -XX:+UseJVMCICompiler",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 410,
+      "language": "text",
+      "sha256": "e5fc9a255e00b2d80c1f1da7c8c672183cc62334d495bd12fa1e231a91259a99",
+      "preview": "    147   1       3       java.lang.String::hashCode (55 bytes)",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jit-compilation-deep-dive.md",
+      "line": 425,
+      "language": "plain",
+      "sha256": "2121a6e7a9f214cb545fdb09b7e73cec2d7534045611f89f9b6c79cd379d964c",
+      "preview": "1. Interpreter → C1 (compile nhanh, profile) → C2 (compile chậm, peak optimization)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 159,
+      "language": "plain",
+      "sha256": "2b5a839fca8acfcae2ba0df473a57b3bd47d566688d0ac2a9b6203115a0d2082",
+      "preview": "Constant Pool (trong .class file):",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 250,
+      "language": "plain",
+      "sha256": "9cc3d379c93f7cab1aed3f1ac15aedb174e9960791c3d494c9f57a933b9189cc",
+      "preview": "0: iload_1        // push a (local var 1) lên operand stack",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 276,
+      "language": "plain",
+      "sha256": "7ee10025ed9978cfaab33847517972e2855fe295cd66c4c92fe91b347f7c0cf4",
+      "preview": "0: new #2             // new StringBuilder",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 339,
+      "language": "text",
+      "sha256": "2ae0a48fee630cbe3c9a520575f92349f0de8d43a485d137b173c63f65e93c3f",
+      "preview": "iload_0       // lấy a, đẩy vào operand stack",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 578,
+      "language": "plain",
+      "sha256": "34c127d86f63d64956bba434e9e65cc9c9138102cf2e07dacabbcf8ac5051369",
+      "preview": "invokedynamic #15 <forEach>",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 612,
+      "language": "plain",
+      "sha256": "a5c6f9502981f362394bbdf1522afc5d167ad6c4e3607da1ba2eff20a2324a23",
+      "preview": "-XX:MaxInlineSize=35        ← method ≤ 35 bytes bytecode → luôn inline",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 658,
+      "language": "java",
+      "sha256": "e11c9d1c0a5f4104df08f00eeb87912cede50ba582dcba1210783bb155a53b88",
+      "preview": "interface Shape { double area(); }",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 675,
+      "language": "plain",
+      "sha256": "c7ace9bf1a1dde559d959252030871a4467e1ec6724a9a2ec5376ca7aeb2e8c7",
+      "preview": "DEOPT: reason=class_check method=App.process(LShape;) bci=12",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 729,
+      "language": "plain",
+      "sha256": "16dae487fbcd00edda706e102633dbf745f8bcbe1ac7d84fb57fe9a93b22b5b0",
+      "preview": "    29    1       java.lang.Object::<init> (1 bytes)",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/jvm-architecture.md",
+      "line": 795,
+      "language": "plain",
+      "sha256": "dff75d80f9806d4358a28e3125af37396f3342a9ce057e74208c60a72deccb99",
+      "preview": "1. javac → bytecode → ClassLoader → Runtime Data Areas",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/jvm-jdk-jre.md",
+      "line": 185,
+      "language": "text",
+      "sha256": "95409b8319b471f6f0acdf1f53b53eb135ce844f722f5a9f577055cc68c63fc0",
+      "preview": "public static void main(java.lang.String[]);",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-jdk-jre.md",
+      "line": 229,
+      "language": "plain",
+      "sha256": "58212046607f86c7639fd471b833a140a4c0969cdf18e69bcdc431b70baf69f0",
+      "preview": "ClassFile {",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "jvm/jvm-jdk-jre.md",
+      "line": 460,
+      "language": "plain",
+      "sha256": "ce1fb3a46ff52b46ddec0acadf6af3325411ce776a4e9e20d84406f36e7609b0",
+      "preview": "1. .java  --javac-->  .class (class file chứa bytecode, không phụ thuộc CPU)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 132,
+      "language": "plain",
+      "sha256": "cf9f993ea7689d524f0fd496be867b4d209b95aa8bc09f2b227167261b3d041e",
+      "preview": "Màu    | Ý nghĩa",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 395,
+      "language": "java",
+      "sha256": "87307c24aee0ff25e42c02bf3cff6cc7d237ccda6b7df9c63432aa755305f470",
+      "preview": "public class Activity {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 414,
+      "language": "plain",
+      "sha256": "15c4439c59a0a2b3a0446d5d6e4783e1ed1f47e458839925ed8f29f6a8107037",
+      "preview": "class Activity$MyRunnable {",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 662,
+      "language": "plain",
+      "sha256": "a9971e15333d39b1803a58ebf9d0151d11a34b8df9cc9857d9020eee20ed666a",
+      "preview": "MAT Leak Suspect #1:",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 710,
+      "language": "plain",
+      "sha256": "6697493d5d898d5854955f1d464d7f9cf19d4f5c6d71c004ba6d1cec6e7b645f",
+      "preview": "# BÌNH THƯỜNG: heap after GC ổn định quanh 200-300 MB",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 736,
+      "language": "plain",
+      "sha256": "654f892334fd12a8f5b93e4a62175d3cf618d1752499b57a85bc6a4524ef3030",
+      "preview": "Panel 1: \"Heap After GC\" (jvm_memory_used_after_gc)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/memory-leak.md",
+      "line": 783,
+      "language": "plain",
+      "sha256": "0d1c7e443a0ac70e06bd87d549c9639ca34be4a45b25574faf19dce2a4156119",
+      "preview": "Memory Leak trong Java = Object reachable nhưng không cần → GC không thu hồi",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "jvm/object-reference-memory-address.md",
+      "line": 305,
+      "language": "text",
+      "sha256": "6965d9cfa17361bdf84fb8f7695d490a88c1fc4cf3fb402c599df76f3e2313f0",
+      "preview": "Compressed reference (khái niệm):",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "jvm/reference-types-deep-dive.md",
+      "line": 99,
+      "language": "java",
+      "sha256": "ea8b59963c4a68486ea6756fd5a4e16026f3f489beb0a3fe05912472e2f090fa",
+      "preview": "Object obj = new Object();     // strong ref",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "jvm/reference-types-deep-dive.md",
+      "line": 134,
+      "language": "plain",
+      "sha256": "d9160e2bc7e41a8742e7b0fc41edc871d7140e381568ea6ccd418a535460e583",
+      "preview": "// HotSpot policy:",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "jvm/reference-types-deep-dive.md",
+      "line": 486,
+      "language": "plain",
+      "sha256": "f7779b23facb9f64a9dbcc4c631fbac7ca69ad108b04e3cc28e27111f83a975d",
+      "preview": "1. Strong: GC KHÔNG collect. Mọi biến = strong ref.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/optional.md",
+      "line": 89,
+      "language": "java",
+      "sha256": "b5544aada2db13b7570b4ed3222a5b1254e657393ee1d70a55a3d414571c2c03",
+      "preview": "// map: hàm trả VALUE thường → Optional tự bọc → Optional<U>",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "modern-java/optional.md",
+      "line": 295,
+      "language": "plain",
+      "sha256": "24c4c3e7385c6087ab13f2324b6a6a80a20927f831daf07234c765cc9c3ab05f",
+      "preview": "1. Dành cho KIỂU TRẢ VỀ của method (không phải field/parameter)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/pattern-matching.md",
+      "line": 225,
+      "language": "plain",
+      "sha256": "f2e86716e4093e9d0c85b32cbe308a8238fec29e665a79efda535d181e9b9aea",
+      "preview": "case Circle, Rectangle, Triangle...",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "modern-java/pattern-matching.md",
+      "line": 267,
+      "language": "plain",
+      "sha256": "58de120270f7c986ef6460d7343aa11b982e67242492c0cf9fac7cc39a62b568",
+      "preview": "switch expr:   case A, B -> val;  case C -> { ...; yield val; }",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "modern-java/records-sealed.md",
+      "line": 63,
+      "language": "text",
+      "sha256": "405a4e67877a5068bf4ec6a0268c50940d427be236fa68ed325a16fe188a706b",
+      "preview": "final class Point extends java.lang.Record {",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "modern-java/records-sealed.md",
+      "line": 79,
+      "language": "text",
+      "sha256": "5000dca9053faa0834c65bd0e9c959392aeb5295d320534ee01373e7748e34c3",
+      "preview": "public final int hashCode();",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "modern-java/records-sealed.md",
+      "line": 196,
+      "language": "text",
+      "sha256": "a1d2da4eb27cfbd2a363c5a85b6439c856b7d116e47ec1be62f922124a54e844",
+      "preview": "sealed interface Shape",
+      "category": "bytecode-or-metadata"
+    },
+    {
+      "path": "modern-java/records-sealed.md",
+      "line": 284,
+      "language": "plain",
+      "sha256": "fdcb91086f407fc06be66d383cb13fc669c52a02cbdc49113c456c9ef82444ab",
+      "preview": "1. record = nominal tuple bất biến: field final + ctor + accessor + equals/hashCode/toString",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/reflection-dynamic-proxy-deep-dive.md",
+      "line": 158,
+      "language": "text",
+      "sha256": "6fed1c4618aa137ece4f6e01ded477fdde8cb4267f4bf85b9e63e336558774b5",
+      "preview": "Method                              ns/op   Speedup vs raw reflect",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "modern-java/reflection-dynamic-proxy-deep-dive.md",
+      "line": 276,
+      "language": "java",
+      "sha256": "c12db399096010be29674b3d46b1cf894e55179817f5555175580dbb53b8bc9c",
+      "preview": "// Generated: $Proxy0 (decompiled)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "modern-java/reflection-dynamic-proxy-deep-dive.md",
+      "line": 437,
+      "language": "plain",
+      "sha256": "43bfea8d51d9e4bbff8617bdfc6b00b971320c8fdfb9258e44deba90aeaef890",
+      "preview": "1. Reflection: Class → getDeclaredMethod → Method.invoke → MethodAccessor → actual call",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/stream-api.md",
+      "line": 500,
+      "language": "text",
+      "sha256": "ecac18328f6fc4ba9a50ca872bf059d213ebfea375a928ab50a0b22e34a3cfb9",
+      "preview": "JMH Benchmark (JDK 17, 1M integers, sum of squares of even numbers):",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/stream-api.md",
+      "line": 567,
+      "language": "plain",
+      "sha256": "459f39d2b01f0d9067dff4d9f08c549309041efa40b98a1b09aad5c5e3e4e0c5",
+      "preview": "1. Stream = lazy pipeline: Source → Intermediate ops → Terminal op",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "modern-java/virtual-threads.md",
+      "line": 685,
+      "language": "text",
+      "sha256": "c9857ece10bffe3123a2b66dc310f0b87c4769cf926079826f8d1211fe9c8a8c",
+      "preview": "Virtual Thread = cheap thread for a concurrent task, especially one waiting for I/O.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "serialization/java-serialization.md",
+      "line": 52,
+      "language": "text",
+      "sha256": "c5b6a786ee404010b18e89849dc3c9ce0fa6f106416db69eb0a7c66d4897dcdf",
+      "preview": "AC ED 00 05 73 72 00 04 55 73 65 72 ...",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "serialization/java-serialization.md",
+      "line": 282,
+      "language": "plain",
+      "sha256": "8acfbfe6908a4ac8913915274f158c550ac8fd2b1dd023621ff96cd56127f96d",
+      "preview": "1. Serializable (marker) + ObjectOutputStream → byte (magic 0xACED)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 59,
+      "language": "plain",
+      "sha256": "9ac42e3754fe5515d74a0fbf339f1bfe8180902a300965371dda5c8684879398",
+      "preview": "tag = (field_number << 3) | wire_type",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 74,
+      "language": "plain",
+      "sha256": "09b95f46bc0891fe3123f9890b1e2e49292db252d85045cb67bedd3518648b16",
+      "preview": "150 (thập phân) → varint: 0x96 0x01  (2 byte thay vì 4)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 83,
+      "language": "plain",
+      "sha256": "a9e1f47397781ebdde9cc926506987d9d2041055bd50d3030684fe8ed4ce1108",
+      "preview": "ZigZag:  0→0, -1→1, 1→2, -2→3, 2→4 ...   công thức: (n << 1) ^ (n >> 31)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 150,
+      "language": "plain",
+      "sha256": "45703df5c08b88f084b213bcab078ca7f40fe94982150195c1316e5f38b09b5d",
+      "preview": "[Header: schema JSON 1 lần] [record][record][record]...  (record không lặp schema)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 188,
+      "language": "text",
+      "sha256": "fd593fb6c91778a43c11c39f4b0bcf71e8c78b59aa431c8ad09b2840bfa69f6f",
+      "preview": "message trên Kafka = [magic byte][schema ID 4 byte][dữ liệu Avro trần]",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "serialization/protobuf-avro.md",
+      "line": 248,
+      "language": "plain",
+      "sha256": "3272362233bc908f2f5b8bf2c25526fc32a3d08bdfb5c9cc78aa2ec6b8c6cfc4",
+      "preview": "Protobuf → schema .proto, wire format = (field_number, value), varint/ZigZag",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 90,
+      "language": "text",
+      "sha256": "89d601946237f79ca002687f7b74314d857b4c141f41ad47eb417243182f8f1a",
+      "preview": "Decision = f(subject, action, resource, context, relationships)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 208,
+      "language": "text",
+      "sha256": "2f8963edc9604946519ee4564257693284559caaeb0ea9ccd393738c61673f91",
+      "preview": "ALLOW invoice.approve WHEN",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 320,
+      "language": "text",
+      "sha256": "05c8e4deb2122d432a7faa8f4cdb486e911afcbfd85239d08497a3cb7205687f",
+      "preview": "Role:       FINANCE_MANAGER",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 364,
+      "language": "text",
+      "sha256": "0307fe9f7327e7b9395346f66646c7a98e30ffe03e40b0f420821ef1c3e0ec91",
+      "preview": "Người tạo invoice != người duyệt invoice",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 382,
+      "language": "text",
+      "sha256": "6c2f16582e2147ecd209b5b2edeef241e2111de7dfc890ac696135e27d6712a0",
+      "preview": "invoice:read",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 731,
+      "language": "text",
+      "sha256": "1e0fe8886cb166b8ce6c685341233037274e5f63c852ea1f46c92dc0e48cfcc0",
+      "preview": "(resource_type, resource_id, subject_type, subject_id, permission, effect)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 746,
+      "language": "text",
+      "sha256": "30fbc2daba3ceb4a31a5a8d4ce5c4e8af1a19ad72af0a608972c3732f1205aab",
+      "preview": "(INVOICE, 42, USER, alice, READ, ALLOW)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 758,
+      "language": "text",
+      "sha256": "f036e93e0b8ef1a9086d801796df91effc1b32ea9b3627f029ed2f06dfb6a16e",
+      "preview": "resource = INVOICE:42",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 814,
+      "language": "text",
+      "sha256": "294e7d0608cf0898167d1ab7f565b322499b7aaafef2352b87028ad7476705e3",
+      "preview": "(INVOICE, 42, USER, alice, APPROVE, ALLOW)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 832,
+      "language": "text",
+      "sha256": "2ccd7d7e0e5a7d7b945de1b031d3a847da21046a64b967fb7314e316ac2a2a16",
+      "preview": "ALLOW = RBAC capability AND ACL object scope",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 900,
+      "language": "text",
+      "sha256": "45c860c24378b1acef65aad6c419a2795b767dc81d9e25b3968754e4a384a52c",
+      "preview": "ALLOW = hasAuthority('document:read-all') OR ACL READ",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1146,
+      "language": "text",
+      "sha256": "d28332b0590f9396eecfd37de1d79174f4e42df2626d937bb0cdc3bb44fbbac3",
+      "preview": "resource  resource_id  subject  permission",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1167,
+      "language": "text",
+      "sha256": "b09d109e0f6136c1a9004c37e9a18170561c5db9ebe3abcb73a61f1ed7b5f4d8",
+      "preview": "resource  resource_id  subject  permission_mask",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1251,
+      "language": "text",
+      "sha256": "0f99112a170ce49c8750cdebfdfc6bd04fe34486e59111ed129756f4302e9423",
+      "preview": "READ       0001",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1318,
+      "language": "text",
+      "sha256": "ae6ba6c67c7398a0540f0e0892fbfd54a5f6df79c79a7237788051ab35336e3d",
+      "preview": "Grant:      current | permission",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1338,
+      "language": "text",
+      "sha256": "3b52b20fea3636c096e87aff8144aa7a6f8ab739de3f73c17f24284af9a6bb3c",
+      "preview": "Granted    0011",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1347,
+      "language": "text",
+      "sha256": "78829a4c27d3cb643bbf9095f5c02d71ab96d3461f8710405974ccb77c01a674",
+      "preview": "Granted    0011",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1409,
+      "language": "text",
+      "sha256": "936bbd095b3a91edc29f6fc2b5e0cf84b1b8e00ea07ef7c27e2ded9574e92be3",
+      "preview": "resource_type = DOCUMENT",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1531,
+      "language": "text",
+      "sha256": "042b783096cc3af3980528c009d7360efebde3d27fd38a4b55484fe0760b2f47",
+      "preview": "Current     0011 = READ + WRITE",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1544,
+      "language": "text",
+      "sha256": "9105b0ad56e3daf51e40b9c266b62c6bce802ce8d6e674a3d1789509e21b2db6",
+      "preview": "Current     0111",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1577,
+      "language": "text",
+      "sha256": "793d5f68ed8d88aea56c87d129838c80993f969be127e7ed1ed1bdb05dd366c3",
+      "preview": "USER:alice  có READ       → 0001",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1602,
+      "language": "text",
+      "sha256": "70e482c2dd360e9e8acd789ccd9712203d50c15a05072d2724f8118afd36401d",
+      "preview": "Có bit  → ALLOW",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/access-control-models-rbac-acl.md",
+      "line": 1609,
+      "language": "text",
+      "sha256": "c79b62198de23ffb8b53f9fa5b3999977458c21d67458d004535622016d8a15f",
+      "preview": "allow_mask = các quyền được cấp",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/bean-lifecycle.md",
+      "line": 558,
+      "language": "java",
+      "sha256": "52e3e82a4b1463cee1fb992b38573d79e057d977d15a45755ab90efb636facb7",
+      "preview": "// 1. Scoped proxy:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/bean-lifecycle.md",
+      "line": 695,
+      "language": "plain",
+      "sha256": "c3ce1e255d97a38e46e8afd3067581e062a0b2c1df1b35510883da92e66a618a",
+      "preview": "1. BeanDefinition scan → BeanFactoryPostProcessor sửa def → Instantiate",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 39,
+      "language": "text",
+      "sha256": "b15246fa35c9a5ad2fdeb63cbbd641c9d7535fe742243fca897a724718b261f9",
+      "preview": "TCP handshake:         ~1ms (local), ~50ms (cross-region)",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 216,
+      "language": "plain",
+      "sha256": "f1058576fbcf4d4359ec310fdbab1a79b03291a08d100f2307644d1085da2648",
+      "preview": "pool_size = Tn × (Cm − 1) + 1",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 224,
+      "language": "plain",
+      "sha256": "6935be966a19fb2c678a15ec0f1f19c7a4beee9d129137da15ef77b9dff0236b",
+      "preview": "pool_size = 10 × (1 - 1) + 1 = 1 ← quá nhỏ! Vì công thức giả định perfect interleaving",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 230,
+      "language": "plain",
+      "sha256": "f4bcbf9455dc635576379774aca23431984f102dc11a37a57b946da7fe6cbc06",
+      "preview": "pool_size = CPU_cores × 2 + disk_spindles",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 235,
+      "language": "plain",
+      "sha256": "c3b0188b25396e32683cf9dc61066a716f5434862dc9eef8a16d5110384bb1dc",
+      "preview": "pool_size ≈ CPU_cores × 2 = 8 cores × 2 = 16",
+      "category": "formula-or-bit-arithmetic"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 244,
+      "language": "text",
+      "sha256": "7046a5d384422408030844eaae05b2426eed94d3020fa5f794e94deffcf975d0",
+      "preview": "Benchmark results (PostgreSQL, 8 cores, SSD):",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 283,
+      "language": "plain",
+      "sha256": "9bba6ca492bc21b9effdf28bcdd845f36d2c986249a405da20b7d5411ef3dbec",
+      "preview": "WARN  HikariPool - Connection leak detection triggered for conn0",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/connection-pool.md",
+      "line": 507,
+      "language": "plain",
+      "sha256": "ba35d70b7213b6eac54a0ed4f246ccf7ee029e4a3f0bd32ea31ff6b8a27e4351",
+      "preview": "1. HikariCP = lock-free pool dùng ConcurrentBag (thread-local → CAS → handoff)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/dispatcher-servlet.md",
+      "line": 987,
+      "language": "text",
+      "sha256": "765225c0ee4b54876efd56eadfbb064989f2e1ff428c8e69ecbfc096c26d42e0",
+      "preview": "1. DispatcherServlet#doDispatch",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/dispatcher-servlet.md",
+      "line": 1014,
+      "language": "text",
+      "sha256": "188e2d905c86ffb838b286bffd68b153a130db38c8a1735029d87404943f3793",
+      "preview": "1. Servlet container nhận HTTP request.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/kafka-spring-boot.md",
+      "line": 215,
+      "language": "plain",
+      "sha256": "21c25a00e160508542362f12979047cf612e28699985c2a107cac40ea183619c",
+      "preview": "Partition for group = Math.abs(groupId.hashCode()) % 50",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/kafka-spring-boot.md",
+      "line": 508,
+      "language": "plain",
+      "sha256": "1a5e15ee45883d21ec1924b046fbe150ad2bd2b2154843a9abb8b175a9c463d3",
+      "preview": "Kafka + Spring Boot = KafkaTemplate (produce) + @KafkaListener (consume)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/mdc-logging.md",
+      "line": 42,
+      "language": "text",
+      "sha256": "67cd307b4878098fd33f36ac6780ddc4354b937c40765e4ec446291f08d87e9f",
+      "preview": "Không có MDC:",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/mdc-logging.md",
+      "line": 54,
+      "language": "text",
+      "sha256": "6ca62a3b4592666f255aaaa25f85d11806aa22f5c56645d08846a20df1abbef4",
+      "preview": "INFO  [requestId=67f2... traceId=ab12...] OrderService - Creating order 42",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/mdc-logging.md",
+      "line": 175,
+      "language": "text",
+      "sha256": "e8239b82edd7f7e2a9aafec3c38cab60136a21d148f30872d7208e2158c993c7",
+      "preview": "10:31:49.117 INFO  [req:67f2c9 trace:4bf92f tenant:acme] c.example.OrderService - Creating order",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/mdc-logging.md",
+      "line": 253,
+      "language": "text",
+      "sha256": "1e56c809df1c561600fd91c3f80a3f98e58e78a5b8daed2d6cb721fb0d5b4d48",
+      "preview": "Ví dụ thứ tự:",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/mdc-logging.md",
+      "line": 546,
+      "language": "text",
+      "sha256": "ad4643d0bf0adf92ff85475900be0abfdd081ec8c2947f4d62d8e7574d32a29a",
+      "preview": "Servlet MVC: ThreadLocal MDC thường hợp lệ trong request đồng bộ.",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-aop.md",
+      "line": 103,
+      "language": "text",
+      "sha256": "02a4eec4062d02adf3c28306105514dbadd400456df8fd56b5e5f7c17351133f",
+      "preview": "Aspect = Pointcut (chạy ở đâu) + Advice (chạy việc gì)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-aop.md",
+      "line": 325,
+      "language": "text",
+      "sha256": "945c4ac215ff0402f4db04b5c5198d9d22b344e6311fcf49eb6689fa350227aa",
+      "preview": "execution(modifiers-pattern? ret-type-pattern declaring-type-pattern? name-pattern(param-pattern) throws-pattern?)",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 133,
+      "language": "java",
+      "sha256": "597d40e87c8e2910a78a4aabe8bc5c49b727e8add5e307a57a0e1a85cc6be4f8",
+      "preview": "// Rút gọn từ AutoConfigurationImportSelector.getAutoConfigurationEntry()",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 165,
+      "language": "plain",
+      "sha256": "f39d417480e93d31eccb0ba13a0277e0830339996301f42c00a72c8343115987",
+      "preview": "META-INF/spring.factories",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 174,
+      "language": "plain",
+      "sha256": "5c54143f97a3ba1f661647b9d87825f5ccb79e028bfb43d13f0ed8880f3f2d59",
+      "preview": "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 242,
+      "language": "java",
+      "sha256": "0a1fc3a634693c2d41e8cf707f65499a2f5fd7faf4097fbc3303dd90b06e1b8c",
+      "preview": "// Rút gọn từ ConfigurationClassParser",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 334,
+      "language": "java",
+      "sha256": "5945117a4afcd690f6607092ed1cb8aa188a14c687126f9b100218cae472d16f",
+      "preview": "@Conditional(OnClassCondition.class)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 359,
+      "language": "java",
+      "sha256": "5becdb04216c84bad4e813274bed5546caad48935dbd4567a4162f4f8b72927e",
+      "preview": "// OnBeanCondition.getMatchOutcome() — rút gọn:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 695,
+      "language": "plain",
+      "sha256": "f8f2108d636ea8d1809b10aaebf20a13711364d1fbdb9ac0464bbcf60d28ce51",
+      "preview": "spring-boot-starter-{name}          — official Spring Boot starters",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 702,
+      "language": "plain",
+      "sha256": "9b1c53e060e4c10ced46086f682db285cf859673617763a2d736a76fe91e6c2f",
+      "preview": "my-service-spring-boot-starter/          (POM — dependency aggregation)",
+      "category": "literal-file-listing"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 756,
+      "language": "plain",
+      "sha256": "05a9ba3aa0c47e6a9f55b2698f6921f9aa1e887ef46848b3d4145e18e7b3f44b",
+      "preview": "# src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 781,
+      "language": "text",
+      "sha256": "f32111b5c20e64e65f937420203adc6c68c63805e3d00bb752b9b81594fffa74",
+      "preview": "***************************",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 864,
+      "language": "text",
+      "sha256": "aecb2d6eb7e74e17a0e27333b84389d148f1b5304cf62298967fc0ea66518b80",
+      "preview": "============================",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/spring-boot-autoconfiguration.md",
+      "line": 1047,
+      "language": "plain",
+      "sha256": "98186414af28dbd5cd83879d0ac33449ec54e6b404858e8d75be5b80907749dd",
+      "preview": "1. @SpringBootApplication → @EnableAutoConfiguration → @Import(AutoConfigurationImportSelector)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 338,
+      "language": "java",
+      "sha256": "a83a6ed131152998cfdb768fdb305100962b73c8c1d4735a15148c6b308d028f",
+      "preview": "@Configuration",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 362,
+      "language": "java",
+      "sha256": "79bb1e9dc78aa5e821e9e31abb712fd146443661b2178c963556c0c303e2818f",
+      "preview": "// AppConfig$$EnhancerBySpringCGLIB:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 432,
+      "language": "java",
+      "sha256": "81f5c1a0adb1f39123978412fb44a606d21d775fecb5c652da2e4e87b258237e",
+      "preview": "// Rút gọn từ DefaultListableBeanFactory.determineAutowireCandidate()",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 644,
+      "language": "java",
+      "sha256": "aefde0c94df346c14d4eb84e5bc52f6d4dd5c1081fc753198beeec4122bb02d3",
+      "preview": "@Configuration",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 763,
+      "language": "plain",
+      "sha256": "8321d7b887090d09abeee131e0cf97337ecba7d75c28df4337e62d017651a9b9",
+      "preview": "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 834,
+      "language": "text",
+      "sha256": "85e4045ad105c79153d1ef7df87a88bf9a6200ed2199274b03247323dfc63718",
+      "preview": "============================",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 900,
+      "language": "java",
+      "sha256": "bdf0300d624e884167b3c2d468dd62165ca2bb4188873fcd0ced1b7ebb1e16a3",
+      "preview": "// 1) AutowiredAnnotationBeanPostProcessor phát hiện @Value",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 1031,
+      "language": "java",
+      "sha256": "a15b884225f4fa47a70e8155e57e0655bdc08532360d604d4eaf21c91026fbb8",
+      "preview": "@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-ioc-container.md",
+      "line": 1224,
+      "language": "plain",
+      "sha256": "4b4b8caf725932344adecb8281b622c00d92245e59b57a278671b8b661858038",
+      "preview": "1. SpringApplication.run() → tạo ApplicationContext (chứa DefaultListableBeanFactory)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-overview.md",
+      "line": 170,
+      "language": "plain",
+      "sha256": "91f80fe50fde6ebcc8a37e0da5b793270da0ee3474f1fbb772e2c4dd7210d78e",
+      "preview": "proxy.place():",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-overview.md",
+      "line": 192,
+      "language": "xml",
+      "sha256": "82e1e102e38f5957afa9d503e215c4a3c44fa1f9bf1a82346c2d41750fd80a82",
+      "preview": "<!-- Một dòng kéo về Tomcat + Spring MVC + Jackson + validation... -->",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-overview.md",
+      "line": 291,
+      "language": "plain",
+      "sha256": "e263a157fceef97ae2bb0913f4990e1a9b85853eeebd0c3ce96c2567ff746d11",
+      "preview": "IoC/DI → container TẠO + TIÊM dependency (bạn khai báo, không new)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 318,
+      "language": "text",
+      "sha256": "cecf1483131cff9c704488bb86ec7e15e67c216c7bb57dbac79eb0ce14120d9f",
+      "preview": "# JMH benchmark, JDK 17, 10M iterations, interface method call",
+      "category": "literal-log-or-output"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 527,
+      "language": "plain",
+      "sha256": "d2f73537d07c188d0946ab569e2cc2bda36f348417dbf3b22acd4619747107d9",
+      "preview": "Advisor = Pointcut + Advice",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 857,
+      "language": "java",
+      "sha256": "9f3f1735abd05e3cb1467fc9e479aba0ffdbea4a2457e2e2924804fb496eb023",
+      "preview": "// ScopedProxyFactoryBean tạo proxy với target source đặc biệt:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 882,
+      "language": "java",
+      "sha256": "f9aa8b53fabe63365cf2e69288ef6b2aa01ff50f853e0d40e9729fe6a5521c2a",
+      "preview": "// Khi Spring inject \"service\" vào Controller:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 1005,
+      "language": "java",
+      "sha256": "5ff668084b11cd8b7f39746cd3c9be2c7f80420135ed0307b488662b9507b6cf",
+      "preview": "// Nếu cùng lúc:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-proxy.md",
+      "line": 1026,
+      "language": "plain",
+      "sha256": "7a0be12bf17b0db9cda6380ceaf8e11c7efc1578605599c7c4042a0f87816e6b",
+      "preview": "1. Spring quét bean → BeanPostProcessor tìm Advisor match (Pointcut.matches)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 159,
+      "language": "java",
+      "sha256": "6a23df95ee29013bbcd77ba5d2369d1d04bd0f495dbee4fd9469fa54917eae96",
+      "preview": "// Rút gọn từ FilterChainProxy.VirtualFilterChain",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 338,
+      "language": "java",
+      "sha256": "54e2deebbff40f1858af5ac459f0a7f84ac31eba66135768a049cfd526857ec4",
+      "preview": "// Rút gọn từ ProviderManager",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 426,
+      "language": "java",
+      "sha256": "3d5e97b95a7b7cc3b5d0b60856d3dc0a8b7c2fd7a8cf5c67499bd06c57493e38",
+      "preview": "// Rút gọn từ DaoAuthenticationProvider (extends AbstractUserDetailsAuthenticationProvider)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 654,
+      "language": "text",
+      "sha256": "0258892b8a1e255ff9a9764cb015141901e7c82481f025f2357b976400c8e862",
+      "preview": "$2a$12$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 685,
+      "language": "plain",
+      "sha256": "c453f40c3ae06e1b4fb245ff4f53fe1abd4eefaa260a6606f82ee30d0eb125b6",
+      "preview": "{bcrypt}$2a$10$N9qo8uLOickgx...     ← BCrypt",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 723,
+      "language": "java",
+      "sha256": "1e0f4b72be25bb88343a4d114126924f99fa6c4638240926a614e90df5ff0f4f",
+      "preview": "// Rút gọn từ AuthorizationFilter (thay thế FilterSecurityInterceptor từ Spring Security 6)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 755,
+      "language": "java",
+      "sha256": "14cf5e69be76463ed1388499ed67720bf5bd16ed080ed85338a06020673ebaf2",
+      "preview": "// DSL config:",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 861,
+      "language": "java",
+      "sha256": "13454efc565650181deec546aa566cc61095334a29cffe2df4477a74dffd8ebf",
+      "preview": "// Rút gọn từ ExceptionTranslationFilter",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 960,
+      "language": "java",
+      "sha256": "521a1ec0bdf5b084d4a351886b9fee91617fb76df5516763bb2f3db6f4cedd73",
+      "preview": "// Rút gọn từ BearerTokenAuthenticationFilter",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 1206,
+      "language": "plain",
+      "sha256": "becc5d1a1fb2fb1adf33026796a129b8faa790837d007ee2f58e2073f10371f6",
+      "preview": "OPTIONS /api/data HTTP/1.1",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 1214,
+      "language": "plain",
+      "sha256": "1492318eccf120f2fa56568cba75d9829c09767300c352e2607d47bc58101a8a",
+      "preview": "Access-Control-Allow-Origin: https://frontend.com",
+      "category": "payload-or-configuration"
+    },
+    {
+      "path": "spring/spring-security.md",
+      "line": 1431,
+      "language": "plain",
+      "sha256": "3f5afaecfc988027e7fefcc8e02223e36a20640fc7d0dfa1827c2dddc8bb3e8c",
+      "preview": "1.  Request → Tomcat → DelegatingFilterProxy → FilterChainProxy (Spring Bean)",
+      "category": "reference-table-or-prose"
+    },
+    {
+      "path": "spring/spring-transaction.md",
+      "line": 784,
+      "language": "java",
+      "sha256": "d06d7b19cfe512cfc9d4b5cb2c7a8f054c52fad5408187d4c00ef58c02d899f7",
+      "preview": "@Transactional",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-transaction.md",
+      "line": 975,
+      "language": "java",
+      "sha256": "130f38cccb60c2e922957316da83b991a6ba051364cf2f207d44d9b1d06dac1c",
+      "preview": "@Transactional(readOnly = true)",
+      "category": "code-or-pseudocode"
+    },
+    {
+      "path": "spring/spring-transaction.md",
+      "line": 1174,
+      "language": "java",
+      "sha256": "83e66b88ff98bb9c3546b119b575521781f6da5cebe021d3ccee0ab6455bd906",
+      "preview": "// ❌ Sai — giữ connection suốt thời gian gọi API",
+      "category": "code-or-pseudocode"
+    }
+  ]
+}

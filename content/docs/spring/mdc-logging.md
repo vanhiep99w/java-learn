@@ -466,10 +466,13 @@ Mỗi message phải set/clear context độc lập vì listener container cũng
 
 Sau khi Spring Security authenticate thành công, application có thể thêm `userId` hoặc `tenantId` vào MDC. Nhưng cần hiểu thứ tự:
 
-```text
-CorrelationIdFilter
-  → Spring Security authentication filters
-    → DispatcherServlet / controller
+```d2 title="Correlation ID được gắn trước authentication"
+direction: down
+n0: "CorrelationIdFilter"
+n1: "Spring Security authentication filters"
+n2: "DispatcherServlet / controller"
+n0 -> n1
+n1 -> n2
 ```
 
 Correlation ID nên do filter chạy sớm tạo. User identity chỉ nên thêm **sau khi** security context hợp lệ. Có ba cách thường gặp:
@@ -680,20 +683,30 @@ Ví dụ nếu cần liên kết theo email nhưng không cần đọc email, lo
 
 ## 14. Tóm tắt
 
-```text
-MDC = metadata logging gắn với execution context hiện tại.
-
-Spring MVC đồng bộ:
-  Filter → MDC.put(requestId) → Controller/Service logs → finally MDC.clear()
-
-Async/executor:
-  Caller MDC snapshot → TaskDecorator → worker MDC → finally restore/clear
-
-Messaging:
-  Header/event metadata → set MDC cho từng message → finally clear
-
-WebFlux:
-  Reactor Context là source of truth; MDC chỉ là projection lúc ghi log.
+```d2 title="MDC theo execution context"
+direction: right
+r0n0: "MVC đồng bộ: Filter"
+r0n1: "MDC.put(requestId)"
+r0n2: "Controller/Service logs"
+r0n3: "finally MDC.clear()"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Async/executor: Caller MDC snapshot"
+r1n1: "TaskDecorator"
+r1n2: "Worker MDC"
+r1n3: "finally restore/clear"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
+r2n0: "Messaging: Header/event metadata"
+r2n1: "Set MDC từng message"
+r2n2: "finally clear"
+r2n0 -> r2n1
+r2n1 -> r2n2
+r3n0: "WebFlux: Reactor Context là source of truth"
+r3n1: "MDC chỉ projection lúc ghi log"
+r3n0 -> r3n1
 ```
 
 | Thành phần | Trách nhiệm |

@@ -343,15 +343,23 @@ protected final boolean tryReleaseShared(int releases) {
 }
 ```
 
-```
-state = 3 (3 permits)
-Thread A: acquire(1) → state = 2, success
-Thread B: acquire(1) → state = 1, success
-Thread C: acquire(1) → state = 0, success
-Thread D: acquire(1) → state would be -1 → FAIL → enqueue, park
-
-Thread A: release(1) → state = 1 → unpark Thread D
-Thread D: retry acquire(1) → state = 0, success!
+```d2 title="Semaphore: state, acquire và release"
+grid-rows: 4
+grid-columns: 2
+n0: "state=3 (3 permits)"
+n1: "Thread A: acquire(1)\nstate=2, success"
+n3: "Thread C: acquire(1)\nstate=0, success"
+n2: "Thread B: acquire(1)\nstate=1, success"
+n4: "Thread D: acquire(1)\nstate sẽ là -1 → FAIL\nenqueue, park"
+n5: "Thread A: release(1)\nstate=1, unpark Thread D"
+n7: "" {style.opacity: 0}
+n6: "Thread D retry acquire(1)\nstate=0, success"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 ---
@@ -408,11 +416,12 @@ static int sharedCount(int c)    { return c >>> SHARED_SHIFT; }  // read count
 static int exclusiveCount(int c) { return c & EXCLUSIVE_MASK; }  // write count
 ```
 
-```
-state = 0x00030002
-         ^^^^ ^^^^
-         │    └── write lock held 2 times (reentrant)
-         └────── 3 readers currently holding read lock
+```d2 title="Read/write count trong state AQS"
+direction: right
+state: "state = 0x00030002" {
+  read: "16 bit cao: 0x0003\n3 readers đang giữ read lock"
+  write: "16 bit thấp: 0x0002\nwrite lock reentrant 2 lần"
+}
 ```
 
 **Read lock acquire** (shared mode):

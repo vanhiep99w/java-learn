@@ -145,8 +145,13 @@ JDK 9+ thay đổi lớn: **Module System** (JPMS) thay thế Extension ClassLoa
 
 ClassLoader đọc bytecode (`.class` file) từ nguồn (file system, JAR, network, database...) và tạo `java.lang.Class` object trong Metaspace:
 
-```
-.class file (bytes) → ClassLoader.defineClass() → Class<?> object
+```d2 title="defineClass tạo đối tượng Class"
+direction: down
+n0: ".class file (bytes)"
+n1: "ClassLoader.defineClass()"
+n2: "Class<?> object"
+n0 -> n1
+n1 -> n2
 ```
 
 Ở phase này: class đã tồn tại trong JVM nhưng **chưa dùng được** — chưa verify, chưa resolve references.
@@ -359,11 +364,18 @@ jmap -dump:live,format=b,file=heap.hprof <pid>
 
 JDK 9 thêm **Java Platform Module System (JPMS)**:
 
-```
-JDK 8:   Bootstrap → Extension → Application
-JDK 9+:  Bootstrap → Platform → Application
-                        ↑
-                  (thay Extension, scope khác)
+```d2 title="ClassLoader chain thay đổi từ Java 9"
+direction: right
+r0n0: "JDK 8: Bootstrap"
+r0n1: "Extension"
+r0n2: "Application"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "JDK 9+: Bootstrap"
+r1n1: "Platform (thay Extension, scope khác)"
+r1n2: "Application"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 | Thay đổi | Hệ quả |

@@ -185,9 +185,21 @@ Quy tắc resolution: khớp field **theo tên** (không theo vị trí); field 
 
 Trong hệ Kafka, gửi schema JSON kèm *mỗi* message vẫn lãng phí. **Schema Registry** (Confluent) lưu schema tập trung, mỗi message chỉ mang một **schema ID** (vài byte):
 
-```
+```text
 message trên Kafka = [magic byte][schema ID 4 byte][dữ liệu Avro trần]
-consumer: lấy schema ID → hỏi registry → lấy writer schema → resolve với reader schema
+```
+
+Đây là layout payload thực; consumer dùng schema ID theo luồng sau.
+
+```d2 title="Avro consumer resolve schema từ schema ID"
+direction: down
+n0: "Consumer lấy schema ID"
+n1: "Hỏi registry"
+n2: "Lấy writer schema"
+n3: "Resolve với reader schema"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Registry còn **ép luật tương thích** (compatibility mode: BACKWARD/FORWARD/FULL) — từ chối schema mới nếu nó phá vỡ tương thích, chặn bug evolution ngay lúc deploy.

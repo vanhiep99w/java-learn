@@ -166,11 +166,20 @@ Mấu chốt là `Subscription.request(n)`: consumer **chủ động kéo** đú
 
 HTTP/2 hỗ trợ **multiplexing** (nhiều stream song song trên một kết nối TCP) và streaming hai chiều ở tầng giao thức. **gRPC** (trên HTTP/2) cho 4 kiểu:
 
-```
-Unary:           1 request → 1 response          (như REST thường)
-Server streaming: 1 request → N response          (vd tải danh sách lớn dần)
-Client streaming: N request → 1 response          (vd upload chunks)
-Bidirectional:   N request ↔ N response          (chat, đồng bộ real-time)
+```d2 title="Bốn dạng gRPC streaming"
+direction: right
+r0n0: "Unary: 1 request"
+r0n1: "1 response (như REST thường)"
+r0n0 -> r0n1
+r1n0: "Server streaming: 1 request"
+r1n1: "N response (danh sách lớn dần)"
+r1n0 -> r1n1
+r2n0: "Client streaming: N request"
+r2n1: "1 response (upload chunks)"
+r2n0 -> r2n1
+r3n0: "Bidirectional: N request"
+r3n1: "N response (chat, đồng bộ real-time)"
+r3n0 <-> r3n1
 ```
 
 > [!TIP]

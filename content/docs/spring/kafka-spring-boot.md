@@ -58,17 +58,21 @@ cluster.b2 -> consumer
 
 ### 2.1. Partition = parallelism
 
-```
-Topic "orders" (3 partitions):
-
-Partition 0: [msg0][msg3][msg6][msg9]...
-Partition 1: [msg1][msg4][msg7][msg10]...
-Partition 2: [msg2][msg5][msg8][msg11]...
-
-Consumer Group "order-service" (3 instances):
-  Consumer A ← P0
-  Consumer B ← P1
-  Consumer C ← P2
+```d2 title="Topic partitions và consumer assignment"
+direction: down
+topic: "Topic orders — 3 partitions" {
+  p0: "Partition 0: msg0, msg3, msg6, msg9, …"
+  p1: "Partition 1: msg1, msg4, msg7, msg10, …"
+  p2: "Partition 2: msg2, msg5, msg8, msg11, …"
+}
+group: "Consumer Group order-service — 3 instances" {
+  a: "Consumer A"
+  b: "Consumer B"
+  c: "Consumer C"
+}
+topic.p0 -> group.a
+topic.p1 -> group.b
+topic.p2 -> group.c
 ```
 
 > [!NOTE]
@@ -181,18 +185,27 @@ n_GC -> n_C2: "SyncResponse (your partitions: P1)"
 
 ### 5.1. At-least-once vs At-most-once
 
-```
-At-least-once (commit SAU xử lý):
-  poll → process → commit
-  Crash after process, before commit → re-process (DUPLICATE)
-
-At-most-once (commit TRƯỚC xử lý):
-  poll → commit → process
-  Crash after commit, before process → LOST message
-
-Exactly-once:
-  poll → process + commit TRONG CÙNG transaction
-  Cần: Kafka transaction + idempotent consumer
+```d2 title="Offset commit quyết định delivery semantics"
+direction: right
+r0n0: "At-least-once: poll"
+r0n1: "Process"
+r0n2: "Commit SAU xử lý"
+r0n3: "Crash sau process trước commit → re-process (DUPLICATE)"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "At-most-once: poll"
+r1n1: "Commit TRƯỚC xử lý"
+r1n2: "Process"
+r1n3: "Crash sau commit trước process → LOST message"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
+r2n0: "Exactly-once: poll"
+r2n1: "Process + commit TRONG CÙNG transaction"
+r2n2: "Kafka transaction + idempotent consumer"
+r2n0 -> r2n1
+r2n1 -> r2n2
 ```
 
 ### 5.2. `__consumer_offsets` internals — offset lưu ở đâu?
@@ -214,9 +227,15 @@ Ví dụ:
 **Compaction**: Topic dùng `log.cleanup.policy=compact` — Kafka chỉ giữ **latest offset** cho mỗi [group, topic, partition] key. Old entries bị nén → topic nhỏ gọn.
 
 **Group Coordinator** = broker hosting partition chứa group:
-```
-group "order-service" → hash % 50 = partition 12
-→ Broker là leader của __consumer_offsets partition 12 = Group Coordinator
+```d2 title="Group coordinator từ __consumer_offsets"
+direction: down
+n0: "group order-service"
+n1: "hash % 50 = partition 12"
+n2: "Broker leader của __consumer_offsets partition 12"
+n3: "Group Coordinator"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 > [!NOTE]

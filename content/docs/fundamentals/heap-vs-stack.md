@@ -322,10 +322,16 @@ Người ta hay nói "cấp phát heap chậm". Với HotSpot hiện đại, c�
 - Cấp phát = **tăng một con trỏ** (bump-the-pointer) trong TLAB của thread → không cần khóa, không tranh chấp.
 - Chỉ khi TLAB đầy mới xin buffer mới (hiếm, có khóa).
 
-```
-Eden:  [─── TLAB thread A ───][─── TLAB thread B ───][ free ... ]
-                    ▲ ptr                    ▲ ptr
-  new Object() = ptr += size  (một lệnh tăng con trỏ, không khóa)
+```d2 title="Eden chia TLAB riêng cho mỗi thread"
+direction: right
+eden: Eden {
+  a: "TLAB thread A\nallocation ptr A"
+  b: "TLAB thread B\nallocation ptr B"
+  free: "free …"
+}
+allocation: "new Object() = ptr += size\nmột lệnh tăng con trỏ, không khóa"
+allocation -> eden.a: "thread A"
+allocation -> eden.b: "thread B"
 ```
 
 Kết hợp với **generational GC**: object trẻ chết sớm được dọn cực rẻ trong minor GC (copy số ít object còn sống sang survivor). Đây là lý do phong cách "tạo nhiều object nhỏ sống ngắn" trong Java thường **chấp nhận được** về hiệu năng — khác hẳn trực giác từ C/C++.

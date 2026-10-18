@@ -1062,8 +1062,15 @@ Nếu chưa chắc, bắt đầu từ DTO cho read-only API; dùng fetch join ho
 
 **Cheat sheet một dòng:**
 
-```text
-Mapping LAZY → query khai báo fetch plan → map DTO trong transaction → đo SQL và số row
+```d2 title="Chọn fetch plan và kiểm chứng"
+direction: down
+n0: "Mapping LAZY"
+n1: "Query khai báo fetch plan"
+n2: "Map DTO trong transaction"
+n3: "Đo SQL và số row"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 ## 15. Tài liệu liên quan

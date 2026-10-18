@@ -140,10 +140,13 @@ count++;   // ← BUG: không phải một thao tác
 
 `count++` biên dịch thành **3 bước**:
 
-```
-1. READ  count     → register (giá trị: 5)
-2. ADD   1         → register (giá trị: 6)
-3. WRITE register  → count
+```d2 title="count++ là ba thao tác riêng"
+direction: down
+n0: "READ count → register (5)"
+n1: "ADD 1 → register (6)"
+n2: "WRITE register → count"
+n0 -> n1
+n1 -> n2
 ```
 
 Với volatile, mỗi bước riêng lẻ là visible. Nhưng **giữa** READ và WRITE, thread khác có thể chen vào:
@@ -238,16 +241,10 @@ n_A -> n_B: "JDK 15+ deprecated" { style.stroke-dash: 3 }
 
 Giả thuyết: đa số lock chỉ có **1 thread** sử dụng. Biased lock **gắn** lock cho thread đầu tiên acquire — lần acquire tiếp theo **zero overhead** (chỉ check thread ID trong object header).
 
-```
-Object header (64 bits, normal):
-┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [hash:25 | age:4 | biased:1 | lock_state:2]  │
-└─────────────────────────────────────────────────────────┘
-
-Biased state: thread_id thay vào vị trí hash
-┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [thread_id:54 | epoch:2 | age:4 | 1 | 01]    │
-└─────────────────────────────────────────────────────────┘
+```d2 title="Mark Word thường và biased (layout minh họa cũ)"
+direction: down
+n0: "Object header / Mark Word 64 bits (normal)\nhash:25 | age:4 | biased:1 | lock_state:2"
+n1: "Biased: thread_id thay vị trí hash\nthread_id:54 | epoch:2 | age:4 | 1 | 01"
 ```
 
 > [!NOTE]
@@ -261,12 +258,11 @@ Khi có thread thứ 2 cố acquire:
 3. Nếu CAS thành công → acquire
 4. Nếu CAS thất bại → **spin** (busy-wait vài lần)
 
-```
-Thin lock state:
-┌─────────────────────────────────────────────────────────┐
-│ Mark Word: [ptr_to_lock_record:62 | 00]                 │
-└─────────────────────────────────────────────────────────┘
-Lock record nằm trên stack frame của owning thread
+```d2 title="Thin lock trỏ tới lock record trên stack"
+direction: right
+mark: "Thin lock Mark Word\nptr_to_lock_record:62 | 00"
+record: "Lock record\nstack frame của owning thread"
+mark -> record: "pointer"
 ```
 
 ### 6.3. Fat Lock (Heavyweight / OS mutex)
@@ -490,17 +486,22 @@ static final class Cell {
 
 **`@Contended`** thêm **128 bytes padding** xung quanh mỗi Cell → mỗi Cell nằm trên **cache line riêng** (64B hoặc 128B):
 
-```
-Không padding (false sharing):
-Cache line 64B: [Cell0.value | Cell1.value | ...]
-  → Thread 0 ghi Cell0 → invalidate cache line → Thread 1 phải reload Cell1
-  → Performance collapse!
-
-Có @Contended padding:
-Cache line: [pad...pad | Cell0.value | pad...pad]
-Cache line: [pad...pad | Cell1.value | pad...pad]
-  → Thread 0 ghi Cell0 → KHÔNG ảnh hưởng Cell1
-  → Zero false sharing!
+```d2 title="False sharing và @Contended"
+direction: down
+shared: "Không padding — cache line 64B" {
+  c0: "Cell0.value"
+  c1: "Cell1.value"
+  rest: "…"
+}
+t0: "Thread 0 ghi Cell0"
+t1: "Thread 1 phải reload Cell1\nperformance collapse"
+t0 -> shared.c0
+shared.c0 -> shared.c1: "invalidate cùng cache line"
+shared.c1 -> t1
+padded0: "Có @Contended\nline riêng: pad | Cell0.value | pad"
+padded1: "line riêng: pad | Cell1.value | pad"
+t0 -> padded0: "ghi, KHÔNG ảnh hưởng Cell1"
+padded1.tooltip: "Zero false sharing trong ví dụ này"
 ```
 
 **Flow khi LongAdder.add(1):**

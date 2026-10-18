@@ -69,17 +69,23 @@ Trước JDK 21, một Java `Thread` thông thường tương ứng gần như 1
 
 Ví dụ một service có 200 request đồng thời. Mỗi request mất 5 ms CPU nhưng chờ database 95 ms:
 
-```text
-Mỗi request: [CPU 5 ms] ── [chờ DB 95 ms] ── [CPU 5 ms]
-
-Platform thread pool 200 threads:
-- 200 OS threads phần lớn đang chờ DB.
-- Muốn nhận thêm request thường phải tăng pool và tăng OS resources.
-
-Virtual thread:
-- Request chờ DB → virtual thread được tạm dừng.
-- Carrier thread được rảnh để chạy request khác.
-- Có thể giữ nhiều request đang chờ hơn với ít OS thread hơn.
+```d2 title="I/O wait: platform threads và virtual threads"
+direction: right
+r0n0: "Mỗi request: CPU 5ms"
+r0n1: "Chờ DB 95ms"
+r0n2: "CPU 5ms"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "Platform pool 200 threads"
+r1n1: "200 OS threads phần lớn chờ DB"
+r1n2: "Nhận thêm request thường phải tăng pool và OS resources"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r2n0: "Virtual thread chờ DB"
+r2n1: "VT suspend, carrier rảnh chạy request khác"
+r2n2: "Nhiều request chờ với ít OS thread hơn"
+r2n0 -> r2n1
+r2n1 -> r2n2
 ```
 
 Virtual Threads không rút thời gian DB trả lời từ 95 ms xuống 10 ms. Chúng giảm số OS thread bị lãng phí khi chờ. Vì thế lợi ích chính thường là **throughput cao hơn ở mức concurrency lớn**, không phải mỗi request tự nhiên có latency thấp hơn.
@@ -117,22 +123,42 @@ Carrier là platform thread thật. Hệ điều hành vẫn chỉ schedule plat
 
 Một VT ở một thời điểm có thể đang chạy, đang chờ, hoặc đã kết thúc:
 
-```text
-1. VT được mount lên carrier và chạy Java code.
-2. VT gọi blocking operation, ví dụ socket read hoặc Semaphore.acquire().
-3. JVM suspend VT; trạng thái call stack của VT được giữ để tiếp tục sau.
-4. VT unmount; carrier được trả về scheduler để chạy VT khác.
-5. Khi I/O/permit sẵn sàng, JVM mount lại VT lên một carrier bất kỳ.
-6. VT tiếp tục ngay sau lệnh blocking, như thể chưa từng bị tạm dừng.
+```d2 title="Virtual thread: mount, unmount và resume"
+direction: down
+n0: "VT mount lên carrier, chạy Java code"
+n1: "Blocking operation\nsocket read hoặc Semaphore.acquire()"
+n2: "JVM suspend VT\ngiữ call stack để tiếp tục"
+n3: "VT unmount\ncarrier về scheduler chạy VT khác"
+n4: "I/O hoặc permit sẵn sàng\nmount VT lên carrier bất kỳ"
+n5: "VT tiếp tục sau lệnh blocking"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
-```text
-Thời gian ─────────────────────────────────────────────────────────►
-
-Carrier 1:  [VT-A xử lý] [VT-B xử lý] [VT-C xử lý] [VT-A tiếp tục]
-Carrier 2:  [VT-D xử lý] [VT-E xử lý] [VT-F xử lý]
-
-VT-A:       [run] ── socket.read() ── [waiting, unmounted] ── [run]
+```d2 title="Carrier tiếp tục công việc khi VT-A unmount"
+direction: right
+r0n0: "Carrier 1: VT-A xử lý"
+r0n1: "VT-B xử lý"
+r0n2: "VT-C xử lý"
+r0n3: "VT-A tiếp tục"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Carrier 2: VT-D xử lý"
+r1n1: "VT-E xử lý"
+r1n2: "VT-F xử lý"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r2n0: "VT-A: run"
+r2n1: "socket.read()"
+r2n2: "waiting, unmounted"
+r2n3: "run"
+r2n0 -> r2n1
+r2n1 -> r2n2
+r2n2 -> r2n3
 ```
 
 Code ứng dụng vẫn là code tuần tự, blocking và dễ đọc. Việc suspend/resume là chi tiết của JVM; không nên dựa vào carrier cụ thể nào đang chạy VT.
@@ -141,12 +167,24 @@ Code ứng dụng vẫn là code tuần tự, blocking và dễ đọc. Việc s
 
 Nói chính xác, một carrier **không chạy nhiều VT cùng lúc**. Tại một thời điểm nó chỉ thực thi một VT, giống như một CPU core chỉ thực thi một luồng lệnh tại một thời điểm. JVM tạo cảm giác một carrier “phục vụ nhiều VT” bằng cách chuyển carrier sang VT khác ngay khi VT hiện tại không còn làm việc hữu ích mà đang chờ.
 
-```text
-Carrier 1:
-[ chạy VT-A ] [ VT-A chờ I/O ] [ chạy VT-B ] [ chạy VT-C ] [ chạy lại VT-A ]
-
-VT-A:
-[ parse request ] ── socket.read() ── [ waiting ] ── [ xử lý response ]
+```d2 title="Tách trạng thái VT-A khỏi công việc của carrier"
+direction: right
+r0n0: "Carrier 1 chạy VT-A"
+r0n1: "VT-A chờ I/O → carrier rảnh"
+r0n2: "Carrier chạy VT-B"
+r0n3: "Carrier chạy VT-C"
+r0n4: "Carrier chạy lại VT-A"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r0n3 -> r0n4
+r1n0: "VT-A parse request"
+r1n1: "socket.read()"
+r1n2: "waiting (không chiếm carrier nếu unmount được)"
+r1n3: "xử lý response"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 Ví dụ, khi VT gọi `httpClient.send(...)`, nó đi qua chuỗi sau:

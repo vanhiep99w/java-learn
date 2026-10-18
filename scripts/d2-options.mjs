@@ -3,6 +3,7 @@ import { parseDocument } from 'yaml';
 export const D2_LAYOUTS = Object.freeze(['elk', 'dagre', 'tala']);
 export const d2Options = Object.freeze({
   layout: 'elk',
+  assetsRoot: 'content/assets/d2',
   cacheDir: '.next/cache/docs-kit/d2',
   defaultCaption: 'Sơ đồ',
 });

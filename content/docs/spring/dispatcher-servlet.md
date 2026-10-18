@@ -78,17 +78,21 @@ Servlet không tự mở port hay đọc socket. Container làm việc đó, t�
 
 Container quản lý lifecycle này:
 
-```text
-Application startup
-  → tạo servlet instance
-  → init(ServletConfig)        // một lần
-
-Mỗi HTTP request match mapping
-  → service(request, response)
-  → HttpServlet phân nhánh tới doGet/doPost/doPut/...
-
-Application shutdown
-  → destroy()                  // một lần
+```d2 title="Servlet: startup, request và shutdown"
+direction: right
+r0n0: "Application startup"
+r0n1: "Tạo servlet instance"
+r0n2: "init(ServletConfig): một lần"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "Mỗi HTTP request match mapping"
+r1n1: "service(request,response)"
+r1n2: "HttpServlet chọn doGet/doPost/doPut/…"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r2n0: "Application shutdown"
+r2n1: "destroy(): một lần"
+r2n0 -> r2n1
 ```
 
 Một servlet instance thường phục vụ nhiều request đồng thời trên nhiều container thread. Vì vậy không lưu state theo request vào instance field:
@@ -111,10 +115,17 @@ Servlet mapping có độ ưu tiên. Mapping chính xác hoặc dài hơn thư�
 
 Hoàn toàn **có thể** viết nhiều servlet:
 
-```text
-/orders/*   → OrdersServlet
-/users/*    → UsersServlet
-/payments/* → PaymentsServlet
+```d2 title="Servlet mapping theo URL"
+direction: right
+r0n0: "/orders/*"
+r0n1: "OrdersServlet"
+r0n0 -> r0n1
+r1n0: "/users/*"
+r1n1: "UsersServlet"
+r1n0 -> r1n1
+r2n0: "/payments/*"
+r2n1: "PaymentsServlet"
+r2n0 -> r2n1
 ```
 
 Đây là cách hợp lý với ứng dụng Servlet nhỏ hoặc endpoint có protocol đặc biệt. Nhưng khi application tăng lên, mỗi servlet phải tự lặp lại hoặc tự xây framework riêng cho các concern giống nhau:
@@ -338,42 +349,55 @@ protected void doDispatch(HttpServletRequest request,
 
 Flow đầy đủ hơn:
 
-```mermaid
-sequenceDiagram
-    participant F as Filter chain
-    participant DS as DispatcherServlet
-    participant HM as HandlerMapping
-    participant HI as HandlerInterceptors
-    participant HA as HandlerAdapter
-    participant C as Controller
-    participant ER as ExceptionResolver
-    participant V as View/MessageConverter
-
-    F->>DS: service(request, response)
-    DS->>DS: checkMultipart()
-    DS->>HM: getHandler(request)
-    HM-->>DS: HandlerExecutionChain
-    DS->>HA: supports(handler)?
-    DS->>HI: preHandle() theo thứ tự
-    alt preHandle trả false
-        HI-->>DS: dừng chain
-    else tiếp tục
-        DS->>HA: handle(request, response, handler)
-        HA->>C: invoke controller method
-        alt controller ném exception
-            C-->>DS: exception
-            DS->>ER: resolveException()
-            ER-->>DS: ModelAndView / ghi response
-        else controller return kết quả
-            C-->>HA: return value
-            HA-->>DS: ModelAndView hoặc response đã ghi
-        end
-        DS->>HI: postHandle() theo thứ tự ngược
-        DS->>V: render view / write body
-        DS->>HI: afterCompletion() theo thứ tự ngược
-    end
-    DS-->>F: response
+```d2 interactive title="DispatcherServlet: chọn handler và kiểm tra preHandle"
+shape: sequence_diagram
+f: "Filter chain"
+ds: DispatcherServlet
+hm: HandlerMapping
+ha: HandlerAdapter
+hi: HandlerInterceptors
+f -> ds: "service(request, response)"
+ds -> ds: "checkMultipart()"
+ds -> hm: "getHandler(request)"
+hm -> ds: "HandlerExecutionChain"
+ds -> ha: "supports(handler)?"
+ds -> hi: "preHandle() theo thứ tự"
+stop: "Nếu preHandle trả false" {
+  hi -> ds: "dừng chain; không invoke controller"
+  ds -> hi: "afterCompletion cho interceptor đã preHandle thành công"
+  ds -> f: "response"
+}
 ```
+
+Nếu tất cả `preHandle` cho phép tiếp tục, DispatcherServlet dùng HandlerAdapter gọi controller. Hai nhánh return/exception dưới đây loại trừ nhau; `postHandle` chỉ chạy khi handler thành công, không chạy khi controller ném exception. Body `@ResponseBody` có thể đã được MessageConverter ghi trong HandlerAdapter; render view chỉ cần khi có ModelAndView.
+
+```d2 interactive title="DispatcherServlet: kết quả controller và nhánh exception"
+shape: sequence_diagram
+ds: DispatcherServlet
+ha: HandlerAdapter
+c: Controller
+hi: HandlerInterceptors
+er: ExceptionResolver
+v: "View / MessageConverter"
+f: "Filter chain"
+ds -> ha: "handle(request, response, handler)"
+ha -> c: "invoke controller method"
+ok: "Controller return kết quả" {
+  c -> ha: "return value"
+  ha -> ds: "ModelAndView hoặc response đã ghi"
+  ds -> hi: "postHandle() theo thứ tự ngược"
+}
+fail: "Controller ném exception (nhánh thay thế)" {
+  c -> ds: "exception qua HandlerAdapter"
+  ds -> er: "resolveException()"
+  er -> ds: "ModelAndView / ghi response"
+}
+ds -> v: "render view nếu cần / body đã được converter ghi"
+ds -> hi: "afterCompletion() theo thứ tự ngược"
+ds -> f: "response"
+```
+
+Exception chưa resolve được tiếp tục propagate ra filter/container; `afterCompletion` nhận lỗi tương ứng. Exception đã resolve thường dẫn tới completion không kèm exception. Sơ đồ mô tả request đồng bộ, không gộp async dispatch vào nhánh này.
 
 Điểm quan trọng: controller không tự quyết định tất cả. Handler adapter xử lý argument resolution, data binding, validation và return value handling trước khi DispatcherServlet render hoặc hoàn tất response.
 
@@ -518,10 +542,29 @@ public interface HandlerInterceptor {
 
 Thứ tự callback với ba interceptors A, B, C:
 
-```text
-A.preHandle → B.preHandle → C.preHandle → Controller
-Controller → C.postHandle → B.postHandle → A.postHandle
-Render response → C.afterCompletion → B.afterCompletion → A.afterCompletion
+```d2 title="Interceptor: forward preHandle, reverse completion"
+direction: right
+r0n0: "A.preHandle"
+r0n1: "B.preHandle"
+r0n2: "C.preHandle"
+r0n3: "Controller"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Controller"
+r1n1: "C.postHandle"
+r1n2: "B.postHandle"
+r1n3: "A.postHandle"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
+r2n0: "Render response"
+r2n1: "C.afterCompletion"
+r2n2: "B.afterCompletion"
+r2n3: "A.afterCompletion"
+r2n0 -> r2n1
+r2n1 -> r2n2
+r2n2 -> r2n3
 ```
 
 `preHandle()` trả `false` dừng chain. Khi đó controller không chạy, các interceptor chưa chạy `preHandle` sẽ không được gọi, còn interceptor trước đó vẫn được `afterCompletion()` để cleanup.

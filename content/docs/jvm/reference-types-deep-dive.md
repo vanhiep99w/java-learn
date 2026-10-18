@@ -325,12 +325,17 @@ Reference<?> ref = queue.remove(5000); // timeout 5s
 
 **Flow GC → ReferenceQueue:**
 
-```
-1. GC mark phase: phát hiện object chỉ weakly/softly/phantom reachable
-2. GC clear reference: ref.referent = null
-3. GC enqueue reference vào queue (nếu reference có queue)
-4. Application thread poll queue → biết object đã bị GC
-5. Application cleanup (remove from map, free resource, ...)
+```d2 title="Reference processing và cleanup"
+direction: down
+n0: "GC mark phát hiện object chỉ weakly/softly/phantom reachable"
+n1: "GC clear ref.referent=null"
+n2: "GC enqueue reference nếu có queue"
+n3: "Application thread poll queue\nbiết object đã bị GC"
+n4: "Application cleanup\nremove from map, free resource, …"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 **Không có queue** (tạo reference không có queue param):

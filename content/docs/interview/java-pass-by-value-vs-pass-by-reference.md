@@ -62,12 +62,15 @@ Vì vậy, nói chính xác không phải là “biến `user` là object”. `u
 
 **Pass-by-value** nghĩa là: khi gọi method, giá trị trong argument được **copy** sang parameter. Sau đó caller và method có hai biến khác nhau. Gán lại parameter chỉ tác động bản sao trong method.
 
-```text
-Caller:  x = 10
-Gọi:     increase(x)
-Method:  number = 10     ← number là bản sao của giá trị x
-
-number = 20              ← chỉ đổi number, x vẫn là 10
+```d2 title="Primitive argument là bản copy"
+direction: right
+r0n0: "Caller: x=10"
+r0n1: "Gọi increase(x)"
+r0n2: "Method: number=10 (bản sao x)"
+r0n3: "number=20 chỉ đổi number\nx caller vẫn 10"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
 ```
 
 Điểm kiểm tra là: **method không thể gán lại biến `x` của caller**.
@@ -76,12 +79,15 @@ number = 20              ← chỉ đổi number, x vẫn là 10
 
 **Pass-by-reference** nghĩa là: parameter là một alias của chính biến bên caller. Method không nhận một biến mới chứa bản sao; nó được phép thao tác trực tiếp lên ô biến gốc.
 
-```text
-Caller:  x = 10
-Gọi:     setToTwenty(x)
-Method:  parameter là alias của x
-
-parameter = 20           ← x của caller cũng thành 20
+```d2 title="Pass-by-reference giả định (không phải Java)"
+direction: right
+r0n0: "Caller: x=10"
+r0n1: "Gọi setToTwenty(x)"
+r0n2: "Parameter là alias của x"
+r0n3: "parameter=20 → x caller cũng 20"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
 ```
 
 Đây mới là ý nghĩa của cụm “truyền tham chiếu” trong thuật ngữ *pass-by-reference*. Nếu gán lại parameter mà biến caller không đổi, cơ chế đó **không phải** pass-by-reference.
@@ -101,12 +107,14 @@ Có hai câu gần giống nhau nhưng nghĩa hoàn toàn khác:
 
 Hãy dùng ví dụ hai tờ giấy ghi địa chỉ nhà:
 
-```text
-Object = căn nhà ở U1
-Reference = tờ giấy ghi “U1”
-
-Java gọi method:
-caller giữ tờ giấy U1  ── photocopy ──► method nhận một tờ giấy U1 khác
+```d2 title="Pass-by-value: copy tờ giấy địa chỉ, không copy căn nhà"
+direction: down
+caller: "Caller giữ tờ giấy U1"
+parameter: "Method nhận tờ giấy U1 khác"
+house: "Object: căn nhà ở U1"
+caller -> parameter: "photocopy khi gọi method"
+caller -> house: "reference U1"
+parameter -> house: "reference U1"
 ```
 
 Hai tờ giấy cùng dẫn tới một căn nhà. Do đó method có thể tới căn nhà và sơn lại tường — tức là sửa object. Nhưng nếu method tẩy `U1` trên **tờ giấy của nó** rồi ghi `U2`, tờ giấy của caller vẫn ghi `U1`. Đây là lý do hai phát biểu sau cùng đúng:

@@ -182,12 +182,17 @@ for (Method method : clazz.getDeclaredMethods()) {
 
 Khi gọi `getAnnotation()`, JVM tạo **dynamic proxy** implement annotation interface:
 
-```java
-// Runtime: ann.getClass()
-// → com.sun.proxy.$Proxy1 (dynamic proxy)
-// → implements MyAnnotation (annotation interface)
-// → handler: AnnotationInvocationHandler
-//     └── memberValues: {"value": "important", "priority": 1}  (từ .class file)
+```d2 title="Annotation runtime là dynamic proxy"
+direction: down
+ann: "Runtime: ann.getClass()"
+proxy: "com.sun.proxy.\$Proxy1\ndynamic proxy"
+iface: "MyAnnotation\nannotation interface"
+handler: "AnnotationInvocationHandler"
+values: "memberValues\nvalue=important, priority=1\nđọc từ .class file"
+ann -> proxy
+proxy -> iface: "implements"
+proxy -> handler: "handler"
+handler -> values
 ```
 
 `AnnotationInvocationHandler` giữ `Map<String, Object>` chứa annotation element values. Mỗi method call (`value()`, `priority()`) được dispatch tới map lookup.

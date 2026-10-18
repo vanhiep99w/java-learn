@@ -103,8 +103,13 @@ heap.list -> heap.cached
 
 Khi `process()` kết thúc, stack frame bị xóa nên hai nguồn root `order` và `customer` biến mất. Nhưng object `Order` vẫn sống vì còn đường khác:
 
-```text
-static root CACHE → ArrayList → Order
+```d2 title="Static cache giữ Order reachable"
+direction: down
+n0: "Static root CACHE"
+n1: "ArrayList"
+n2: "Order"
+n0 -> n1
+n1 -> n2
 ```
 
 Nếu gọi `CACHE.clear()` và không còn root nào khác dẫn tới `Order`, object đó mới trở thành đối tượng có thể được GC thu hồi.
@@ -186,14 +191,10 @@ Quan sát thực nghiệm trên hầu hết ứng dụng:
 
 > **"Most objects die young."** — 80-98% object trở thành rác ngay sau khi method kết thúc.
 
-```text
-Object lifetime distribution (typical web app):
-╠══════════════════════════════╗
-║  ~95% chết trong < 1 GC      ║ ← Young Generation
-╠══════════════════════════════╝
-╠═════╗
-║ ~5% ║ sống lâu (cache, pool, singleton) ← Old Generation
-╠═════╝
+```d2 title="Phân bố tuổi object (ví dụ typical web app)"
+direction: down
+n0: "Young Generation: ~95% chết trong <1 GC"
+n1: "Old Generation: ~5% sống lâu\ncache, pool, singleton"
 ```
 
 Từ đó, JVM chia heap thành **generations**:
@@ -284,16 +285,21 @@ Trong cách gọi truyền thống, **Minor GC** là lần thu gom Young Generat
 
 Giả sử trước GC, S0 đang là **From** và S1 đang trống để làm **To**:
 
-```text
-TRƯỚC YOUNG GC
-  Eden: [A chết] [B sống]
-  S0 (From): [C sống, age=1]
-  S1 (To):   [trống]
-
-SAU KHI COPY OBJECT SỐNG
-  Eden: [trống]
-  S0 (To mới): [trống]
-  S1 (From mới): [B age=1] [C age=2]
+```d2 title="Young GC copy: đổi vai trò survivor spaces"
+direction: down
+before: "TRƯỚC YOUNG GC" {
+  eden: "Eden: A chết, B sống"
+  s0: "S0 (From): C sống, age=1"
+  s1: "S1 (To): trống"
+}
+after: "SAU KHI COPY OBJECT SỐNG" {
+  eden: "Eden: trống"
+  s0: "S0 (To mới): trống"
+  s1: "S1 (From mới): B age=1, C age=2"
+}
+before.eden -> after.s1: "B sống → age=1; bỏ A chết"
+before.s0 -> after.s1: "C sống → age=2"
+before.s1 -> after.s1: "To được lấp rồi thành From"
 ```
 
 Điểm quan trọng: `S0` và `S1` không phải hai cấp độ tuổi, cũng không phải nơi mỗi vùng chỉ chứa một object. Mỗi vùng là một buffer chứa nhiều object và hai buffer luân phiên vai trò:
@@ -305,17 +311,18 @@ Sau mỗi Young GC, To chứa các object sống mới và trở thành From. Fr
 
 Tại sao cần hai vùng? Giả sử chỉ có một Survivor:
 
-```text
-S0 trước GC: [B chết][C sống]
-Eden:        [D sống]
-
-Kết quả cần có: [C sống][D sống]
+```d2 title="Copy giữ C và D, loại B"
+direction: down
+n0: "S0 trước GC: B chết, C sống\nEden: D sống"
+n1: "Kết quả cần có: C sống, D sống"
+n0 -> n1
 ```
 
 Nếu ghi kết quả ngay vào `S0`, JVM phải di chuyển `C` để lấp chỗ của `B`, đồng thời cập nhật các reference tới `C`. Đó chính là compact ngay trong cùng vùng và phức tạp hơn. Với `S1` đang trống, JVM chỉ cần copy `C` và `D` sang `S1`, rồi bỏ toàn bộ `S0` cũ:
 
-```text
-S1 (To): [C sống][D sống]
+```d2 title="Survivor To sau copy"
+direction: down
+n0: "S1 (To): C sống, D sống"
 ```
 
 Hai Survivor giúp JVM luôn có một vùng đích sạch để copy object sống mà không ghi đè object khác. Nếu không dùng hai vùng, JVM phải compact tại chỗ, dùng một vùng tạm khác hoặc promote object lên Old sớm.
@@ -425,32 +432,40 @@ Ba câu hỏi dùng để so sánh các thuật toán:
 
 Giả sử heap đang có các object sau:
 
-```text
-[A sống][B rác][C sống][D rác][E sống]
+```d2 title="Heap có live object và garbage"
+direction: down
+n0: "Thứ tự liên tiếp: A sống | B rác | C sống | D rác | E sống"
 ```
 
 GC có thể thu hồi `B` và `D`. Nhưng nếu chỉ xóa chúng tại chỗ, heap sẽ thành:
 
-```text
-[A sống][  trống  ][C sống][  trống  ][E sống]
+```d2 title="Thu hồi rác để lại các lỗ trống"
+direction: down
+n0: "Thứ tự liên tiếp: A sống | trống | C sống | trống | E sống"
 ```
 
 Tổng vùng trống có thể đủ lớn, nhưng bị chia thành nhiều block nhỏ. Đây là **fragmentation** — phân mảnh heap.
 
 Phân mảnh gây vấn đề khi JVM cần một block liên tục cho object lớn:
 
-```text
-Heap còn 1MB tổng cộng:
-[A][trống 0.5MB][C][trống 0.3MB][E][trống 0.2MB]
-
-new byte[1MB]  →  không có block 1MB liền nhau
+```d2 title="Phân mảnh: tổng free đủ nhưng không liên tục"
+direction: down
+n0: "Heap: A | trống 0.5MB | C | trống 0.3MB | E | trống 0.2MB\nTổng free=1MB"
+n1: "new byte[1MB]"
+n2: "Không có block 1MB liền nhau"
+n0 -> n1
+n1 -> n2
 ```
 
 Khi vùng trống nằm liền nhau, JVM có thể cấp phát bằng cách tăng một free pointer. Cách này thường được gọi là **bump-the-pointer**:
 
-```text
-Trước: [A][C][E][free................]
-new X: [A][C][E][X][free.............]
+```d2 title="Cấp phát vào free block liền nhau"
+direction: down
+n0: "Trước: A | C | E | free…"
+n1: "new X"
+n2: "Sau: A | C | E | X | free…"
+n0 -> n1
+n1 -> n2
 ```
 
 Vì vậy GC không chỉ cần “xóa object rác”. Nó còn phải quyết định có nên sắp xếp lại object sống để tạo vùng trống liền mạch hay không.
@@ -467,15 +482,13 @@ Mark-Sweep có hai bước rõ ràng:
 
 Áp dụng vào ví dụ trên:
 
-```text
-Trước GC:
-[A sống][B rác][C sống][D rác][E sống]
-
-Sau MARK:
-[A ✓    ][B ✗   ][C ✓    ][D ✗   ][E ✓    ]
-
-Sau SWEEP:
-[A sống][  trống  ][C sống][  trống  ][E sống]
+```d2 title="Mark-Sweep giữ vị trí object sống"
+direction: down
+n0: "Trước GC: A sống | B rác | C sống | D rác | E sống"
+n1: "Sau MARK: A ✓ | B ✗ | C ✓ | D ✗ | E ✓"
+n2: "Sau SWEEP: A sống | trống | C sống | trống | E sống"
+n0 -> n1
+n1 -> n2
 ```
 
 Mark-Sweep **không di chuyển object sống**. Vì thế các reference tới `A`, `C` và `E` vẫn dùng địa chỉ cũ.
@@ -494,16 +507,15 @@ CMS là ví dụ lịch sử dùng Mark-Sweep cho Old Gen. Vì CMS không compac
 
 Copying chia vùng nhớ thành **vùng nguồn** và **vùng đích**. GC chỉ copy object sống từ nguồn sang đích, sau đó bỏ toàn bộ vùng nguồn.
 
-```text
-Vùng nguồn (From): [A sống][B rác][C sống][D rác][E sống]
-Vùng đích (To):   [                         trống                         ]
-
-Copy object sống:
-Vùng đích (To):   [A sống][C sống][E sống][             trống             ]
-
-Sau đó:
-- bỏ toàn bộ vùng From cũ;
-- đổi vai trò From và To cho lần GC tiếp theo.
+```d2 title="Copying: chuyển live object rồi bỏ From"
+direction: down
+n0: "From: A sống | B rác | C sống | D rác | E sống\nTo: trống"
+n1: "Copy live object\nTo: A sống | C sống | E sống | trống"
+n2: "Bỏ toàn bộ From cũ"
+n3: "Đổi vai trò From và To cho lần GC tiếp"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Vì object sống được xếp liên tiếp ở vùng đích, vùng trống sau GC cũng liền mạch. GC không cần xử lý từng object rác; nó chỉ copy những object còn sống.
@@ -530,12 +542,13 @@ Mark-Compact thực hiện ba việc:
 2. Tính vị trí mới để dồn các object sống về một phía.
 3. Di chuyển object và cập nhật các reference tới vị trí mới.
 
-```text
-Trước:
-[A sống][  trống  ][C sống][  trống  ][E sống]
-
-Sau COMPACT:
-[A sống][C sống][E sống][             trống             ]
+```d2 title="Compact gom free thành một block"
+direction: down
+n0: "Trước: A sống | trống | C sống | trống | E sống"
+n1: "COMPACT"
+n2: "Sau: A sống | C sống | E sống | trống liên tục"
+n0 -> n1
+n1 -> n2
 ```
 
 Mark-Compact tạo được một vùng trống liền mạch mà không cần dành riêng 50% heap làm vùng To như mô hình Copying đầy đủ.
@@ -625,9 +638,22 @@ n_App -> n_App: "resume"
 - Young Gen: parallel copying. Old Gen: parallel mark-compact
 - Vẫn **STW** toàn bộ — chỉ rút ngắn thời gian pause nhờ multi-thread
 
-```text
-Serial:    |----Mark----|----Compact----|   (1 thread, 200ms)
-Parallel:  |--Mark--|--Compact--|            (8 threads, ~50ms)
+```d2 title="Serial và Parallel: cùng phase, khác mức song song"
+direction: right
+r0n0: "Serial: 1 thread"
+r0n1: "Mark"
+r0n2: "Compact"
+r0n3: "200ms (minh họa)"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Parallel: 8 threads"
+r1n1: "Mark"
+r1n2: "Compact"
+r1n3: "~50ms (minh họa)"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 | Flag | Ý nghĩa |
@@ -682,11 +708,24 @@ n_group1.n_C -> n_group1.n_D
 
 G1 chia heap thành **hàng trăm regions** cùng kích thước (1-32MB), mỗi region có thể là Eden/Survivor/Old/Humongous:
 
-```
-┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
-│ E │ E │ E │ S │ O │ O │ H │ H │ O │ E │ F │ F │
-└───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
-E = Eden, S = Survivor, O = Old, H = Humongous, F = Free
+```d2 title="Các region của G1"
+direction: right
+heap: "12 region theo thứ tự minh họa" {
+  grid-rows: 3
+  grid-columns: 4
+  e0: "0: E (Eden)"
+  e1: "1: E (Eden)"
+  e2: "2: E (Eden)"
+  s: "3: S (Survivor)"
+  o0: "4: O (Old)"
+  o1: "5: O (Old)"
+  h0: "6: H (Humongous)"
+  h1: "7: H (Humongous)"
+  o2: "8: O (Old)"
+  e3: "9: E (Eden)"
+  f0: "10: F (Free)"
+  f1: "11: F (Free)"
+}
 ```
 
 **Khác biệt lớn với Parallel/CMS**: G1 **không** cần Young/Old liền mạch. Regions linh hoạt — một region Free có thể trở thành Eden hoặc Old tuỳ nhu cầu.
@@ -802,15 +841,16 @@ ZGC            < 1ms                  16TB
 
 ZGC lưu metadata **trong chính pointer** (dùng bit cao của 64-bit address):
 
-```
-64-bit pointer layout (ZGC):
-┌──────────┬─┬─┬─┬─┬────────────────────────────────────┐
-│ unused   │M│R│F│ │        Object address (42 bits)    │
-└──────────┴─┴─┴─┴─┴────────────────────────────────────┘
-             │ │ │
-             │ │ └─ Finalizable
-             │ └── Remapped
-             └─── Marked (0 or 1)
+```d2 title="Colored pointer ZGC (mô hình 64-bit trong ví dụ)"
+direction: right
+pointer: "64-bit pointer layout" {
+  unused: "unused"
+  m: "M: Marked (0 hoặc 1)"
+  r: "R: Remapped"
+  f: "F: Finalizable"
+  reserved: "bit/vùng để trống trong hình gốc"
+  address: "Object address: 42 bits"
+}
 ```
 
 Lợi ích: GC có thể kiểm tra trạng thái object (marked? relocated?) chỉ bằng **đọc pointer** — không cần lookup bảng phụ.

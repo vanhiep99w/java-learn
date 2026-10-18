@@ -133,12 +133,20 @@ list -> other: "CẤM gán lại" { style.stroke-dash: 3 }
 
 Cơ chế: compiler chèn một **freeze (memory barrier)** ở cuối constructor, **trước** khi reference object thoát ra. Barrier này ngăn việc ghi final field bị **sắp xếp xuống sau** việc publish reference:
 
-```
-KHÔNG final:                          CÓ final field:
-  ghi timeout = 30  ─┐                 ghi timeout = 30
-  publish ref       ─┘ có thể đảo →    [freeze barrier]   ← chặn đảo
-  thread B đọc 0 (chưa ghi)            publish ref
-                                       thread B luôn thấy 30
+```d2 title="Final field và publication"
+direction: right
+r0n0: "KHÔNG final: ghi timeout=30"
+r0n1: "publish ref (có thể đảo với ghi)"
+r0n2: "thread B có thể đọc 0 (chưa ghi)"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "CÓ final field: ghi timeout=30"
+r1n1: "freeze barrier chặn đảo"
+r1n2: "publish ref"
+r1n3: "thread B thấy 30 (constructor không leak this)"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 ```java

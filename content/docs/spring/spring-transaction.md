@@ -473,50 +473,61 @@ public void transfer(Long fromId, Long toId, BigDecimal amount) {
 
 Tổng hợp tất cả các component, đây là flow end-to-end khi một method `@Transactional` được gọi:
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant P as CGLIB Proxy
-    participant TI as TransactionInterceptor
-    participant TAS as TransactionAttributeSource
-    participant TM as PlatformTransactionManager
-    participant TSM as TransactionSynchronizationManager
-    participant DS as DataSource (HikariCP)
-    participant DB as Database
+```d2 interactive title="Transactional: metadata và begin"
+shape: sequence_diagram
+c: Caller
+p: "CGLIB Proxy"
+ti: TransactionInterceptor
+tas: TransactionAttributeSource
+tm: PlatformTransactionManager
+c -> p: "service.transfer()"
+p -> ti: "invoke(MethodInvocation)"
+ti."Bước 1 — Đọc metadata"
+ti -> tas: "getTransactionAttribute(method, class)"
+tas -> ti: "propagation=REQUIRED\nisolation=DEFAULT, rollbackFor=…"
+ti."Bước 2 — Begin transaction"
+ti -> tm: "getTransaction(definition)"
+```
 
-    C->>P: service.transfer()
-    P->>TI: invoke(MethodInvocation)
+Với transaction mới, transaction manager lấy connection rồi bind vào thread hiện tại. Trường hợp REQUIRED tham gia transaction đã có sẽ không lặp lại việc begin vật lý này.
 
-    Note over TI: Bước 1 — Đọc metadata
-    TI->>TAS: getTransactionAttribute(method, class)
-    TAS-->>TI: {propagation=REQUIRED, isolation=DEFAULT, rollbackFor=...}
+```d2 interactive title="Transactional: connection và thực thi target"
+shape: sequence_diagram
+tm: PlatformTransactionManager
+ds: "DataSource (HikariCP)"
+db: Database
+tsm: TransactionSynchronizationManager
+ti: TransactionInterceptor
+p: "CGLIB Proxy / target"
+tm -> ds: "getConnection()"
+ds -> tm: "Connection từ pool"
+tm -> db: "SET autocommit=0"
+tm -> tsm: "bindResource(DataSource, Connection)"
+ti -> p: "Bước 3 — proceed() → target.transfer()"
+p."JdbcTemplate / Hibernate\nDataSourceUtils.getConnection()\nThreadLocal → cùng Connection"
+```
 
-    Note over TI: Bước 2 — Begin transaction
-    TI->>TM: getTransaction(definition)
-    TM->>DS: getConnection()
-    DS-->>TM: Connection (từ pool)
-    TM->>DB: SET autocommit=0
-    TM->>TSM: bindResource(DataSource, Connection)
+Hai nhánh hoàn tất dưới đây là lựa chọn thay thế. Cả commit và rollback đều unbind rồi close connection để trả pool; return/rethrow chỉ diễn ra sau completion. Chính sách rollback còn phụ thuộc metadata, không phải mọi checked exception đều tự rollback.
 
-    Note over TI: Bước 3 — Gọi method thật
-    TI->>P: proceed() → target.transfer()
-    Note over P: JdbcTemplate / Hibernate<br/>gọi DataSourceUtils.getConnection()<br/>→ lấy từ ThreadLocal → cùng Connection
-
-    alt Method thành công
-        Note over TI: Bước 4a — Commit
-        TI->>TM: commit(status)
-        TM->>DB: COMMIT
-        TM->>TSM: unbindResource(DataSource)
-        TM->>DS: connection.close() (trả về pool)
-    else Method ném RuntimeException
-        Note over TI: Bước 4b — Rollback
-        TI->>TM: rollback(status)
-        TM->>DB: ROLLBACK
-        TM->>TSM: unbindResource(DataSource)
-        TM->>DS: connection.close() (trả về pool)
-    end
-
-    TI-->>C: return / rethrow
+```d2 interactive title="Transactional: commit hoặc rollback rồi cleanup"
+shape: sequence_diagram
+ti: TransactionInterceptor
+tm: PlatformTransactionManager
+db: Database
+tsm: TransactionSynchronizationManager
+ds: "DataSource (HikariCP)"
+c: Caller
+ok: "Bước 4a — Method thành công" {
+  ti -> tm: "commit(status)"
+  tm -> db: "COMMIT"
+}
+fail: "Bước 4b — Method ném RuntimeException (nhánh thay thế)" {
+  ti -> tm: "rollback(status)"
+  tm -> db: "ROLLBACK"
+}
+tm -> tsm: "unbindResource(DataSource)"
+tm -> ds: "connection.close() — trả về pool"
+ti -> c: "return / rethrow"
 ```
 
 Tóm lại **4 giai đoạn**:

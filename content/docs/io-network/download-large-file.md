@@ -123,8 +123,19 @@ futures.forEach(CompletableFuture::join);   // chờ tất cả
 
 Copy "thường" tốn 4 lần chuyển dữ liệu + 2 lần chuyển context giữa kernel↔user space:
 
-```
-đĩa → kernel buffer → user buffer (app) → socket buffer → NIC   (lãng phí)
+Đường copy qua buffer app là phần có thể lãng phí khi phục vụ file; zero-copy giảm các lần copy phù hợp với nền tảng.
+
+```d2 title="Copy dữ liệu qua user-space trước khi tới NIC"
+direction: down
+n0: "Đĩa"
+n1: "Kernel buffer"
+n2: "User buffer (app)"
+n3: "Socket buffer"
+n4: "NIC"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 **Zero-copy** để dữ liệu đi thẳng trong kernel, không vòng qua user space:

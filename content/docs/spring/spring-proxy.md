@@ -703,12 +703,17 @@ Quy tắc:
 - Spring infrastructure advisor (Transaction, Cache) có default order: `Ordered.LOWEST_PRECEDENCE` (Integer.MAX_VALUE)
 - Nếu cùng order → thứ tự **không đảm bảo** — phụ thuộc bean registration order
 
-```
-Order nhỏ → outer → chạy TRƯỚC proceed() và SAU khi proceed() return
-Order lớn → inner → chạy SAU nhưng gần target nhất
+Order nhỏ chạy trước `proceed()` và sau khi `proceed()` return. Order lớn nằm gần target hơn, chạy sau ở chiều vào; chiều ra đảo ngược.
 
-Chain:  [Order 1: Cache] → [Order 2: TX] → [Order 3: Timing] → Target
-         outer                                                  inner
+```d2 title="Order nhỏ bọc ngoài advice chain"
+direction: down
+n0: "Order 1: Cache (outer)"
+n1: "Order 2: TX"
+n2: "Order 3: Timing (inner)"
+n3: "Target"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 > [!WARNING]

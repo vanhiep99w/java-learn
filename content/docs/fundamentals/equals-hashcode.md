@@ -332,10 +332,18 @@ map.size();                 // 1  ← entry vẫn còn ở bucket 1, "rò rỉ"
   Xem MutableKey.java cùng các ví dụ khác
 </SourceRef>
 
-```
-Lúc put:   bucket[1] -> (Node.hash=1, key, "value")
-Sau đổi:   get(key) tính hash=2 -> nhìn bucket[2] -> trống -> null
-           entry vẫn kẹt ở bucket[1], không ai với tới được
+```d2 title="Hash key thay đổi: entry vẫn ở bucket cũ"
+direction: right
+r0n0: "Lúc put: hash=1"
+r0n1: "bucket[1]: Node.hash=1, key, value"
+r0n0 -> r0n1
+r1n0: "Sau đổi: hash=2"
+r1n1: "get(key) nhìn bucket[2]"
+r1n2: "trống → null"
+r1n3: "entry vẫn kẹt ở bucket[1]"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 > [!IMPORTANT]

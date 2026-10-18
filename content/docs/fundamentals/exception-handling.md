@@ -168,13 +168,17 @@ try {
 
 Khi exception throw, JVM thực hiện **stack unwinding** — duyệt ngược call stack tìm handler:
 
-```
-throw tại frame F5 (deep call):
-  F5: exception table → không match → pop
-  F4: exception table → không match → pop
-  F3: exception table → MATCH! → jump to handler PC
+Ước lượng chi phí trong ví dụ gốc: ~5–50 μs tùy stack depth, so với ~5 ns cho normal return; đây không phải phép đo của website.
 
-Chi phí: ~5-50μs tùy stack depth (vs ~5ns cho normal return)
+```d2 title="Unwind stack tìm exception handler"
+direction: down
+n0: "throw tại frame F5 (deep call)"
+n1: "F5: exception table không match → pop"
+n2: "F4: exception table không match → pop"
+n3: "F3: exception table MATCH\njump tới handler PC"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 **Tại sao throw đắt?**

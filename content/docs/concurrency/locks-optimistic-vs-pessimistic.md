@@ -134,10 +134,13 @@ public final int incrementAndGet() {
 }
 ```
 
-```
-Thread A: prev=5, next=6, CAS(5→6) ✓
-Thread B: prev=5, next=6, CAS(5→6) ✗ (A đã đổi thành 6)
-          → lặp: prev=6, next=7, CAS(6→7) ✓
+```d2 title="CAS thất bại phải đọc lại trước khi retry"
+direction: down
+n0: "Thread A: prev=5, next=6\nCAS(5→6) thành công"
+n1: "Thread B: prev=5, next=6\nCAS(5→6) thất bại vì A đã đổi thành 6"
+n2: "Thread B lặp: prev=6, next=7\nCAS(6→7) thành công"
+n0 -> n1
+n1 -> n2
 ```
 
 - Không thread nào bị **block/park** — chỉ "quay vòng" đọc lại và thử lại.

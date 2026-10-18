@@ -409,12 +409,22 @@ class TraceAspect { /* outer */ }
 class AuditAspect { /* middle */ }
 ```
 
-```text
-Request đi vào:
-Trace.before → Audit.before → Transaction.begin → Target
-
-Kết quả quay ra:
-Target → Transaction.commit/rollback → Audit.after → Trace.after
+```d2 title="Advice nesting trên request và response"
+direction: right
+r0n0: "Request: Trace.before"
+r0n1: "Audit.before"
+r0n2: "Transaction.begin"
+r0n3: "Target"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "Kết quả: Target"
+r1n1: "Transaction.commit/rollback"
+r1n2: "Audit.after"
+r1n3: "Trace.after"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 ```d2 title="8. Thứ tự nhiều aspect"
@@ -599,13 +609,21 @@ Nếu `new OrderService(...)` trong test, test chỉ kiểm tra target. Nó khô
 
 ## 13. Tóm tắt
 
-```text
-Aspect  = concern cắt ngang được đóng gói
-Pointcut = chọn method nào chịu ảnh hưởng
-Advice  = logic chạy trước/sau/quanh method
-Proxy   = object Spring thực sự chạy advice
+Aspect = concern cắt ngang được đóng gói. Pointcut chọn method nào chịu ảnh hưởng. Advice là logic chạy trước/sau/quanh method. Proxy là object Spring thực sự chạy advice.
 
-Caller → Proxy → advice chain → target method → advice chain → Caller
+```d2 title="Proxy và advice chain"
+direction: down
+n0: "Caller"
+n1: "Proxy"
+n2: "Advice chain (before)"
+n3: "Target method"
+n4: "Advice chain (after)"
+n5: "Caller nhận kết quả"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Nguyên tắc cần nhớ:

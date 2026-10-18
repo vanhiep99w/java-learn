@@ -195,15 +195,13 @@ Các nguồn tạo happens-before quan trọng:
 | `Thread.join()` | Mọi việc trong thread con happens-before `join()` trả về |
 | `final` field | Khởi tạo final field trong constructor happens-before khi object được publish đúng cách |
 
-```text
-Trong code bug của ta:
-   main:    stop = true            (thao tác ghi)
-   worker:  while (!stop) ...       (thao tác đọc)
-
-   Có happens-before giữa hai cái này không?
-   → KHÔNG. stop không volatile, không synchronized,
-     không qua start/join nào nối chúng lại.
-   → JMM: "Tôi không hứa worker thấy giá trị true." → treo.
+```d2 title="Không có happens-before giữa write và loop read"
+direction: down
+main: "main: stop=true (ghi)"
+worker: "worker: while(!stop)… (đọc)"
+main -> worker: "KHÔNG có happens-before\nkhông volatile/synchronized\nkhông start/join nối hai truy cập" {style.stroke-dash: 4}
+result: "JMM không hứa worker thấy true\nvòng lặp có thể treo"
+worker -> result
 ```
 
 > [!NOTE]

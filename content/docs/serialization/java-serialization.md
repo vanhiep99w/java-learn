@@ -49,13 +49,11 @@ try (var in = new ObjectInputStream(new FileInputStream("u.ser"))) {
 
 Chuỗi byte có format riêng, bắt đầu bằng **magic number `0xACED`** + version `0x0005`:
 
-```
+```text
 AC ED 00 05 73 72 00 04 55 73 65 72 ...
-└─magic─┘ └ver┘ │  │  └len┘ └─"User"─┘
-                 │  └ TC_CLASSDESC (mô tả class)
-                 └ TC_OBJECT
-→ stream chứa: tên class, serialVersionUID, danh sách field + kiểu, rồi giá trị field
 ```
+
+Các byte trên là payload, không phải sơ đồ: `AC ED` là magic, `00 05` là version; `73` là `TC_OBJECT`, `72` là `TC_CLASSDESC`, `00 04` là độ dài tên, và `55 73 65 72` là `"User"`. Stream chứa tên class, serialVersionUID, danh sách field + kiểu, rồi giá trị field.
 
 > [!NOTE]
 > Bất kỳ chuỗi byte nào bắt đầu bằng `AC ED 00 05` (hoặc base64 `rO0AB...`) là một Java serialized object. Đây là dấu hiệu pentester tìm để dò điểm deserialization — và là lý do **không bao giờ** deserialize dữ liệu từ nguồn không tin cậy (mục 7).
@@ -166,8 +164,17 @@ class Node implements Serializable { Node next; String data; }
 - **Reference dùng chung** (hai field trỏ cùng object) được giữ nguyên khi đọc lại (vẫn cùng object).
 - **Vòng lặp** (A trỏ B, B trỏ A) **không** gây đệ quy vô hạn — object thứ hai chỉ là handle.
 
-```
-ghi A → ghi B (A.next) → B.prev trỏ về A → đã ghi A rồi → ghi HANDLE, không lặp
+```d2 title="Serialization handle ngăn lặp object graph"
+direction: down
+n0: "Ghi A"
+n1: "Ghi B qua A.next"
+n2: "B.prev trỏ về A"
+n3: "A đã được ghi"
+n4: "Ghi HANDLE, không lặp"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 > [!CAUTION]

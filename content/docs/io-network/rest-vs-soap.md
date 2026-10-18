@@ -102,6 +102,45 @@ Và **status code** mang ý nghĩa kết quả:
 5xx lỗi server   500, 502, 503
 ```
 
+Đối chiếu cùng một resource trong hai tình huống dưới đây. Đây là hợp đồng HTTP minh họa, không phải endpoint đang chạy; ví dụ giả định caller đã có quyền đọc. `404` diễn đạt resource không tồn tại, không phải lỗi xác thực. Client nên rẽ nhánh theo status trước khi đọc body, thay vì dò field `error` trong mọi response `200`.
+
+```protocol-exchange
+title: Đọc user — thành công và không tìm thấy
+variants:
+  - id: found
+    title: User tồn tại
+    request:
+      method: GET
+      url: /users/123
+      headers:
+        - id: accept
+          name: Accept
+          value: application/json
+    response:
+      status: 200
+      headers:
+        - id: content-type
+          name: Content-Type
+          value: application/json
+      body:
+        kind: json
+        json: '{"id":123,"name":"alice"}'
+  - id: missing
+    title: User không tồn tại
+    request:
+      method: GET
+      url: /users/999
+    response:
+      status: 404
+      headers:
+        - id: content-type
+          name: Content-Type
+          value: application/problem+json
+      body:
+        kind: json
+        json: '{"type":"about:blank","title":"Not Found","status":404}'
+```
+
 > [!WARNING]
 > Anti-pattern kinh điển: trả `200 OK` kèm `{"error": "not found"}` trong body. Điều này phá vỡ toàn bộ hạ tầng HTTP — client, proxy, monitoring đều tưởng thành công. Hãy trả **đúng status code**: 404 cho không tìm thấy, 400 cho input sai, 409 cho xung đột. Status code *là* một phần API của bạn.
 

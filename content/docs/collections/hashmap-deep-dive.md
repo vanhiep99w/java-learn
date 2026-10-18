@@ -113,11 +113,16 @@ Các hằng số quyết định hành vi:
 
 Hình dung table với 16 bucket, vài bucket có chain:
 
-```
-index:  0    1    2    3    4    5   ...  15
-       [ ]  [A]  [ ]  [B]→[C] [ ]  [D]  ... [ ]
-                       │
-                       └─ bucket 3 có 2 node (collision): B.next = C
+```d2 title="HashMap: bucket và collision"
+direction: right
+table: "Node[]: index 0..15" {
+  empty: "0, 2, 4, …, 15: trống"
+  one: "bucket 1: A"
+  three: "bucket 3: B"
+  five: "bucket 5: D"
+}
+c: "C"
+table.three -> c: "B.next = C\ncollision: 2 node"
 ```
 
 ---
@@ -173,9 +178,20 @@ Vì `(n - 1) & hash` chỉ tương đương `hash % n` **khi n là luỹ thừa 
 
 Khi hai key khác nhau cho ra **cùng index**, đó là **collision**. HashMap xử lý bằng **separate chaining**: các node cùng bucket nối thành **danh sách liên kết** qua con trỏ `next`.
 
-```
-put("Aa", 1)  → hash → bucket 5 → [Aa=1]
-put("BB", 2)  → hash → bucket 5 → [Aa=1] → [BB=2]   (collision! nối vào cuối)
+```d2 title="Hai put cùng bucket 5"
+direction: right
+r0n0: "put(\"Aa\", 1)"
+r0n1: "hash"
+r0n2: "bucket 5: Aa=1"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "put(\"BB\", 2)"
+r1n1: "hash"
+r1n2: "bucket 5: Aa=1"
+r1n3: "BB=2 (nối cuối do collision)"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 > [!TIP]
@@ -255,9 +271,13 @@ static int tieBreakOrder(Object a, Object b) {
 
 Mỗi lần `size` vượt `threshold = capacity * loadFactor`, HashMap **gấp đôi** số bucket và **rehash** lại toàn bộ entry.
 
-```
-capacity 16, loadFactor 0.75 → threshold 12
-put entry thứ 13 → resize: 16 → 32 bucket, threshold 12 → 24
+```d2 title="Ngưỡng resize của HashMap"
+direction: down
+n0: "capacity 16, loadFactor 0.75\nthreshold 12"
+n1: "put entry thứ 13"
+n2: "resize: 16 → 32 bucket\nthreshold 12 → 24"
+n0 -> n1
+n1 -> n2
 ```
 
 **Vì sao 0.75?** Đây là điểm cân bằng giữa **bộ nhớ** và **collision**: thấp hơn (vd 0.5) tốn bộ nhớ, ít collision; cao hơn (vd 1.0) tiết kiệm bộ nhớ nhưng chain dài hơn. 0.75 là trade-off mặc định đã được kiểm chứng theo phân phối Poisson.
@@ -357,10 +377,17 @@ Trên **Java 7**, nếu nhiều thread cùng `put` và kích hoạt **resize đ�
 
 Nguyên nhân: Java 7 dùng **head insertion** và **đảo ngược thứ tự** chain khi rehash. Hai thread chạy xen kẽ trên cùng một chain có thể tạo con trỏ trỏ vòng lại.
 
-```
-Thread 1 vừa kịp: e = A, next = B
-Thread 2 hoàn tất resize:  bucket mới = B → A
-Thread 1 tiếp tục với con trỏ cũ → nối A → B → A  (vòng tròn)
+```d2 title="Resize không đồng bộ tạo cycle (JDK cũ)"
+direction: down
+first: "Thread 1: e=A, next=B"
+second: "Thread 2 resize xong\nbucket mới B → A"
+resume: "Thread 1 tiếp tục với con trỏ cũ"
+a: A
+b: B
+first -> second -> resume
+resume -> a: "nối lại"
+a -> b
+b -> a: "cycle"
 ```
 
 > [!WARNING]
@@ -408,9 +435,16 @@ map.containsKey(key);            // false — dù entry vẫn còn trong map!
 map.size();                      // 1 — "bóng ma" chiếm chỗ, không cách nào lấy ra
 ```
 
-```
-Lúc put:   hash(["a"])     → bucket 3   → lưu entry ở đây
-Sau mutate: hash(["a","b"]) → bucket 9   → get tìm ở 9 → rỗng → null
+```d2 title="Mutate key làm lookup sai bucket"
+direction: right
+r0n0: "Lúc put: hash([\"a\"])"
+r0n1: "bucket 3: lưu entry"
+r0n0 -> r0n1
+r1n0: "Sau mutate: hash([\"a\",\"b\"])"
+r1n1: "get tìm bucket 9"
+r1n2: "rỗng → null"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 > [!WARNING]

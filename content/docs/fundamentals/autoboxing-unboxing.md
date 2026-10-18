@@ -105,9 +105,18 @@ System.out.println(c == d);    // false — 200 ngoài cache → 2 object khác 
 System.out.println(c.equals(d)); // true — equals so GIÁ TRỊ
 ```
 
-```
-valueOf(100): cache[-128..127] có sẵn → cùng reference  → == true
-valueOf(200): ngoài [-128,127]        → new Integer mỗi lần → == false
+```d2 title="Integer cache ảnh hưởng identity"
+direction: right
+r0n0: "valueOf(100)"
+r0n1: "cache [-128..127] có sẵn"
+r0n2: "cùng reference → == true"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r1n0: "valueOf(200)"
+r1n1: "ngoài [-128..127]"
+r1n2: "new Integer mỗi lần → == false"
+r1n0 -> r1n1
+r1n1 -> r1n2
 ```
 
 > [!WARNING]
@@ -165,12 +174,25 @@ Wrapper đắt hơn nguyên thủy theo **ba** trục, không chỉ "tốn RAM":
 
 **2. Cache locality.** `int[]` là khối liền mạch, CPU prefetch tuyến tính. `Integer[]` là **mảng reference** trỏ tới các object rải rác khắp heap → mỗi truy cập là một lần **pointer chasing**, dễ **cache miss**:
 
-```
-int[]:      [42][43][44][45]            ← liền mạch, prefetch tốt
-Integer[]:  [ref][ref][ref][ref]        ← mảng con trỏ
-              │    │    │    │
-              ▼    ▼    ▼    ▼
-            {42} {43} {44} {45}         ← object rải rác → cache miss
+```d2 title="int[] liền mạch, Integer[] chứa reference"
+direction: down
+primitive: "int[]: 42, 43, 44, 45\nliền mạch, prefetch tốt"
+refs: "Integer[]: mảng con trỏ" {
+  r0: "ref[0]"
+  r1: "ref[1]"
+  r2: "ref[2]"
+  r3: "ref[3]"
+}
+heap: "Object rải rác → cache miss" {
+  a: "Integer 42"
+  b: "Integer 43"
+  c: "Integer 44"
+  d: "Integer 45"
+}
+refs.r0 -> heap.a
+refs.r1 -> heap.b
+refs.r2 -> heap.c
+refs.r3 -> heap.d
 ```
 
 **3. Allocation/GC.** Box trong vòng lặp tạo rác liên tục (mục 1), gây áp lực GC young-gen.

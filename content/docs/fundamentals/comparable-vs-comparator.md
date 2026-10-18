@@ -146,11 +146,15 @@ byAge.add(new Person("Bình", 30));    // compare == 0 với An → bị coi là
 System.out.println(byAge.size());      // 1  ← "Bình" biến mất!
 ```
 
-```
-TreeSet dùng compare()==0 làm "trùng", không phải equals()
-  add(An,30):   cây rỗng → thêm
-  add(Bình,30): compare(Bình, An)==0 (cùng age) → "đã có" → bỏ qua
-  → set chỉ còn 1 phần tử dù An != Bình
+```d2 title="TreeSet dùng compare()==0 để loại trùng"
+direction: down
+n0: "add(An,30): cây rỗng → thêm"
+n1: "add(Bình,30): compare(Bình,An)==0\ncùng age"
+n2: "Bị coi là đã có → bỏ qua"
+n3: "Set chỉ còn một phần tử\ndù An != Bình"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 > [!IMPORTANT]

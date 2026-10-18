@@ -47,28 +47,27 @@ Phần còn lại của doc giải thích **từng thủ phạm** và **cách ch
 
 Mô hình sai trong đầu nhiều người:
 
-```text
-❌ Mô hình sai (tuyến tính vô hạn):
-   1 thread  → 100s
-   2 thread  → 50s
-   4 thread  → 25s
-   100 thread → 1s     ← "cứ chia đều ra là xong!"
+```d2 title="Mô hình sai: giả định speedup tuyến tính vô hạn"
+direction: down
+n0: "SAI: 1 thread → 100s"
+n1: "SAI: 2 thread → 50s"
+n2: "SAI: 4 thread → 25s"
+n3: "SAI: 100 thread → 1s\nkhông thể cứ chia đều ra là xong"
 ```
 
 Thực tế đường cong speedup luôn **cong và bão hòa**, rồi **đi xuống**:
 
-```text
-✅ Thực tế:
- speedup
-   ▲
- 5 │           ╭─────●──────●─────  ← bão hòa (Amdahl) rồi TỤT (overhead)
- 4 │       ╭──●                 ●
- 3 │     ╭●                        ●
- 2 │   ╭●
- 1 │ ●
-   └──┴───┴───┴────┴──────────────────────► số thread
-     1   2   4    8             100
-        "vùng có lợi"   "vùng overhead lấn át"
+Đây là hình xu hướng định tính, không phải benchmark hay lời hứa về một số thread tối ưu cố định.
+
+```d2 title="Speedup bão hòa rồi giảm khi overhead lấn át"
+direction: down
+n0: "1 thread: mốc khởi đầu"
+n1: "2–4 thread: vùng có lợi\nspeedup tăng"
+n2: "Khoảng 8 thread: gần bão hòa\ntrần Amdahl, speedup khoảng 5× trong hình minh họa"
+n3: "Nhiều thread hơn, tới 100\noverhead lấn át, speedup tụt"
+n0 -> n1
+n1 -> n2
+n2 -> n3
 ```
 
 Có hai lực kéo ngược nhau:
@@ -106,12 +105,22 @@ Phần `(1 − P)` là **phần tuần tự** — dù `N → ∞`, speedup cũng
 
 Đọc bảng này: nếu chỉ **5%** code là tuần tự (P = 95%), thì dù có **vô hạn** core, bạn cũng chỉ nhanh được **20 lần**. Với 8 core thực tế chỉ ~5.9 lần. Đây giải thích trực tiếp vì sao "8 core mà chỉ nhanh 4 lần".
 
-```text
-Tác vụ 100s, giả sử 20s là tuần tự (đọc file đầu vào, gộp kết quả cuối):
-   1 thread:  [████████ tuần tự 20s ████████ song song 80s ]  = 100s
-   8 thread:  [████████ tuần tự 20s ██] song song 80/8=10s    = 30s
-   → speedup = 100/30 ≈ 3.3×, KHÔNG phải 8×
-   → phần tuần tự 20s là TRẦN không thể phá bằng cách thêm thread
+```d2 title="Amdahl: 20 giây tuần tự là giới hạn"
+direction: right
+r0n0: "1 thread"
+r0n1: "tuần tự 20s"
+r0n2: "song song 80s"
+r0n3: "tổng 100s"
+r0n0 -> r0n1
+r0n1 -> r0n2
+r0n2 -> r0n3
+r1n0: "8 thread"
+r1n1: "tuần tự 20s"
+r1n2: "song song 80/8=10s"
+r1n3: "tổng 30s → speedup≈3.3×, không phải 8×"
+r1n0 -> r1n1
+r1n1 -> r1n2
+r1n2 -> r1n3
 ```
 
 > [!IMPORTANT]
@@ -209,12 +218,22 @@ Cách giảm contention:
 
 CPU không quản lý bộ nhớ theo từng byte mà theo **cache line** (thường 64 byte). Nếu hai biến độc lập **nằm cùng một cache line**, và hai thread (trên hai core) mỗi thread ghi một biến, thì mỗi lần ghi làm **invalidate toàn bộ cache line** ở core kia — dù chúng chẳng dùng chung dữ liệu gì.
 
-```text
-Cache line 64 byte:  [ counter[0] | counter[1] | ... ]
-   Core 0 ghi counter[0] → invalidate cache line ở Core 1
-   Core 1 ghi counter[1] → invalidate cache line ở Core 0
-   → "ping-pong" cache line qua lại liên tục giữa các core
-   → cực chậm, dù hai biến HOÀN TOÀN độc lập
+```d2 title="False sharing: cache line ping-pong giữa core"
+direction: down
+line: "Cache line 64 byte" {
+  zero: "counter[0]"
+  one: "counter[1]"
+  rest: "…"
+}
+c0: "Core 0"
+c1: "Core 1"
+c0 -> line.zero: "ghi"
+line.zero -> c1: "invalidate cache line"
+c1 -> line.one: "ghi"
+line.one -> c0: "invalidate cache line"
+result: "Cache line ping-pong liên tục\ncực chậm dù hai biến độc lập"
+c0 -> result
+c1 -> result
 ```
 
 ```java
@@ -234,11 +253,17 @@ long[] counters = new long[numThreads];
 
 Thêm thread thường đồng nghĩa **tạo thêm object** đồng thời (mỗi request/task cấp phát buffer, DTO...). Điều này dồn áp lực lên Garbage Collector:
 
-```text
-Nhiều thread → tốc độ cấp phát (allocation rate) tăng
-   → Young generation đầy nhanh hơn → GC chạy thường xuyên hơn
-   → GC pause (stop-the-world) "ăn" vào thời gian của TẤT CẢ thread
-   → Đến mức nào đó: app dành nhiều thời gian GC hơn làm việc
+```d2 title="Allocation tăng làm GC chiếm thời gian"
+direction: down
+n0: "Nhiều thread → allocation rate tăng"
+n1: "Young generation đầy nhanh hơn"
+n2: "GC thường xuyên hơn"
+n3: "Stop-the-world pause ăn thời gian tất cả thread"
+n4: "Có thể dành nhiều thời gian GC hơn làm việc"
+n0 -> n1
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 Ngoài ra mỗi platform thread tốn **~512KB–1MB stack**. 1000 thread ≈ 0.5–1GB chỉ riêng cho stack — chưa kể heap. Đây là một lý do nữa khiến "spam thread" phản tác dụng, và là động lực cho **virtual threads** (Project Loom) — thread siêu nhẹ cho tác vụ I/O-bound.
