@@ -473,25 +473,7 @@ public void transfer(Long fromId, Long toId, BigDecimal amount) {
 
 Tổng hợp tất cả các component, đây là flow end-to-end khi một method `@Transactional` được gọi:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Transactional: metadata và begin" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(c -> p)[0]"
-#         description: "Caller → CGLIB Proxy: service.transfer()"
-#       - edge: "(p -> ti)[0]"
-#         description: "CGLIB Proxy → TransactionInterceptor: invoke(MethodInvocation)"
-#       - edge: "(ti -> tas)[0]"
-#         description: "TransactionInterceptor → TransactionAttributeSource: getTransactionAttribute(method, class)"
-#       - edge: "(tas -> ti)[0]"
-#         description: "TransactionAttributeSource → TransactionInterceptor: propagation=REQUIRED isolation=DEFAULT, rollbackFor=…"
-#       - edge: "(ti -> tm)[0]"
-#         description: "TransactionInterceptor → PlatformTransactionManager: getTransaction(definition)"
-# @endflow
+```d2 interactive title="Transactional: metadata và begin"
 shape: sequence_diagram
 c: Caller
 p: "CGLIB Proxy"
@@ -509,23 +491,7 @@ ti -> tm: "getTransaction(definition)"
 
 Với transaction mới, transaction manager lấy connection rồi bind vào thread hiện tại. Trường hợp REQUIRED tham gia transaction đã có sẽ không lặp lại việc begin vật lý này.
 
-```d2 title="Transactional: connection và thực thi target" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(tm -> ds)[0]"
-#         description: "PlatformTransactionManager → DataSource (HikariCP): getConnection()"
-#       - edge: "(ds -> tm)[0]"
-#         description: "DataSource (HikariCP) → PlatformTransactionManager: Connection từ pool"
-#       - edge: "(tm -> db)[0]"
-#         description: "PlatformTransactionManager → Database: SET autocommit=0"
-#       - edge: "(tm -> tsm)[0]"
-#         description: "PlatformTransactionManager → TransactionSynchronizationManager: bindResource(DataSource, Connection)"
-#       - edge: "(ti -> p)[0]"
-#         description: "TransactionInterceptor → CGLIB Proxy / target: Bước 3 — proceed() → target.transfer()"
-# @endflow
+```d2 interactive title="Transactional: connection và thực thi target"
 shape: sequence_diagram
 tm: PlatformTransactionManager
 ds: "DataSource (HikariCP)"
@@ -543,36 +509,7 @@ p."JdbcTemplate / Hibernate\nDataSourceUtils.getConnection()\nThreadLocal → c�
 
 Hai nhánh hoàn tất dưới đây là lựa chọn thay thế. Cả commit và rollback đều unbind rồi close connection để trả pool; return/rethrow chỉ diễn ra sau completion. Chính sách rollback còn phụ thuộc metadata, không phải mọi checked exception đều tự rollback.
 
-```d2 title="Transactional: commit hoặc rollback rồi cleanup" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: commit
-#     label: "Method thành công"
-#     steps:
-#       - edge: "(ti -> tm)[0]"
-#         description: "TransactionInterceptor → PlatformTransactionManager: commit(status)"
-#       - edge: "(tm -> db)[0]"
-#         description: "PlatformTransactionManager → Database: COMMIT"
-#       - edge: "(tm -> tsm)[0]"
-#         description: "PlatformTransactionManager → TransactionSynchronizationManager: unbindResource(DataSource)"
-#       - edge: "(tm -> ds)[0]"
-#         description: "PlatformTransactionManager → DataSource (HikariCP): connection.close() — trả về pool"
-#       - edge: "(ti -> c)[0]"
-#         description: "Interceptor trả kết quả về caller sau commit và cleanup."
-#   - id: rollback
-#     label: "RuntimeException: rollback"
-#     steps:
-#       - edge: "(ti -> tm)[1]"
-#         description: "TransactionInterceptor → PlatformTransactionManager: rollback(status)"
-#       - edge: "(tm -> db)[1]"
-#         description: "PlatformTransactionManager → Database: ROLLBACK"
-#       - edge: "(tm -> tsm)[0]"
-#         description: "PlatformTransactionManager → TransactionSynchronizationManager: unbindResource(DataSource)"
-#       - edge: "(tm -> ds)[0]"
-#         description: "PlatformTransactionManager → DataSource (HikariCP): connection.close() — trả về pool"
-#       - edge: "(ti -> c)[0]"
-#         description: "Interceptor ném lại lỗi về caller sau rollback và cleanup."
-# @endflow
+```d2 interactive title="Transactional: commit hoặc rollback rồi cleanup"
 shape: sequence_diagram
 ti: TransactionInterceptor
 tm: PlatformTransactionManager

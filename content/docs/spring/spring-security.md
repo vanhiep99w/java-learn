@@ -305,47 +305,7 @@ Khi bạn gọi `addFilterBefore(myFilter, UsernamePasswordAuthenticationFilter.
 
 ### 6.1. Flow tổng quan
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="6.1. Flow tổng quan" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_C -> n_F)[0]"
-#         description: "Client → AuthenticationFilter: POST /login (username, password)"
-#       - edge: "(n_F -> n_F)[0]"
-#         description: "AuthenticationFilter → AuthenticationFilter: Tạo UsernamePasswordAuthenticationToken (unauthenticated)"
-#       - edge: "(n_F -> n_AM)[0]"
-#         description: "AuthenticationFilter → AuthenticationManager: authenticate(token)"
-#       - edge: "(n_AM -> n_PM)[0]"
-#         description: "AuthenticationManager → ProviderManager: delegate"
-#       - edge: "(n_PM -> n_PM)[0]"
-#         description: "ProviderManager → ProviderManager: Duyệt providers list"
-#       - edge: "(n_PM -> n_AP)[0]"
-#         description: "ProviderManager → AuthenticationProvider: supports(token.class)? → true"
-#       - edge: "(n_PM -> n_AP)[1]"
-#         description: "ProviderManager → AuthenticationProvider: authenticate(token)"
-#       - edge: "(n_AP -> n_UDS)[0]"
-#         description: "AuthenticationProvider → UserDetailsService: loadUserByUsername(username)"
-#       - edge: "(n_UDS -> n_AP)[0]"
-#         description: "UserDetailsService → AuthenticationProvider: UserDetails"
-#       - edge: "(n_AP -> n_PE)[0]"
-#         description: "AuthenticationProvider → PasswordEncoder: matches(rawPassword, encodedPassword)"
-#       - edge: "(n_PE -> n_AP)[0]"
-#         description: "PasswordEncoder → AuthenticationProvider: true"
-#       - edge: "(n_AP -> n_PM)[0]"
-#         description: "AuthenticationProvider → ProviderManager: Authentication(authenticated=true, authorities)"
-#       - edge: "(n_PM -> n_AM)[0]"
-#         description: "ProviderManager → AuthenticationManager: return"
-#       - edge: "(n_AM -> n_F)[0]"
-#         description: "AuthenticationManager → AuthenticationFilter: return"
-#       - edge: "(n_F -> n_F)[1]"
-#         description: "AuthenticationFilter → AuthenticationFilter: SecurityContextHolder.setContext(auth)"
-#       - edge: "(n_F -> n_C)[0]"
-#         description: "AuthenticationFilter → Client: 302 Redirect / 200 OK"
-# @endflow
+```d2 title="6.1. Flow tổng quan"
 shape: sequence_diagram
 n_C: "Client"
 n_F: "AuthenticationFilter"
@@ -1077,17 +1037,7 @@ http.oauth2ResourceServer(oauth2 -> oauth2
 
 HTTP minh họa: response body là `{"active":true,"sub":"user1","scope":"read write","exp":1234567890}`; `abc123` chỉ là token demo.
 
-```d2 title="Opaque token introspection" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(resource -> auth)[0]"
-#         description: "Resource Server → https://auth-server/introspect: POST token=abc123&token_type_hint=access_token"
-#       - edge: "(auth -> resource)[0]"
-#         description: "https://auth-server/introspect → Resource Server: active=true, sub=user1 scope=read write, exp=1234567890"
-# @endflow
+```d2 title="Opaque token introspection"
 shape: sequence_diagram
 resource: "Resource Server"
 auth: "https://auth-server/introspect"
@@ -1138,39 +1088,7 @@ spring:
 
 ### 13.2. Authorization Code Flow
 
-```d2 title="13.2. Authorization Code Flow" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_U -> n_App)[0]"
-#         description: "User Browser → Spring App: GET /oauth2/authorization/google"
-#       - edge: "(n_App -> n_App)[0]"
-#         description: "Spring App → Spring App: OAuth2AuthorizationRequestRedirectFilter Tạo authorization request (state, nonce, PKCE)"
-#       - edge: "(n_App -> n_U)[0]"
-#         description: "Spring App → User Browser: 302 Redirect → Google authorization endpoint"
-#       - edge: "(n_U -> n_Auth)[0]"
-#         description: "User Browser → Google OAuth2: Login + consent"
-#       - edge: "(n_Auth -> n_U)[0]"
-#         description: "Google OAuth2 → User Browser: 302 Redirect → /login/oauth2/code/google?code=abc&state=xyz"
-#       - edge: "(n_U -> n_App)[1]"
-#         description: "User Browser → Spring App: GET /login/oauth2/code/google?code=abc&state=xyz"
-#       - edge: "(n_App -> n_App)[1]"
-#         description: "Spring App → Spring App: OAuth2LoginAuthenticationFilter Extract code + verify state"
-#       - edge: "(n_App -> n_Auth)[0]"
-#         description: "Spring App → Google OAuth2: POST /token (code + client_secret + redirect_uri)"
-#       - edge: "(n_Auth -> n_App)[0]"
-#         description: "Google OAuth2 → Spring App: { access_token, id_token, refresh_token }"
-#       - edge: "(n_App -> n_Auth)[1]"
-#         description: "Spring App → Google OAuth2: GET /userinfo (Authorization: Bearer access_token)"
-#       - edge: "(n_Auth -> n_App)[1]"
-#         description: "Google OAuth2 → Spring App: { sub, email, name, picture }"
-#       - edge: "(n_App -> n_App)[2]"
-#         description: "Spring App → Spring App: Tạo OAuth2AuthenticationToken Set SecurityContext"
-#       - edge: "(n_App -> n_U)[1]"
-#         description: "Spring App → User Browser: 302 Redirect → /dashboard"
-# @endflow
+```d2 title="13.2. Authorization Code Flow"
 shape: sequence_diagram
 n_U: "User Browser"
 n_App: "Spring App"

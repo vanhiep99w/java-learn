@@ -152,25 +152,7 @@ invokespecial Animal.<init>()V
 
 Với constructor thông thường trong ví dụ này, trình tự là:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="3.2. Constructor chaining: Animal trước, Dog sau" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(caller -> dog)[0]"
-#         description: "Caller → Dog.<init>: invokespecial Dog.<init>()"
-#       - edge: "(dog -> animal)[0]"
-#         description: "Dog.<init> → Animal.<init>: invokespecial Animal.<init>()"
-#       - edge: "(animal -> dog)[0]"
-#         description: "Animal.<init> → Dog.<init>: Constructor cha hoàn tất"
-#       - edge: "(dog -> dog)[0]"
-#         description: "Dog.<init> → Dog.<init>: Khởi tạo field của Dog rồi chạy phần thân constructor"
-#       - edge: "(dog -> caller)[0]"
-#         description: "Dog.<init> → Caller: Dog.<init> hoàn tất (void)"
-# @endflow
+```d2 title="3.2. Constructor chaining: Animal trước, Dog sau"
 shape: sequence_diagram
 caller: Caller
 dog: "Dog.<init>"

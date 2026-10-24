@@ -462,45 +462,7 @@ n_MANUAL_REVIEW -> n_CANCELLED: "manual resolution"
 
 ### 9.2. Luồng thành công
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="9.2. Luồng thành công" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_C -> n_O)[0]"
-#         description: "Client → Order Orchestrator: process(orderId, requestId)"
-#       - edge: "(n_O -> n_DB)[0]"
-#         description: "Order Orchestrator → Order DB: TX1: NEW → PROCESSING, create saga"
-#       - edge: "(n_DB -> n_O)[0]"
-#         description: "Order DB → Order Orchestrator: COMMIT"
-#       - edge: "(n_O -> n_P)[0]"
-#         description: "Order Orchestrator → Payment API: authorize(idempotencyKey)"
-#       - edge: "(n_P -> n_O)[0]"
-#         description: "Payment API → Order Orchestrator: paymentRef"
-#       - edge: "(n_O -> n_DB)[1]"
-#         description: "Order Orchestrator → Order DB: TX2: payment step → SUCCEEDED"
-#       - edge: "(n_O -> n_I)[0]"
-#         description: "Order Orchestrator → Inventory API: reserve(idempotencyKey)"
-#       - edge: "(n_I -> n_O)[0]"
-#         description: "Inventory API → Order Orchestrator: reservationRef"
-#       - edge: "(n_O -> n_DB)[2]"
-#         description: "Order Orchestrator → Order DB: TX3: inventory step → SUCCEEDED"
-#       - edge: "(n_O -> n_S)[0]"
-#         description: "Order Orchestrator → Shipping API: reserveShipment(idempotencyKey)"
-#       - edge: "(n_S -> n_O)[0]"
-#         description: "Shipping API → Order Orchestrator: shipmentRef"
-#       - edge: "(n_O -> n_DB)[3]"
-#         description: "Order Orchestrator → Order DB: TX4: shipping step → SUCCEEDED"
-#       - edge: "(n_O -> n_DB)[4]"
-#         description: "Order Orchestrator → Order DB: TX5: PROCESSING → COMPLETED"
-#       - edge: "(n_DB -> n_O)[1]"
-#         description: "Order DB → Order Orchestrator: COMMIT"
-#       - edge: "(n_O -> n_C)[0]"
-#         description: "Order Orchestrator → Client: success"
-# @endflow
+```d2 title="9.2. Luồng thành công"
 shape: sequence_diagram
 n_C: "Client"
 n_O: "Order Orchestrator"
@@ -531,45 +493,7 @@ Mỗi database transaction ngắn. Không transaction nào mở trong lúc chờ
 
 Giả sử Payment và Inventory thành công nhưng Shipping thất bại:
 
-```d2 title="9.3. Luồng thất bại và compensation" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_O -> n_P)[0]"
-#         description: "Orchestrator → Payment API: authorize(payment-key)"
-#       - edge: "(n_P -> n_O)[0]"
-#         description: "Payment API → Orchestrator: success"
-#       - edge: "(n_O -> n_DB)[0]"
-#         description: "Orchestrator → Order DB: payment = SUCCEEDED"
-#       - edge: "(n_O -> n_I)[0]"
-#         description: "Orchestrator → Inventory API: reserve(inventory-key)"
-#       - edge: "(n_I -> n_O)[0]"
-#         description: "Inventory API → Orchestrator: success"
-#       - edge: "(n_O -> n_DB)[1]"
-#         description: "Orchestrator → Order DB: inventory = SUCCEEDED"
-#       - edge: "(n_O -> n_S)[0]"
-#         description: "Orchestrator → Shipping API: reserveShipment(shipping-key)"
-#       - edge: "(n_S -> n_O)[0]"
-#         description: "Shipping API → Orchestrator: permanent failure"
-#       - edge: "(n_O -> n_DB)[2]"
-#         description: "Orchestrator → Order DB: saga = COMPENSATING"
-#       - edge: "(n_O -> n_I)[1]"
-#         description: "Orchestrator → Inventory API: release(inventory-compensation-key)"
-#       - edge: "(n_I -> n_O)[1]"
-#         description: "Inventory API → Orchestrator: success"
-#       - edge: "(n_O -> n_DB)[3]"
-#         description: "Orchestrator → Order DB: inventory = COMPENSATED"
-#       - edge: "(n_O -> n_P)[1]"
-#         description: "Orchestrator → Payment API: voidAuthorization(payment-compensation-key)"
-#       - edge: "(n_P -> n_O)[1]"
-#         description: "Payment API → Orchestrator: success"
-#       - edge: "(n_O -> n_DB)[4]"
-#         description: "Orchestrator → Order DB: payment = COMPENSATED"
-#       - edge: "(n_O -> n_DB)[5]"
-#         description: "Orchestrator → Order DB: order = CANCELLED"
-# @endflow
+```d2 title="9.3. Luồng thất bại và compensation"
 shape: sequence_diagram
 n_O: "Orchestrator"
 n_DB: "Order DB"
@@ -718,25 +642,7 @@ Cách xử lý:
 4. Nếu crash giữa bước 2 và 3, worker retry bằng **cùng idempotency key**.
 5. Remote service trả lại kết quả cũ thay vì thực hiện lần hai.
 
-```d2 title="12. Crash window: API thành công nhưng chưa kịp lưu DB" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(app -> db)[0]"
-#         description: "App / recovery worker → Local DB: step = STARTED"
-#       - edge: "(app -> remote)[0]"
-#         description: "App / recovery worker → Remote API: call với idempotency key K"
-#       - edge: "(remote -> remote)[0]"
-#         description: "Remote API → Remote API: lưu K → success + externalRef"
-#       - edge: "(app -> remote)[1]"
-#         description: "App / recovery worker → Remote API: Recovery: retry cùng key K"
-#       - edge: "(remote -> app)[0]"
-#         description: "Remote API → App / recovery worker: success + externalRef cũ (không làm lại side effect)"
-#       - edge: "(app -> db)[1]"
-#         description: "App / recovery worker → Local DB: step = SUCCEEDED"
-# @endflow
+```d2 title="12. Crash window: API thành công nhưng chưa kịp lưu DB"
 shape: sequence_diagram
 app: "App / recovery worker"
 db: "Local DB"

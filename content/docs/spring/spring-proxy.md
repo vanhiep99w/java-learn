@@ -624,35 +624,7 @@ Khi một bean có **nhiều** annotation (`@Transactional` + `@Cacheable` + cus
 
 ### 9.1. Chain execution model
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="9.1. Chain execution model" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_C -> n_P)[0]"
-#         description: "Caller → Proxy: getPrice(\"SKU-1\")"
-#       - edge: "(n_P -> n_I1)[0]"
-#         description: "Proxy → CacheInterceptor: invoke(invocation)"
-#       - edge: "(n_I1 -> n_I2)[0]"
-#         description: "CacheInterceptor → TransactionInterceptor: invocation.proceed()"
-#       - edge: "(n_I2 -> n_I3)[0]"
-#         description: "TransactionInterceptor → TimingInterceptor: invocation.proceed()"
-#       - edge: "(n_I3 -> n_T)[0]"
-#         description: "TimingInterceptor → Target Method: invocation.proceed() → target.getPrice()"
-#       - edge: "(n_T -> n_I3)[0]"
-#         description: "Target Method → TimingInterceptor: return 42.00"
-#       - edge: "(n_I3 -> n_I2)[0]"
-#         description: "TimingInterceptor → TransactionInterceptor: return 42.00"
-#       - edge: "(n_I2 -> n_I1)[0]"
-#         description: "TransactionInterceptor → CacheInterceptor: return 42.00"
-#       - edge: "(n_I1 -> n_P)[0]"
-#         description: "CacheInterceptor → Proxy: return 42.00"
-#       - edge: "(n_P -> n_C)[0]"
-#         description: "Proxy → Caller: return 42.00"
-# @endflow
+```d2 title="9.1. Chain execution model"
 shape: sequence_diagram
 n_C: "Caller"
 n_P: "Proxy"

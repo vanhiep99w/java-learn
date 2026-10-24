@@ -103,41 +103,7 @@ Nói ngắn gọn: Spring Data chọn *thao tác nào cần làm*, JPA định n
 
 ### Luồng thực thi một lời gọi repository
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Luồng thực thi một lời gọi repository" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_C -> n_S)[0]"
-#         description: "Controller → Service proxy: findActiveProducts()"
-#       - edge: "(n_S -> n_S)[0]"
-#         description: "Service proxy → Service proxy: Mở transaction read only"
-#       - edge: "(n_S -> n_R)[0]"
-#         description: "Service proxy → Repository proxy: findByStatus(ACTIVE)"
-#       - edge: "(n_R -> n_R)[0]"
-#         description: "Repository proxy → Repository proxy: Phân tích metadata query"
-#       - edge: "(n_R -> n_EM)[0]"
-#         description: "Repository proxy → EntityManager: Thực thi JPQL hoặc Criteria"
-#       - edge: "(n_EM -> n_H)[0]"
-#         description: "EntityManager → Hibernate: Provider xử lý query"
-#       - edge: "(n_H -> n_DB)[0]"
-#         description: "Hibernate → Database: SQL và bind parameters"
-#       - edge: "(n_DB -> n_H)[0]"
-#         description: "Database → Hibernate: Result set"
-#       - edge: "(n_H -> n_EM)[0]"
-#         description: "Hibernate → EntityManager: Entity hoặc projection"
-#       - edge: "(n_EM -> n_R)[0]"
-#         description: "EntityManager → Repository proxy: Kết quả"
-#       - edge: "(n_R -> n_S)[0]"
-#         description: "Repository proxy → Service proxy: List hoặc Page"
-#       - edge: "(n_S -> n_S)[1]"
-#         description: "Service proxy → Service proxy: Kết thúc transaction"
-#       - edge: "(n_S -> n_C)[0]"
-#         description: "Service proxy → Controller: DTO response"
-# @endflow
+```d2 title="Luồng thực thi một lời gọi repository"
 shape: sequence_diagram
 n_C: "Controller"
 n_S: "Service proxy"

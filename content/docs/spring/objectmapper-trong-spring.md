@@ -102,33 +102,7 @@ Content-Type: application/json
 
 luồng xử lý là:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="2. Luồng JSON trong Spring MVC" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(n_Client -> n_MVC)[0]"
-#         description: "Client → Spring MVC: POST /users + JSON body"
-#       - edge: "(n_MVC -> n_Converter)[0]"
-#         description: "Spring MVC → MappingJackson2HttpMessageConverter: đọc @RequestBody CreateUserRequest"
-#       - edge: "(n_Converter -> n_Mapper)[0]"
-#         description: "MappingJackson2HttpMessageConverter → ObjectMapper: readValue(body, CreateUserRequest)"
-#       - edge: "(n_Mapper -> n_Converter)[0]"
-#         description: "ObjectMapper → MappingJackson2HttpMessageConverter: CreateUserRequest"
-#       - edge: "(n_Converter -> n_Controller)[0]"
-#         description: "MappingJackson2HttpMessageConverter → Controller: tham số request"
-#       - edge: "(n_Controller -> n_MVC)[0]"
-#         description: "Controller → Spring MVC: UserResponse"
-#       - edge: "(n_MVC -> n_Converter)[1]"
-#         description: "Spring MVC → MappingJackson2HttpMessageConverter: ghi response JSON"
-#       - edge: "(n_Converter -> n_Mapper)[1]"
-#         description: "MappingJackson2HttpMessageConverter → ObjectMapper: writeValue(response)"
-#       - edge: "(n_Mapper -> n_Client)[0]"
-#         description: "ObjectMapper → Client: 200 + JSON body"
-# @endflow
+```d2 title="2. Luồng JSON trong Spring MVC"
 shape: sequence_diagram
 n_Client: "Client"
 n_MVC: "Spring MVC"
