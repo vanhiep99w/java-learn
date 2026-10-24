@@ -112,7 +112,29 @@ Trong Spring AOP, join point thực tế chỉ là **method execution trên Spri
 - **Proxy** là object Spring đặt trước target. Caller gọi proxy, proxy chạy advice rồi mới gọi target.
 - **Weaving** là hành động ghép aspect vào chương trình. Spring AOP làm việc này lúc khởi tạo bean bằng proxy; AspectJ có thể weave ở compile time hoặc class-load time.
 
-```d2 title="2.2. Target, proxy và weaving"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="2.2. Target, proxy và weaving" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_C -> n_P)[0]"
+#         description: "Caller → Spring AOP Proxy: orderService.placeOrder(command)"
+#       - edge: "(n_P -> n_A)[0]"
+#         description: "Spring AOP Proxy → Advice chain: tìm advice khớp method"
+#       - edge: "(n_A -> n_A)[0]"
+#         description: "Advice chain → Advice chain: before / around logic"
+#       - edge: "(n_A -> n_T)[0]"
+#         description: "Advice chain → Target bean: gọi placeOrder() thật"
+#       - edge: "(n_T -> n_A)[0]"
+#         description: "Target bean → Advice chain: return hoặc throw"
+#       - edge: "(n_A -> n_P)[0]"
+#         description: "Advice chain → Spring AOP Proxy: after / error logic"
+#       - edge: "(n_P -> n_C)[0]"
+#         description: "Spring AOP Proxy → Caller: return hoặc rethrow"
+# @endflow
 shape: sequence_diagram
 n_C: "Caller"
 n_P: "Spring AOP Proxy"
@@ -427,7 +449,29 @@ r1n1 -> r1n2
 r1n2 -> r1n3
 ```
 
-```d2 title="8. Thứ tự nhiều aspect"
+```d2 title="8. Thứ tự nhiều aspect" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_C -> n_T)[0]"
+#         description: "Caller → Trace @Order(10): invoke"
+#       - edge: "(n_T -> n_A)[0]"
+#         description: "Trace @Order(10) → Audit @Order(20): proceed"
+#       - edge: "(n_A -> n_X)[0]"
+#         description: "Audit @Order(20) → Transaction advisor: proceed"
+#       - edge: "(n_X -> n_S)[0]"
+#         description: "Transaction advisor → Service: proceed"
+#       - edge: "(n_S -> n_X)[0]"
+#         description: "Service → Transaction advisor: result"
+#       - edge: "(n_X -> n_A)[0]"
+#         description: "Transaction advisor → Audit @Order(20): commit then result"
+#       - edge: "(n_A -> n_T)[0]"
+#         description: "Audit @Order(20) → Trace @Order(10): audit then result"
+#       - edge: "(n_T -> n_C)[0]"
+#         description: "Trace @Order(10) → Caller: log latency then result"
+# @endflow
 shape: sequence_diagram
 n_C: "Caller"
 n_T: "Trace @Order(10)"

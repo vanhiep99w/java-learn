@@ -669,7 +669,31 @@ Với tác vụ xử lý hàng trăm nghìn row, đừng giữ tất cả entity
 
 Persistence context hoạt động như transactional write-behind cache: thay đổi được ghi vào object trước, còn DML được hoãn và gom lại.
 
-```d2 title="Luồng write-behind"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Luồng write-behind" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_App -> n_PC)[0]"
+#         description: "Application → Persistence Context: find(Product, id)"
+#       - edge: "(n_PC -> n_DB)[0]"
+#         description: "Persistence Context → Database Transaction: SELECT ... WHERE id = ?"
+#       - edge: "(n_DB -> n_PC)[0]"
+#         description: "Database Transaction → Persistence Context: row"
+#       - edge: "(n_App -> n_PC)[1]"
+#         description: "Application → Persistence Context: product.changePrice(...)"
+#       - edge: "(n_App -> n_PC)[2]"
+#         description: "Application → Persistence Context: flush hoặc auto-flush"
+#       - edge: "(n_PC -> n_DB)[1]"
+#         description: "Persistence Context → Database Transaction: UPDATE products ..."
+#       - edge: "(n_App -> n_DB)[0]"
+#         description: "Application → Database Transaction: commit"
+#       - edge: "(n_DB -> n_App)[0]"
+#         description: "Database Transaction → Application: durable nếu commit thành công"
+# @endflow
 shape: sequence_diagram
 n_App: "Application"
 n_PC: "Persistence Context"

@@ -84,7 +84,31 @@ topic.p2 -> group.c
 
 ### 3.1. Send flow
 
-```d2 title="3.1. Send flow"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="3.1. Send flow" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_App -> n_P)[0]"
+#         description: "Application → KafkaProducer: send(record)"
+#       - edge: "(n_P -> n_P)[0]"
+#         description: "KafkaProducer → KafkaProducer: serialize key/value"
+#       - edge: "(n_P -> n_P)[1]"
+#         description: "KafkaProducer → KafkaProducer: partition(key) → partition number"
+#       - edge: "(n_P -> n_A)[0]"
+#         description: "KafkaProducer → Accumulator: append to batch (per partition)"
+#       - edge: "(n_A -> n_S)[0]"
+#         description: "Accumulator → Sender Thread: batch ready"
+#       - edge: "(n_S -> n_B)[0]"
+#         description: "Sender Thread → Broker: Produce request (batch of records)"
+#       - edge: "(n_B -> n_S)[0]"
+#         description: "Broker → Sender Thread: ACK (or error)"
+#       - edge: "(n_S -> n_App)[0]"
+#         description: "Sender Thread → Application: callback(metadata/exception)"
+# @endflow
 shape: sequence_diagram
 n_App: "Application"
 n_P: "KafkaProducer"

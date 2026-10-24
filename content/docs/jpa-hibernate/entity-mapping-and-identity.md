@@ -802,7 +802,31 @@ Check `findBySku()` giúp thông báo lỗi đẹp nhưng không chống race co
 
 `persist()` chuyển entity thành managed, nhưng `INSERT` thường chờ đến flush hoặc commit. Ngoại lệ đáng chú ý là `IDENTITY`: provider thường phải insert sớm để lấy generated id từ database.
 
-```d2 title="8.2. save không đồng nghĩa với INSERT ngay lập tức"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="8.2. save không đồng nghĩa với INSERT ngay lập tức" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_S -> n_R)[0]"
+#         description: "Service → JpaRepository: save(new Product)"
+#       - edge: "(n_R -> n_EM)[0]"
+#         description: "JpaRepository → EntityManager: persist(entity)"
+#       - edge: "(n_EM -> n_H)[0]"
+#         description: "EntityManager → Hibernate: entity trở thành managed"
+#       - edge: "(n_S -> n_S)[0]"
+#         description: "Service → Service: tiếp tục business logic"
+#       - edge: "(n_S -> n_EM)[0]"
+#         description: "Service → EntityManager: transaction commit"
+#       - edge: "(n_EM -> n_H)[1]"
+#         description: "EntityManager → Hibernate: flush"
+#       - edge: "(n_H -> n_DB)[0]"
+#         description: "Hibernate → Database: INSERT product ..."
+#       - edge: "(n_DB -> n_H)[0]"
+#         description: "Database → Hibernate: thành công hoặc constraint violation"
+# @endflow
 shape: sequence_diagram
 n_S: "Service"
 n_R: "JpaRepository"

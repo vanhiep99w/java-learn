@@ -2053,7 +2053,27 @@ user -> project: "shared_with"
 
 Khi relation graph sâu hoặc nhiều service cùng cần policy, cân nhắc external PDP. Request flow khi đó là:
 
-```d2 title="10. Context-Based, PBAC và ReBAC trong Spring"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="10. Context-Based, PBAC và ReBAC trong Spring" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_API -> n_API)[0]"
+#         description: "Spring Boot API → Spring Boot API: Xác thực token"
+#       - edge: "(n_API -> n_PDP)[0]"
+#         description: "Spring Boot API → Policy Engine: subject, action, resource, context"
+#       - edge: "(n_PDP -> n_DB)[0]"
+#         description: "Policy Engine → Relation/Policy Store: Đọc policy/relationship"
+#       - edge: "(n_DB -> n_PDP)[0]"
+#         description: "Relation/Policy Store → Policy Engine: Attributes + tuples"
+#       - edge: "(n_PDP -> n_API)[0]"
+#         description: "Policy Engine → Spring Boot API: ALLOW/DENY + reason + policyVersion"
+#       - edge: "(n_API -> n_API)[1]"
+#         description: "Spring Boot API → Spring Boot API: Enforce, audit decision"
+# @endflow
 shape: sequence_diagram
 n_API: "Spring Boot API"
 n_PDP: "Policy Engine"

@@ -333,7 +333,33 @@ Thứ tự SQL cụ thể phụ thuộc mapping, chiến lược sinh ID, batchi
 
 Luồng dưới đây mô tả lời gọi qua proxy Spring với Hibernate làm JPA provider:
 
-```d2 interactive title="JPA: từ proxy tới dirty managed entity"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="JPA: từ proxy tới dirty managed entity" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(c -> p)[0]"
+#         description: "Controller → Spring transaction proxy: placeOrder(productId, quantity)"
+#       - edge: "(p -> em)[0]"
+#         description: "Spring transaction proxy → EntityManager: mở hoặc tham gia transaction"
+#       - edge: "(p -> s)[0]"
+#         description: "Spring transaction proxy → OrderService: gọi method thật"
+#       - edge: "(s -> em)[0]"
+#         description: "OrderService → EntityManager: find(Product)"
+#       - edge: "(em -> db)[0]"
+#         description: "EntityManager → Database: SELECT product"
+#       - edge: "(db -> em)[0]"
+#         description: "Database → EntityManager: row và version"
+#       - edge: "(s -> s)[0]"
+#         description: "OrderService → OrderService: product.reserve(quantity)"
+#       - edge: "(s -> em)[1]"
+#         description: "OrderService → EntityManager: persist(Order)"
+#       - edge: "(s -> p)[0]"
+#         description: "OrderService → Spring transaction proxy: return orderId (chưa commit)"
+# @endflow
 shape: sequence_diagram
 c: Controller
 p: "Spring transaction proxy"
@@ -354,7 +380,48 @@ s -> p: "return orderId (chưa commit)"
 
 Method trả về chưa đồng nghĩa transaction đã commit. Ở pha sau, EntityManager yêu cầu Hibernate flush; lỗi constraint hoặc version conflict vẫn có thể khiến caller nhận exception thay vì orderId.
 
-```d2 interactive title="JPA: flush, commit hoặc rollback"
+```d2 title="JPA: flush, commit hoặc rollback" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: commit
+#     label: "SQL thành công: commit"
+#     steps:
+#       - edge: "(p -> em)[0]"
+#         description: "Spring transaction proxy → EntityManager: commit"
+#       - edge: "(em -> h)[0]"
+#         description: "EntityManager → Hibernate: flush persistence context"
+#       - edge: "(h -> db)[0]"
+#         description: "Hibernate → Database: INSERT order"
+#       - edge: "(h -> db)[1]"
+#         description: "Hibernate → Database: UPDATE product WHERE version = oldVersion"
+#       - edge: "(em -> db)[0]"
+#         description: "EntityManager → Database: COMMIT"
+#       - edge: "(db -> em)[0]"
+#         description: "Database → EntityManager: commit thành công"
+#       - edge: "(em -> p)[0]"
+#         description: "EntityManager → Spring transaction proxy: success"
+#       - edge: "(p -> c)[0]"
+#         description: "Spring transaction proxy → Controller: orderId"
+#   - id: rollback
+#     label: "SQL lỗi: rollback"
+#     steps:
+#       - edge: "(p -> em)[0]"
+#         description: "Spring transaction proxy → EntityManager: commit"
+#       - edge: "(em -> h)[0]"
+#         description: "EntityManager → Hibernate: flush persistence context"
+#       - edge: "(h -> db)[0]"
+#         description: "Hibernate → Database: INSERT order"
+#       - edge: "(h -> db)[1]"
+#         description: "Hibernate → Database: UPDATE product WHERE version = oldVersion"
+#       - edge: "(db -> em)[1]"
+#         description: "Database → EntityManager: lỗi"
+#       - edge: "(em -> db)[1]"
+#         description: "EntityManager → Database: ROLLBACK"
+#       - edge: "(em -> p)[1]"
+#         description: "EntityManager → Spring transaction proxy: exception"
+#       - edge: "(p -> c)[1]"
+#         description: "Spring transaction proxy → Controller: exception"
+# @endflow
 shape: sequence_diagram
 p: "Spring transaction proxy"
 em: EntityManager

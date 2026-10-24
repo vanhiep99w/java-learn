@@ -176,7 +176,41 @@ Trong Spring Boot, auto-configuration thường tạo `DataSource`, `EntityManag
 
 ### Một request đi qua hệ thống như thế nào
 
-```d2 title="Một request đi qua hệ thống như thế nào"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Một request đi qua hệ thống như thế nào" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_Client -> n_Controller)[0]"
+#         description: "Client → Controller: 1. PATCH /products/42"
+#       - edge: "(n_Controller -> n_Service)[0]"
+#         description: "Controller → Service: 2. rename(42, \"Mechanical Keyboard\")"
+#       - edge: "(n_Service -> n_PC)[0]"
+#         description: "Service → Persistence Context: 3. find(Product.class, 42)"
+#       - edge: "(n_PC -> n_H)[0]"
+#         description: "Persistence Context → Hibernate: 4. cần tải entity nếu chưa có"
+#       - edge: "(n_H -> n_DB)[0]"
+#         description: "Hibernate → Database: 5. SELECT ... WHERE id = ?"
+#       - edge: "(n_DB -> n_H)[0]"
+#         description: "Database → Hibernate: 6. một row"
+#       - edge: "(n_H -> n_PC)[0]"
+#         description: "Hibernate → Persistence Context: 7. hydrate Product và quản lý instance"
+#       - edge: "(n_Service -> n_PC)[1]"
+#         description: "Service → Persistence Context: 8. product.rename(...)"
+#       - edge: "(n_PC -> n_H)[1]"
+#         description: "Persistence Context → Hibernate: 9. flush trước commit"
+#       - edge: "(n_H -> n_DB)[1]"
+#         description: "Hibernate → Database: 10. UPDATE products SET name = ? WHERE id = ?"
+#       - edge: "(n_DB -> n_H)[1]"
+#         description: "Database → Hibernate: 11. affected rows = 1"
+#       - edge: "(n_Service -> n_Controller)[0]"
+#         description: "Service → Controller: 12. hoàn tất"
+#       - edge: "(n_Controller -> n_Client)[0]"
+#         description: "Controller → Client: 13. 204 No Content"
+# @endflow
 shape: sequence_diagram
 n_Client: "Client"
 n_Controller: "Controller"

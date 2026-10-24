@@ -623,7 +623,29 @@ public void removeComment(long postId, long commentId) {
 }
 ```
 
-```d2 title="7.2. Orphan removal xóa child rời aggregate"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="7.2. Orphan removal xóa child rời aggregate" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_S -> n_P)[0]"
+#         description: "Service transaction → Managed Post: removeComment(comment)"
+#       - edge: "(n_P -> n_P)[0]"
+#         description: "Managed Post → Managed Post: comments.remove(comment)"
+#       - edge: "(n_P -> n_C)[0]"
+#         description: "Managed Post → Managed PostComment: post = null"
+#       - edge: "(n_S -> n_H)[0]"
+#         description: "Service transaction → Hibernate flush: transaction commit triggers flush"
+#       - edge: "(n_H -> n_H)[0]"
+#         description: "Hibernate flush → Hibernate flush: compare collection snapshot"
+#       - edge: "(n_H -> n_D)[0]"
+#         description: "Hibernate flush → Database: delete from post_comments where id = ?"
+#       - edge: "(n_D -> n_H)[0]"
+#         description: "Database → Hibernate flush: 1 row deleted"
+# @endflow
 shape: sequence_diagram
 n_S: "Service transaction"
 n_P: "Managed Post"

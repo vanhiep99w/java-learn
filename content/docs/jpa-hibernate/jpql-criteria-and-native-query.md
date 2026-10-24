@@ -1070,7 +1070,35 @@ spring.jpa.properties.hibernate.query.fail_on_pagination_over_collection_fetch=t
 
 Một query không đi thẳng từ chuỗi JPQL tới database. Hibernate parse query, resolve mapping, tạo SQL theo dialect, flush khi cần, bind parameter, chạy JDBC rồi materialize kết quả.
 
-```d2 title="7 Luồng thực thi và SQL Hibernate sinh ra"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="7 Luồng thực thi và SQL Hibernate sinh ra" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(app -> em)[0]"
+#         description: "Application → EntityManager: createQuery và bind parameter"
+#       - edge: "(app -> em)[1]"
+#         description: "Application → EntityManager: getResultList"
+#       - edge: "(em -> pc)[0]"
+#         description: "EntityManager → Persistence Context: kiểm tra flush mode và pending changes"
+#       - edge: "(pc -> db)[0]"
+#         description: "Persistence Context → Database: Nếu cần AUTO flush: INSERT / UPDATE / DELETE đang chờ"
+#       - edge: "(em -> hibernate)[0]"
+#         description: "EntityManager → Hibernate Query Engine: parse JPQL hoặc Criteria tree"
+#       - edge: "(hibernate -> hibernate)[0]"
+#         description: "Hibernate Query Engine → Hibernate Query Engine: resolve entity mapping, tạo SQL AST"
+#       - edge: "(hibernate -> db)[0]"
+#         description: "Hibernate Query Engine → Database: prepared SQL và bind values"
+#       - edge: "(db -> hibernate)[0]"
+#         description: "Database → Hibernate Query Engine: result set"
+#       - edge: "(hibernate -> pc)[0]"
+#         description: "Hibernate Query Engine → Persistence Context: resolve identity và hydrate entity"
+#       - edge: "(pc -> app)[0]"
+#         description: "Persistence Context → Application: entity / DTO / scalar / Tuple"
+# @endflow
 shape: sequence_diagram
 app: Application
 em: EntityManager

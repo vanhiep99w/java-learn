@@ -230,7 +230,27 @@ class AnnotationInvocationHandler implements InvocationHandler {
 
 **Flow hoàn chỉnh khi gọi `getAnnotation()`:**
 
-```d2 title="6.2. Cách AnnotationInvocationHandler hoạt động — chi tiết nội bộ"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="6.2. Cách AnnotationInvocationHandler hoạt động — chi tiết nội bộ" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_Code -> n_Class)[0]"
+#         description: "Application Code → Class object: getAnnotation(MyAnnotation.class)"
+#       - edge: "(n_Class -> n_CP)[0]"
+#         description: "Class object → .class constant pool: Đọc RuntimeVisibleAnnotations attribute"
+#       - edge: "(n_CP -> n_Class)[0]"
+#         description: ".class constant pool → Class object: Raw bytes: element-value pairs"
+#       - edge: "(n_Class -> n_Class)[0]"
+#         description: "Class object → Class object: Parse thành Map<String, Object>"
+#       - edge: "(n_Class -> n_Proxy)[0]"
+#         description: "Class object → Proxy.newProxyInstance: Tạo dynamic proxy (MyAnnotation interface)"
+#       - edge: "(n_Proxy -> n_Code)[0]"
+#         description: "Proxy.newProxyInstance → Application Code: $Proxy1 instance (cached)"
+# @endflow
 shape: sequence_diagram
 n_Code: "Application Code"
 n_Class: "Class object"

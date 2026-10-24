@@ -349,7 +349,48 @@ protected void doDispatch(HttpServletRequest request,
 
 Flow đầy đủ hơn:
 
-```d2 interactive title="DispatcherServlet: chọn handler và kiểm tra preHandle"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="DispatcherServlet: chọn handler và kiểm tra preHandle" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: continue
+#     label: "preHandle cho phép"
+#     steps:
+#       - edge: "(f -> ds)[0]"
+#         description: "Filter chain → DispatcherServlet: service(request, response)"
+#       - edge: "(ds -> ds)[0]"
+#         description: "DispatcherServlet → DispatcherServlet: checkMultipart()"
+#       - edge: "(ds -> hm)[0]"
+#         description: "DispatcherServlet → HandlerMapping: getHandler(request)"
+#       - edge: "(hm -> ds)[0]"
+#         description: "HandlerMapping → DispatcherServlet: HandlerExecutionChain"
+#       - edge: "(ds -> ha)[0]"
+#         description: "DispatcherServlet → HandlerAdapter: supports(handler)?"
+#       - edge: "(ds -> hi)[1]"
+#         description: "Các interceptor cho phép tiếp tục; chuyển sang sơ đồ invoke controller bên dưới."
+#   - id: stop
+#     label: "preHandle từ chối"
+#     steps:
+#       - edge: "(f -> ds)[0]"
+#         description: "Filter chain → DispatcherServlet: service(request, response)"
+#       - edge: "(ds -> ds)[0]"
+#         description: "DispatcherServlet → DispatcherServlet: checkMultipart()"
+#       - edge: "(ds -> hm)[0]"
+#         description: "DispatcherServlet → HandlerMapping: getHandler(request)"
+#       - edge: "(hm -> ds)[0]"
+#         description: "HandlerMapping → DispatcherServlet: HandlerExecutionChain"
+#       - edge: "(ds -> ha)[0]"
+#         description: "DispatcherServlet → HandlerAdapter: supports(handler)?"
+#       - edge: "(ds -> hi)[1]"
+#         description: "DispatcherServlet → HandlerInterceptors: preHandle() theo thứ tự"
+#       - edge: "(hi -> ds)[0]"
+#         description: "HandlerInterceptors → DispatcherServlet: dừng chain; không invoke controller"
+#       - edge: "(ds -> hi)[0]"
+#         description: "DispatcherServlet → HandlerInterceptors: afterCompletion cho interceptor đã preHandle thành công"
+#       - edge: "(ds -> f)[0]"
+#         description: "DispatcherServlet → Filter chain: response"
+# @endflow
 shape: sequence_diagram
 f: "Filter chain"
 ds: DispatcherServlet
@@ -369,9 +410,52 @@ stop: "Nếu preHandle trả false" {
 }
 ```
 
+Kịch bản cho phép dừng ở preHandle; các bước invoke controller nằm ở sơ đồ kế tiếp. Kịch bản từ chối chỉ chạy afterCompletion cho interceptor đã preHandle thành công.
+
 Nếu tất cả `preHandle` cho phép tiếp tục, DispatcherServlet dùng HandlerAdapter gọi controller. Hai nhánh return/exception dưới đây loại trừ nhau; `postHandle` chỉ chạy khi handler thành công, không chạy khi controller ném exception. Body `@ResponseBody` có thể đã được MessageConverter ghi trong HandlerAdapter; render view chỉ cần khi có ModelAndView.
 
-```d2 interactive title="DispatcherServlet: kết quả controller và nhánh exception"
+```d2 title="DispatcherServlet: kết quả controller và nhánh exception" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: success
+#     label: "Controller trả kết quả"
+#     steps:
+#       - edge: "(ds -> ha)[0]"
+#         description: "DispatcherServlet → HandlerAdapter: handle(request, response, handler)"
+#       - edge: "(ha -> c)[0]"
+#         description: "HandlerAdapter → Controller: invoke controller method"
+#       - edge: "(c -> ha)[0]"
+#         description: "Controller → HandlerAdapter: return value"
+#       - edge: "(ha -> ds)[0]"
+#         description: "HandlerAdapter → DispatcherServlet: ModelAndView hoặc response đã ghi"
+#       - edge: "(ds -> hi)[0]"
+#         description: "DispatcherServlet → HandlerInterceptors: postHandle() theo thứ tự ngược"
+#       - edge: "(ds -> v)[0]"
+#         description: "DispatcherServlet → View / MessageConverter: render view nếu cần / body đã được converter ghi"
+#       - edge: "(ds -> hi)[1]"
+#         description: "DispatcherServlet → HandlerInterceptors: afterCompletion() theo thứ tự ngược"
+#       - edge: "(ds -> f)[0]"
+#         description: "DispatcherServlet → Filter chain: response"
+#   - id: exception
+#     label: "Controller ném exception"
+#     steps:
+#       - edge: "(ds -> ha)[0]"
+#         description: "DispatcherServlet → HandlerAdapter: handle(request, response, handler)"
+#       - edge: "(ha -> c)[0]"
+#         description: "HandlerAdapter → Controller: invoke controller method"
+#       - edge: "(c -> ds)[0]"
+#         description: "Controller → DispatcherServlet: exception qua HandlerAdapter"
+#       - edge: "(ds -> er)[0]"
+#         description: "DispatcherServlet → ExceptionResolver: resolveException()"
+#       - edge: "(er -> ds)[0]"
+#         description: "ExceptionResolver → DispatcherServlet: ModelAndView / ghi response"
+#       - edge: "(ds -> v)[0]"
+#         description: "DispatcherServlet → View / MessageConverter: render view nếu cần / body đã được converter ghi"
+#       - edge: "(ds -> hi)[1]"
+#         description: "DispatcherServlet → HandlerInterceptors: afterCompletion() theo thứ tự ngược"
+#       - edge: "(ds -> f)[0]"
+#         description: "DispatcherServlet → Filter chain: response"
+# @endflow
 shape: sequence_diagram
 ds: DispatcherServlet
 ha: HandlerAdapter
@@ -780,7 +864,27 @@ Callable<ReportResponse> report() {
 
 Flow đơn giản:
 
-```d2 title="13. Async MVC: dispatch không luôn kết thúc trên một thread"
+```d2 title="13. Async MVC: dispatch không luôn kết thúc trên một thread" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(n_T1 -> n_DS)[0]"
+#         description: "Servlet Thread 1 → DispatcherServlet: GET /api/report"
+#       - edge: "(n_DS -> n_E)[0]"
+#         description: "DispatcherServlet → Async Task Executor: submit Callable"
+#       - edge: "(n_DS -> n_T1)[0]"
+#         description: "DispatcherServlet → Servlet Thread 1: startAsync(), giải phóng servlet thread"
+#       - edge: "(n_E -> n_T2)[0]"
+#         description: "Async Task Executor → Worker Thread: chạy Callable"
+#       - edge: "(n_T2 -> n_DS)[0]"
+#         description: "Worker Thread → DispatcherServlet: async dispatch với result"
+#       - edge: "(n_DS -> n_DS)[0]"
+#         description: "DispatcherServlet → DispatcherServlet: xử lý return value / render response"
+#       - edge: "(n_DS -> n_C)[0]"
+#         description: "DispatcherServlet → Client: HTTP response"
+# @endflow
 shape: sequence_diagram
 n_T1: "Servlet Thread 1"
 n_DS: "DispatcherServlet"

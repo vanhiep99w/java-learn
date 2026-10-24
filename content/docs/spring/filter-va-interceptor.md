@@ -44,7 +44,23 @@ description: "Phân biệt Servlet Filter, Spring MVC HandlerInterceptor và AOP
 
 Trong ứng dụng Spring MVC chạy trên Tomcat, Jetty hoặc Undertow, HTTP request đi vào **Servlet container** trước. Container chạy Servlet `Filter` chain. Sau đó request đến `DispatcherServlet`, Spring MVC chọn controller handler phù hợp và chạy `HandlerInterceptor` chain.
 
-```d2 interactive title="Filter và Security trước MVC"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Filter và Security trước MVC" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(c -> sc)[0]"
+#         description: "Client → Servlet Container: HTTP request"
+#       - edge: "(sc -> f)[0]"
+#         description: "Servlet Container → Servlet Filters: doFilter()"
+#       - edge: "(f -> ss)[0]"
+#         description: "Servlet Filters → Spring Security filters: DelegatingFilterProxy → FilterChainProxy"
+#       - edge: "(ss -> ds)[0]"
+#         description: "Spring Security filters → DispatcherServlet: chain.doFilter()"
+# @endflow
 shape: sequence_diagram
 c: Client
 sc: "Servlet Container"
@@ -60,7 +76,38 @@ ss -> ds: "chain.doFilter()"
 
 Sau khi Security cho phép request tới MVC, hai nhánh dưới đây phân biệt handler trả kết quả với handler ném exception. Đường response sau MVC quay ngược filter chain; interceptor không thay thế filter.
 
-```d2 interactive title="MVC: callback thành công hoặc exception"
+```d2 title="MVC: callback thành công hoặc exception" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: success
+#     label: "Handler trả kết quả"
+#     steps:
+#       - edge: "(ds -> hi)[3]"
+#         description: "DispatcherServlet → HandlerInterceptors: preHandle()"
+#       - edge: "(ds -> h)[0]"
+#         description: "DispatcherServlet → Controller / Handler: invoke handler qua HandlerAdapter"
+#       - edge: "(h -> ds)[0]"
+#         description: "Controller / Handler → DispatcherServlet: ModelAndView / response body"
+#       - edge: "(ds -> hi)[0]"
+#         description: "DispatcherServlet → HandlerInterceptors: postHandle()"
+#       - edge: "(ds -> hi)[1]"
+#         description: "DispatcherServlet → HandlerInterceptors: afterCompletion() sau render"
+#   - id: exception
+#     label: "Handler ném exception"
+#     steps:
+#       - edge: "(ds -> hi)[3]"
+#         description: "DispatcherServlet → HandlerInterceptors: preHandle()"
+#       - edge: "(ds -> h)[0]"
+#         description: "DispatcherServlet → Controller / Handler: invoke handler qua HandlerAdapter"
+#       - edge: "(h -> ds)[1]"
+#         description: "Controller / Handler → DispatcherServlet: exception"
+#       - edge: "(ds -> e)[0]"
+#         description: "DispatcherServlet → Exception Resolver: resolveException()"
+#       - edge: "(e -> ds)[0]"
+#         description: "Exception Resolver → DispatcherServlet: error response / ModelAndView nếu resolve được"
+#       - edge: "(ds -> hi)[2]"
+#         description: "DispatcherServlet → HandlerInterceptors: afterCompletion(exception nếu chưa resolve)"
+# @endflow
 shape: sequence_diagram
 ds: DispatcherServlet
 hi: HandlerInterceptors
@@ -83,7 +130,19 @@ fail: "Handler ném exception (nhánh thay thế)" {
 
 `preHandle=false` dừng trước handler; chỉ interceptor đã hoàn tất preHandle thành công được gọi afterCompletion. Với exception đã resolve, afterCompletion thường nhận `null`; lỗi chưa resolve propagate ra container.
 
-```d2 title="HTTP response quay ngược filter chain"
+```d2 title="HTTP response quay ngược filter chain" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(ds -> f)[0]"
+#         description: "DispatcherServlet → Servlet Filters (gồm Spring Security filters): response quay ngược filter chain"
+#       - edge: "(f -> sc)[0]"
+#         description: "Servlet Filters (gồm Spring Security filters) → Servlet Container: HTTP response"
+#       - edge: "(sc -> c)[0]"
+#         description: "Servlet Container → Client: HTTP response"
+# @endflow
 shape: sequence_diagram
 ds: DispatcherServlet
 f: "Servlet Filters (gồm Spring Security filters)"
@@ -123,7 +182,29 @@ Nó được Servlet container gọi. Vì là chuẩn Servlet, cùng một filte
 
 Mỗi filter nhận `FilterChain`. Gọi `chain.doFilter(request, response)` để chuyển request tới filter tiếp theo. Khi filter cuối hoàn thành, container gọi servlet đích — trong Spring MVC thường là `DispatcherServlet`.
 
-```d2 title="Request đi xuống, response quay ngược"
+```d2 title="Request đi xuống, response quay ngược" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(client -> a)[0]"
+#         description: "Client → Filter A: Request đi xuống"
+#       - edge: "(a -> b)[0]"
+#         description: "Tiếp tục tại Filter B."
+#       - edge: "(b -> ds)[0]"
+#         description: "Tiếp tục tại DispatcherServlet."
+#       - edge: "(ds -> controller)[0]"
+#         description: "Tiếp tục tại Controller."
+#       - edge: "(controller -> ds)[0]"
+#         description: "Controller → DispatcherServlet: Response quay ngược"
+#       - edge: "(ds -> b)[0]"
+#         description: "Tiếp tục tại Filter B."
+#       - edge: "(b -> a)[0]"
+#         description: "Tiếp tục tại Filter A."
+#       - edge: "(a -> client)[0]"
+#         description: "Tiếp tục tại Client."
+# @endflow
 shape: sequence_diagram
 client: Client
 a: "Filter A"
