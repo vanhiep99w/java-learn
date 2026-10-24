@@ -17,7 +17,7 @@ Tài liệu học Java tiếng Việt — Java Core, JVM, Collections, Concurren
 ## Stack
 
 - Next.js 16 + Fumadocs + Cloudflare Pages (static export).
-- `@vanhiep99w/docs-kit@0.9.0` pin chính xác từ npm: D2 render lúc build, learning fences và Source Explorer lazy-load.
+- `@vanhiep99w/docs-kit@0.12.0` pin chính xác từ npm: D2 render lúc build, learning fences và Source Explorer lazy-load.
 - Node.js **22 trở lên**. Không cần D2 CLI, Go hoặc Java để build website.
 
 ## Development

@@ -107,7 +107,12 @@ try {
       if (['spring/dispatcher-servlet', 'jpa-hibernate/transactions-with-jpa', 'jvm/garbage-collection'].includes(route)) {
         const caption = route === 'spring/dispatcher-servlet' ? 'DispatcherServlet: kết quả controller và nhánh exception'
           : route === 'jpa-hibernate/transactions-with-jpa' ? 'JPA: flush, commit hoặc rollback' : 'Young GC copy: đổi vai trò survivor spaces';
-        await figures.filter({ hasText: caption }).screenshot({ path: resolve(artifacts, `${route.split('/').at(-1)}-${width}-${colorScheme}.png`) });
+        // The SSR figure is replaced when the lazy viewer hydrates. Wait for
+        // that boundary before taking a screenshot of the stable outer wrapper.
+        const interactive = page.locator('.d2-interactive').filter({ hasText: caption });
+        const visual = await interactive.count() ? interactive : figures.filter({ hasText: caption });
+        if (await interactive.count()) await expect(interactive.locator('.d2-viewer')).toBeVisible();
+        await visual.screenshot({ path: resolve(artifacts, `${route.split('/').at(-1)}-${width}-${colorScheme}.png`) });
       }
       checks.push({ route, width, colorScheme, javascript: true });
     }
